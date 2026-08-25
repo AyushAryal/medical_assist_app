@@ -329,6 +329,12 @@ Around the interpreter chain sit four conversational stages, all coded logic:
 
 ### The model contract
 
+Across all three tasks the model chooses among structured options rather than
+producing free text: a question from the published bank, a section number for
+a sentence. Only patient-facing rewording generates prose, and it is the one
+task that carries a caveat instead of a gate.
+
+
 `ModelInterpreter` (last in the chain, active only when a model is installed)
 is a **translator, never an author**: the model receives the redacted request
 plus the published question bank and returns *a sentence* — the nearest known

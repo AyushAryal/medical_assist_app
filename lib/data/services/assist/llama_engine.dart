@@ -205,16 +205,25 @@ class LlamaEngine implements LanguageModelEngine {
   }
 
   @override
-  Future<LanguageModelDraft> structureDictation(String transcript) async {
-    final answer = await _complete(
-      'Sort the clinician\'s dictated sentences into the four SOAP sections. '
-      'Use every sentence exactly once, word for word. Add nothing, '
-      'summarise nothing, diagnose nothing. Reply in exactly this format:\n'
-      'SUBJECTIVE:\n...\nOBJECTIVE:\n...\nASSESSMENT:\n...\nPLAN:\n...',
-      transcript,
-      maxTokens: 512,
+  Future<String?> assignSentencesToSections(
+    List<String> numberedSentences,
+  ) async {
+    if (numberedSentences.isEmpty) return null;
+    return _complete(
+      'You file a clinician\'s sentences into a SOAP note. For each numbered '
+      'sentence, decide which section it belongs to:\n'
+      'SUBJECTIVE — what the patient reports, their history and symptoms.\n'
+      'OBJECTIVE — what the clinician observed, examined or measured.\n'
+      'ASSESSMENT — the clinician\'s interpretation or diagnosis.\n'
+      'PLAN — treatment, prescriptions, referrals, follow-up, advice.\n\n'
+      'Reply with ONLY these four lines, listing sentence numbers:\n'
+      'SUBJECTIVE: 1, 4\nOBJECTIVE: 2\nASSESSMENT: 3\nPLAN:\n\n'
+      'Never write out a sentence. Never invent a number. Leave a section '
+      'empty if nothing belongs there. Use each number at most once.',
+      numberedSentences.join('\n'),
+      // Four short lines of digits. Room for a stray preamble, not for prose.
+      maxTokens: 96,
     );
-    return _draft(answer ?? transcript, sections: _soap(answer));
   }
 
   @override
@@ -228,31 +237,8 @@ class LlamaEngine implements LanguageModelEngine {
     return _draft(answer ?? plan);
   }
 
-  LanguageModelDraft _draft(String text, {Map<String, String>? sections}) =>
-      LanguageModelDraft(
-        text: text,
-        engineName: name,
-        sections: sections ?? const <String, String>{},
-      );
-
-  static Map<String, String> _soap(String? answer) {
-    if (answer == null) return const <String, String>{};
-    final sections = <String, String>{};
-    final pattern = RegExp(
-      r'(SUBJECTIVE|OBJECTIVE|ASSESSMENT|PLAN):\s*',
-      caseSensitive: false,
-    );
-    final matches = pattern.allMatches(answer).toList();
-    for (var i = 0; i < matches.length; i++) {
-      final end =
-          i + 1 < matches.length ? matches[i + 1].start : answer.length;
-      final body = answer.substring(matches[i].end, end).trim();
-      if (body.isNotEmpty) {
-        sections[matches[i].group(1)!.toLowerCase()] = body;
-      }
-    }
-    return sections;
-  }
+  LanguageModelDraft _draft(String text) =>
+      LanguageModelDraft(text: text, engineName: name);
 
   @override
   Future<void> dispose() async {

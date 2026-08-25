@@ -573,12 +573,26 @@ is not in `canonicalContent()`, so the signature covers the four sections and
 nothing else. Signing clears it and warns first, with a word count, so
 dictation nobody sorted cannot silently fail to reach the chart.
 
-- **Sort into S·O·A·P.** With a model active, one button distributes the
-  working notes across the four sections. The gate is mechanical and
-  absolute: every word must be a word the clinician said (a new drug name, a
-  new number, a new "not" are corruption wearing tidiness), and dropping more
-  than a third refuses the whole draft — checked in `note_drafting.dart`
-  before anything is shown.
+- **Sort into S·O·A·P** works on every device, with or without a model. The
+  app's own rules (`note_sectioniser.dart`) classify each sentence by
+  clinical wording — "on examination" introduces an objective finding in
+  every clinic in the world, and recognising that needs a word list, not a
+  model. A model, when installed, only places the sentences the rules could
+  not, and it does so **by choosing sentence numbers**: it is shown the
+  clinician's sentences numbered, replies `SUBJECTIVE: 1, 4`, and the
+  sections are assembled from the *original* sentences by index.
+
+  That makes invention structurally impossible rather than merely detected.
+  The detection version shipped first and failed immediately on a real
+  model, which turned "likely viral URI" (an assessment) into "has a history
+  of viral URI" and a paracetamol prescription into "seeking advice on
+  paracetamol" — both plausible, neither said. A model that replies with
+  prose now parses to no numbers and changes nothing; the rules keep what
+  they placed and take the credit in the review header.
+
+  A sentence nothing can place is left in the working notes and listed on
+  the review screen, because a sentence in the wrong section is worse than
+  one still waiting.
 - **The review screen** replaced a sheet that applied everything at once and
   announced it in a snackbar that disappeared. Each section shows what is
   already there and what would be added, generated text tinted in the accent

@@ -1,3 +1,4 @@
+import '../../../clinical/insights/note_sectioniser.dart';
 import 'language_model.dart';
 
 /// Why a draft was refused, in words a clinician can act on.
@@ -10,14 +11,31 @@ class DraftRefused implements Exception {
   String toString() => reason;
 }
 
-/// A dictation sorted into SOAP sections, gated and ready to preview.
+/// A dictation sorted into SOAP sections, ready to preview.
 class SoapDraft {
-  const SoapDraft({required this.sections, required this.engineName});
+  const SoapDraft({
+    required this.sections,
+    required this.engineName,
+    required this.placed,
+    required this.unplaced,
+  });
 
-  /// Section key (`subjective`…`plan`) to sorted text. Only non-empty
-  /// sections appear.
+  /// Section key (`subjective`…`plan`) to text, assembled from the
+  /// clinician's own sentences. Only non-empty sections appear.
   final Map<String, String> sections;
+
+  /// Who did the sorting, for the review screen to say.
   final String engineName;
+
+  /// How many sentences found a home.
+  final int placed;
+
+  /// The sentences nothing could place, left for the clinician. They stay in
+  /// the working notes rather than being guessed at — a sentence in the wrong
+  /// section is worse than a sentence still waiting.
+  final List<String> unplaced;
+
+  bool get isEmpty => sections.isEmpty;
 }
 
 /// A plan reworded for the patient, ready to preview.
@@ -28,21 +46,25 @@ class InstructionsDraft {
   final String engineName;
 }
 
-/// The model's two note-drafting tasks, behind deterministic gates.
+/// Who sorted a note, when the app is asked to say so.
+const String rulesEngineName = 'the note rules';
+
+/// Sorts dictation into SOAP sections.
 ///
-/// The model proposes; this class decides whether the proposal is even
-/// allowed on screen. The distinction matters most for [sortIntoSoap]: its
-/// contract is *sorting* — every sentence the clinician said, in the box it
-/// belongs in, and nothing else — and a small model will sometimes summarise,
-/// "correct", or invent instead. Those failures look plausible, which is
-/// exactly why a human preview is not enough on its own; the gate checks the
-/// property mechanically, word by word, before a clinician is ever shown the
-/// draft.
+/// **The model never writes a word here.** It is shown the clinician's
+/// sentences, numbered, and asked which section each number belongs to; the
+/// sections are then assembled from the *original* sentences by index. That
+/// makes invention structurally impossible rather than merely detected —
+/// which matters, because the detection version of this shipped first and a
+/// small model failed it immediately, turning "likely viral URI" (an
+/// assessment) into "has a history of viral URI" and a paracetamol
+/// prescription into "seeking advice on paracetamol". Both read plausibly.
+/// Neither is what the clinician said.
 ///
-/// The rewording task cannot be gated the same way — new words are the point
-/// — so it gets weaker mechanical checks and carries its caveat into the UI
-/// instead. That asymmetry is deliberate and worth keeping visible: what can
-/// be verified is verified; what cannot is labelled.
+/// The app's own rules ([NoteSectioniser]) run first and always. The model,
+/// when installed, only decides the sentences the rules left unplaced — so
+/// the feature works on every device, and installing a model makes it reach
+/// further rather than making it exist.
 abstract final class NoteDrafting {
   static const List<String> sectionKeys = <String>[
     'subjective',
@@ -51,55 +73,124 @@ abstract final class NoteDrafting {
     'plan',
   ];
 
-  /// Sorts dictated prose into SOAP sections, or refuses with the reason.
-  static Future<SoapDraft> sortIntoSoap(
+  /// The rules-only sort. Always available, no model required.
+  static SoapDraft sortByRules(String text) {
+    final sorted = NoteSectioniser.sort(text);
+    return _assemble(sorted, engineName: rulesEngineName);
+  }
+
+  /// The rules, then the model on whatever they could not place.
+  ///
+  /// Falls back to the rules-only result on any model failure — a sort that
+  /// half-works is worth more than a refusal, because the review screen shows
+  /// exactly what it did and nothing is applied without a tap.
+  static Future<SoapDraft> sortWithModel(
     LanguageModelEngine engine,
     String text,
   ) async {
-    final source = text.trim();
-    if (source.isEmpty) {
-      throw const DraftRefused('There is nothing to sort yet.');
+    final sorted = NoteSectioniser.sort(text);
+    final undecided = sorted.where((s) => s.section == null).toList();
+    if (undecided.isEmpty) {
+      return _assemble(sorted, engineName: rulesEngineName);
     }
 
-    final draft = await engine.structureDictation(source);
-    final sections = <String, String>{
-      for (final key in sectionKeys)
-        if ((draft.sections[key] ?? '').trim().isNotEmpty)
-          key: draft.sections[key]!.trim(),
-    };
-    if (sections.isEmpty) {
-      throw const DraftRefused(
-        'The model could not read that into sections. Nothing was changed.',
-      );
+    final assignments = await _askModel(engine, undecided);
+    if (assignments.isEmpty) {
+      return _assemble(sorted, engineName: rulesEngineName);
     }
 
-    final sourceTokens = _tokens(source);
-    final draftTokens = _tokens(sections.values.join(' '));
+    final merged = <SectionedSentence>[
+      for (final sentence in sorted)
+        if (sentence.section == null && assignments[sentence.index] != null)
+          (
+            index: sentence.index,
+            text: sentence.text,
+            section: assignments[sentence.index],
+            confidence: 1,
+          )
+        else
+          sentence,
+    ];
 
-    // Invention check: every word in the draft must be a word the clinician
-    // said. A sorted note contains no new vocabulary — a new drug name, a new
-    // number, a new "not" are all corruption wearing tidiness.
-    final invented = draftTokens.difference(sourceTokens);
-    if (invented.isNotEmpty) {
-      throw DraftRefused(
-        'The model changed the words rather than sorting them '
-        '(added: ${invented.take(3).join(', ')}). Nothing was changed.',
-      );
-    }
-
-    // Loss check: sorting must not quietly shorten the record. Some loss of
-    // filler is tolerable; losing a third of the content words is not.
-    final kept = sourceTokens.intersection(draftTokens).length;
-    if (kept < sourceTokens.length * 0.7) {
-      throw const DraftRefused(
-        'The model dropped too much of what was said. Nothing was changed.',
-      );
-    }
-
-    return SoapDraft(sections: sections, engineName: draft.engineName);
+    return _assemble(
+      merged,
+      engineName: '${engine.name} with $rulesEngineName',
+    );
   }
 
-  /// Rewords a plan as instructions a patient can follow, or refuses.
+  /// Asks the model which section each unplaced sentence belongs to.
+  ///
+  /// The reply is parsed as numbers and nothing else; anything the model says
+  /// that is not a recognised `SECTION: n, n` line is discarded, and a number
+  /// outside the range of sentences offered is discarded too. The worst a
+  /// confused model can do is place a sentence oddly — which the review
+  /// screen shows, section by section, before anything is applied.
+  static Future<Map<int, NoteSection>> _askModel(
+    LanguageModelEngine engine,
+    List<SectionedSentence> undecided,
+  ) async {
+    final numbered = <int, SectionedSentence>{
+      for (var i = 0; i < undecided.length; i++) i + 1: undecided[i],
+    };
+
+    final answer = await engine.assignSentencesToSections(
+      <String>[
+        for (final entry in numbered.entries) '${entry.key}. ${entry.value.text}',
+      ],
+    );
+    if (answer == null) return const <int, NoteSection>{};
+
+    final out = <int, NoteSection>{};
+    for (final line in answer.split(RegExp(r'[\n;]+'))) {
+      final match = RegExp(
+        r'\b(subjective|objective|assessment|plan)\b\s*[:\-]?\s*([\d,\s]+)',
+        caseSensitive: false,
+      ).firstMatch(line);
+      if (match == null) continue;
+
+      final section = NoteSection.values
+          .firstWhere((s) => s.name == match.group(1)!.toLowerCase());
+      for (final digits in match.group(2)!.split(RegExp(r'[^\d]+'))) {
+        final number = int.tryParse(digits);
+        final sentence = number == null ? null : numbered[number];
+        // One sentence, one section: a later claim on the same number is
+        // ignored rather than allowed to move it.
+        if (sentence != null && !out.containsKey(sentence.index)) {
+          out[sentence.index] = section;
+        }
+      }
+    }
+    return out;
+  }
+
+  /// Builds the sections from the original sentences, in the order spoken.
+  static SoapDraft _assemble(
+    List<SectionedSentence> sorted, {
+    required String engineName,
+  }) {
+    final grouped = <NoteSection, List<String>>{};
+    final unplaced = <String>[];
+    for (final sentence in sorted) {
+      if (sentence.section case final section?) {
+        (grouped[section] ??= <String>[]).add(sentence.text);
+      } else {
+        unplaced.add(sentence.text);
+      }
+    }
+
+    return SoapDraft(
+      sections: <String, String>{
+        for (final section in NoteSection.values)
+          if (grouped[section] case final lines?)
+            section.key: lines.join(' '),
+      },
+      engineName: engineName,
+      placed: sorted.length - unplaced.length,
+      unplaced: unplaced,
+    );
+  }
+
+/// Rewords a plan as instructions a patient can follow, or refuses.
   static Future<InstructionsDraft> patientInstructions(
     LanguageModelEngine engine,
     String plan,

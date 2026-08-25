@@ -162,6 +162,44 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
               SizedBox(height: m.spaceMd),
             ],
 
+            if (widget.draft.unplaced.isNotEmpty) ...<Widget>[
+              SectionCard(
+                title: 'Staying in your working notes',
+                subtitle:
+                    '${widget.draft.unplaced.length} sentence'
+                        '${widget.draft.unplaced.length == 1 ? '' : 's'} '
+                        'nothing could place',
+                leading: Icon(
+                  Icons.help_outline,
+                  size: 20,
+                  color: context.palette.onSurfaceMuted,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    for (final sentence in widget.draft.unplaced)
+                      Padding(
+                        padding: EdgeInsets.only(bottom: m.spaceXs),
+                        child: Text(
+                          '· $sentence',
+                          style: context.texts.bodySmall,
+                        ),
+                      ),
+                    SizedBox(height: m.spaceXs),
+                    Text(
+                      'These are left where they are rather than guessed at. '
+                      'A sentence in the wrong section is worse than one '
+                      'still waiting.',
+                      style: context.texts.labelSmall?.copyWith(
+                        color: context.palette.onSurfaceMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: m.spaceMd),
+            ],
+
             if (_proposals.isEmpty)
               const EmptyState(
                 icon: Icons.inbox_outlined,
@@ -212,9 +250,9 @@ class _Preamble extends StatelessWidget {
               ),
               SizedBox(height: m.spaceXs),
               Text(
-                'Your words, rearranged — the sort was refused unless every '
-                'word came from what you said. Keep the sections you agree '
-                'with; nothing changes until you apply.',
+                'Your sentences, filed — never reworded. Each one below is '
+                'exactly what you dictated. Keep the sections you agree with; '
+                'nothing changes until you apply.',
                 style: context.texts.bodySmall,
               ),
             ],

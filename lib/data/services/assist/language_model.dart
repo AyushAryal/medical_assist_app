@@ -30,14 +30,20 @@ abstract interface class LanguageModelEngine {
 
   Future<bool> isReady();
 
-  /// Reshapes dictated prose into the four SOAP sections.
-  ///
-  /// The task is *sorting sentences the clinician said into the right boxes* —
-  /// nothing may be added, and nothing may be summarised away.
-  Future<LanguageModelDraft> structureDictation(String transcript);
-
   /// Rewrites a plan as instructions a patient can follow at home.
   Future<LanguageModelDraft> plainLanguageInstructions(String plan);
+
+  /// Says which SOAP section each numbered sentence belongs to.
+  ///
+  /// Classification, not generation — the reply is expected to be section
+  /// names and numbers, and the caller assembles the note from its *own*
+  /// sentences by index. That is what makes it impossible for a model to
+  /// change a word of a clinical note here, rather than merely detectable.
+  ///
+  /// Returns the raw reply for the caller to parse, or null when the model
+  /// could not answer; a null is not an error, it is the rules keeping the
+  /// sentences they already placed.
+  Future<String?> assignSentencesToSections(List<String> numberedSentences);
 
   /// Rewrites a free-form request as one of the question forms the coded
   /// interpreters answer, or returns null when none fits.

@@ -941,15 +941,29 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// box, have it distributed, and be left with the remainder — so what did
   /// *not* get sorted stays visible rather than being silently dropped.
   Future<void> _sortWorkingNotes() async {
+    // No model is not a blocker: the app's own rules sort the common
+    // wordings, and a model only reaches further.
     final engine = context.read<AppBootstrap>().assistEngine;
     final messenger = ScaffoldMessenger.of(context);
-    if (engine == null || _drafting) return;
+    if (_drafting) return;
 
     final source = _working.text.trim();
     setState(() => _drafting = true);
     try {
-      final draft = await NoteDrafting.sortIntoSoap(engine, source);
+      final draft = engine == null
+          ? NoteDrafting.sortByRules(source)
+          : await NoteDrafting.sortWithModel(engine, source);
       if (!mounted) return;
+
+      if (draft.isEmpty) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Nothing in there matched a section. Try full '
+                'sentences — "on examination…", "likely…", "review in a week".'),
+          ),
+        );
+        return;
+      }
 
       final accepted = await DraftReviewScreen.show(
         context,
@@ -975,9 +989,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         }
         // Only what was accepted leaves the working notes. A discarded
         // section's words stay in the box, because they still have not been
-        // recorded anywhere.
-        final kept = accepted.values.join(' ');
-        _working.text = _remainderOf(source, kept);
+        // recorded anywhere — and so does anything nothing could place.
+        _working.text = _remainderOf(source, accepted.values.join(' '));
       });
       _onChanged();
       _offerUndo(
@@ -1702,29 +1715,30 @@ class _WorkingNotesCard extends StatelessWidget {
               ),
               if (hasText) ...<Widget>[
                 SizedBox(height: m.spaceSm),
-                if (hasModel)
-                  AiGlowBorder(
-                    active: isDrafting,
-                    borderRadius: BorderRadius.circular(m.radiusSm),
-                    child: FilledButton.tonalIcon(
-                      onPressed: isDrafting ? null : onSort,
-                      icon: isDrafting
-                          ? const AiSparkleIcon(size: 18)
-                          : const Icon(Icons.auto_awesome_outlined, size: 18),
-                      label: Text(
-                        isDrafting
-                            ? 'Sorting…'
-                            : 'Sort into S · O · A · P',
-                      ),
+                AiGlowBorder(
+                  active: isDrafting,
+                  borderRadius: BorderRadius.circular(m.radiusSm),
+                  child: FilledButton.tonalIcon(
+                    onPressed: isDrafting ? null : onSort,
+                    icon: isDrafting
+                        ? const AiSparkleIcon(size: 18)
+                        : const Icon(Icons.auto_awesome_outlined, size: 18),
+                    label: Text(
+                      isDrafting ? 'Sorting…' : 'Sort into S · O · A · P',
                     ),
-                  )
-                else
-                  Text(
-                    'Install an assistant model in Settings › On-device AI to '
-                    'have this sorted into the four sections for you.',
-                    style: context.texts.labelSmall
-                        ?.copyWith(color: palette.onSurfaceMuted),
                   ),
+                ),
+                SizedBox(height: m.spaceXs),
+                Text(
+                  hasModel
+                      ? 'Sorted by the note rules first; the model places '
+                          'whatever they cannot. Nothing is reworded.'
+                      : 'Sorted by the note rules — "on examination", '
+                          '"likely", "review in a week". An assistant model '
+                          'in Settings › On-device AI places the rest.',
+                  style: context.texts.labelSmall
+                      ?.copyWith(color: palette.onSurfaceMuted),
+                ),
               ],
             ],
           ),

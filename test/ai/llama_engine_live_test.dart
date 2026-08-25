@@ -14,7 +14,9 @@ import 'package:medical_app/ai/interpreters/pattern_interpreter.dart';
 import 'package:medical_app/ai/interpreters/rank_interpreter.dart';
 import 'package:medical_app/ai/preprocess.dart';
 import 'package:medical_app/ai/provenance.dart';
+import 'package:medical_app/clinical/insights/note_sectioniser.dart';
 import 'package:medical_app/data/services/assist/llama_engine.dart';
+import 'package:medical_app/data/services/assist/note_drafting.dart';
 
 /// Real inference through the real shim, on the host.
 ///
@@ -103,6 +105,49 @@ void main() {
       // NONE → null is the honest outcome; a bank question would also be
       // "safe" but this asserts the model actually read the instruction.
       expect(rewrite, isNull, reason: 'got: "$rewrite"');
+    },
+    skip: available ? false : 'set CLINICAL_LLM_LIB and CLINICAL_LLM_MODEL',
+    timeout: const Timeout(Duration(minutes: 5)),
+  );
+
+  // The reported failure, against a real model: a dictated consultation that
+  // the previous design refused every time. The property asserted is the one
+  // that makes the redesign worth it — whatever the model replies, every word
+  // in every section is a word the clinician actually said.
+  test(
+    'a real model files sentences without changing a word of them',
+    () async {
+      final engine = LlamaEngine(
+        modelPath: modelPath!,
+        modelName: 'qwen2.5-0.5b-test',
+        libraryPath: libraryPath,
+        threads: Platform.numberOfProcessors,
+      );
+      addTearDown(engine.dispose);
+
+      const transcript = 'Patient reports three days of cough and fever. '
+          'Chest clear on auscultation, temperature 37.9. '
+          'Likely viral upper respiratory infection. '
+          'Paracetamol for fever, review in one week. '
+          'Mother asks whether he can go back to school.';
+
+      final draft = await NoteDrafting.sortWithModel(engine, transcript);
+
+      expect(draft.isEmpty, isFalse, reason: 'nothing was sorted at all');
+      for (final section in draft.sections.values) {
+        for (final sentence in NoteSectioniser.sentences(section)) {
+          expect(transcript, contains(sentence),
+              reason: '"$sentence" was never dictated');
+        }
+      }
+      // And nothing is lost: every sentence is either filed or still waiting.
+      final filed = draft.sections.values
+          .expand(NoteSectioniser.sentences)
+          .length;
+      expect(
+        filed + draft.unplaced.length,
+        NoteSectioniser.sentences(transcript).length,
+      );
     },
     skip: available ? false : 'set CLINICAL_LLM_LIB and CLINICAL_LLM_MODEL',
     timeout: const Timeout(Duration(minutes: 5)),

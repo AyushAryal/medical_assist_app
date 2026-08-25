@@ -4,10 +4,14 @@ import 'package:medical_app/data/services/assist/language_model.dart';
 /// point: tests about the *system's* handling of model output need the bad
 /// cases on demand, and a real model would only make them flaky.
 class ScriptedModel implements LanguageModelEngine {
-  ScriptedModel({this.rewrite, this.soap, this.instructions});
+  ScriptedModel({this.rewrite, this.assignment, this.instructions});
 
   final String? rewrite;
-  final Map<String, String>? soap;
+
+  /// The raw reply to a sentence-assignment request, e.g.
+  /// `'SUBJECTIVE: 1\nPLAN: 2'`.
+  final String? assignment;
+
   final String? instructions;
 
   List<String>? sawVocabulary;
@@ -33,13 +37,11 @@ class ScriptedModel implements LanguageModelEngine {
   }
 
   @override
-  Future<LanguageModelDraft> structureDictation(String transcript) async {
-    sawText = transcript;
-    return LanguageModelDraft(
-      text: transcript,
-      engineName: name,
-      sections: soap ?? const <String, String>{},
-    );
+  Future<String?> assignSentencesToSections(
+    List<String> numberedSentences,
+  ) async {
+    sawText = numberedSentences.join('\n');
+    return assignment;
   }
 
   @override
