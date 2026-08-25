@@ -107,6 +107,11 @@ class AppBootstrap extends ChangeNotifier {
   /// Whether an assistant model is installed and live.
   bool get assistModelActive => _assistEngine != null;
 
+  /// The live engine, for the features that draft with it (note sorting,
+  /// patient instructions). Null when no model is installed — every caller
+  /// must work without it, because on most devices it will be.
+  LanguageModelEngine? get assistEngine => _assistEngine;
+
   /// Re-reads which assistant model is installed and rebuilds the engine.
   ///
   /// Called at unlock and after every install, switch or removal in Settings.

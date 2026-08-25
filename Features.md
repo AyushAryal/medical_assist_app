@@ -560,6 +560,28 @@ Two things keep it from becoming noise, and both are tested:
   "father takes warfarin" is dismissed at a glance. A bare name on a secondary
   list would be worse than no list, because it would be believed.
 
+### 1.10bf The model in the note editor — *Built*
+
+The installed model's other two tasks, both in the note editor, both gated:
+
+- **Sort into S·O·A·P.** A dictated consultation lands in Subjective as one
+  block; with a model active, a button sorts it into the four sections. The
+  gate is mechanical and absolute: every word of the draft must be a word the
+  clinician said (a new drug name, a new number, a new "not" are corruption
+  wearing tidiness), and dropping more than a third of the content refuses
+  the whole draft — checked in code (`note_drafting.dart`), before the
+  preview, which is itself accepted or discarded as a whole. Other sections
+  are appended to, never overwritten: text a person placed is not the
+  model's to rearrange.
+- **Explain for the patient.** Rewords the plan as instructions a patient can
+  follow. Rewording cannot be gated word-by-word — new words are the point —
+  so it gets the weaker mechanical checks (an echo is refused, an essay four
+  times the plan is refused as invention) and carries its caveat and badge
+  into the preview, with copy or append-under-the-plan as the only exits.
+
+Both buttons exist only while a model is installed; the note editor is
+unchanged without one.
+
 ### 1.11 A small language model — *Interface only, deliberately*
 
 `LanguageModelEngine` in `data/services/assist/` defines the seam and ships no

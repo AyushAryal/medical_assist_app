@@ -22,6 +22,8 @@ import '../attachments/attachment_strip.dart';
 import '../attachments/field_attach_bar.dart';
 import 'amend_note_sheet.dart';
 import 'dictation_sheet.dart';
+import 'model_draft_sheets.dart';
+import '../../data/services/assist/note_drafting.dart';
 import 'template_picker_sheet.dart';
 
 /// The SOAP note editor.
@@ -80,6 +82,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   /// The recording currently being turned into text, if any.
   String? _transcribingId;
+
+  /// True while the on-device model is drafting. One flag for both tasks: a
+  /// 1B model answers in seconds, and two overlapping inferences on tablet
+  /// CPUs would starve each other.
+  bool _drafting = false;
 
   /// The pending "you can undo that" message, and the timer that retires it.
   ///
@@ -817,6 +824,119 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     return 'subjective';
   }
 
+  /// Sorts everything typed or dictated into Subjective across the four
+  /// sections, via the on-device model, gated and previewed.
+  ///
+  /// Reads from Subjective only, on purpose: it is where the toolbar
+  /// microphone lands whole consultations, which is exactly the pile this
+  /// exists to sort. Text already placed in other sections was placed by a
+  /// person and is not the model's to rearrange.
+  Future<void> _sortIntoSections() async {
+    final engine = context.read<AppBootstrap>().assistEngine;
+    final messenger = ScaffoldMessenger.of(context);
+    if (engine == null || _drafting) return;
+
+    setState(() => _drafting = true);
+    try {
+      final draft =
+          await NoteDrafting.sortIntoSoap(engine, _subjective.text);
+      if (!mounted) return;
+      final accepted = await SoapSortSheet.show(context, draft);
+      if (!accepted || !mounted) return;
+
+      _markUndoPoint();
+      setState(() {
+        // Subjective is replaced by its own sorted remainder; the other
+        // sections receive their pieces *appended*, never overwriting what a
+        // person already wrote there.
+        _subjective.text = draft.sections['subjective'] ?? '';
+        for (final key in <String>['objective', 'assessment', 'plan']) {
+          final piece = draft.sections[key];
+          if (piece == null) continue;
+          final existing = _fields[key]!.text.trimRight();
+          _fields[key]!.text =
+              existing.isEmpty ? piece : '$existing\n$piece';
+        }
+      });
+      _onChanged();
+      _offerUndo('Sorted into sections. Check each one before signing.');
+    } on DraftRefused catch (refusal) {
+      messenger.showSnackBar(SnackBar(content: Text(refusal.reason)));
+    } finally {
+      if (mounted) setState(() => _drafting = false);
+    }
+  }
+
+  /// Rewords the plan as instructions for the patient, via the model.
+  Future<void> _explainForPatient() async {
+    final engine = context.read<AppBootstrap>().assistEngine;
+    final messenger = ScaffoldMessenger.of(context);
+    if (engine == null || _drafting) return;
+
+    setState(() => _drafting = true);
+    try {
+      final draft =
+          await NoteDrafting.patientInstructions(engine, _plan.text);
+      if (!mounted) return;
+      final action = await PatientInstructionsSheet.show(context, draft);
+      if (!mounted) return;
+
+      switch (action) {
+        case InstructionsAction.appended:
+          _markUndoPoint();
+          setState(() {
+            _plan.text = '${_plan.text.trimRight()}\n\n'
+                'For the patient:\n${draft.text}';
+          });
+          _onChanged();
+          _offerUndo('Instructions added under the plan. Read them as the '
+              'patient will.');
+        case InstructionsAction.copied:
+          messenger.showSnackBar(
+            const SnackBar(content: Text('Copied. Generated text — check it '
+                'against the plan before sharing.')),
+          );
+        case InstructionsAction.dismissed:
+          break;
+      }
+    } on DraftRefused catch (refusal) {
+      messenger.showSnackBar(SnackBar(content: Text(refusal.reason)));
+    } finally {
+      if (mounted) setState(() => _drafting = false);
+    }
+  }
+
+  /// The model-drafting action under a section, or null where none applies.
+  Widget? _aiActionFor(String key, bool isLocked) {
+    if (isLocked) return null;
+    final bootstrap = context.watch<AppBootstrap>();
+    if (!bootstrap.assistModelActive) return null;
+
+    final (label, onPressed) = switch (key) {
+      'subjective' => (
+          'Sort into S · O · A · P',
+          _subjective.text.trim().isEmpty ? null : _sortIntoSections,
+        ),
+      'plan' => (
+          'Explain for the patient',
+          _plan.text.trim().isEmpty ? null : _explainForPatient,
+        ),
+      _ => (null, null),
+    };
+    if (label == null) return null;
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        onPressed: _drafting ? null : onPressed,
+        icon: _drafting
+            ? const AiSparkleIcon(size: 16)
+            : const Icon(Icons.auto_awesome_outlined, size: 16),
+        label: Text(_drafting ? 'Working…' : label),
+      ),
+    );
+  }
+
   Widget _soapField(String key, bool isLocked) {
     final label = _fieldLabels[key]!;
     return Padding(
@@ -848,6 +968,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           durationMs: durationMs,
         ),
         onDeleteAttachment: _removeAttachment,
+        aiAction: _aiActionFor(key, isLocked),
       ),
     );
   }
@@ -874,6 +995,7 @@ class _SoapField extends StatelessWidget {
     required this.onDictate,
     required this.onTranscribe,
     required this.transcribingId,
+    this.aiAction,
   });
 
   final String letter;
@@ -893,6 +1015,11 @@ class _SoapField extends StatelessWidget {
   final VoidCallback onDictate;
   final void Function(Attachment)? onTranscribe;
   final String? transcribingId;
+
+  /// A model-drafting action for this section — sort, reword — or null when
+  /// no model is installed or the section has none. Rendered under the text
+  /// so the field itself stays what it is everywhere else in the app.
+  final Widget? aiAction;
 
   @override
   Widget build(BuildContext context) {
@@ -941,6 +1068,7 @@ class _SoapField extends StatelessWidget {
               contentPadding: EdgeInsets.zero,
             ),
           ),
+          ?aiAction,
           // Evidence sits under the text it belongs to, playable and viewable
           // in place — never filed away on a separate screen.
           AttachmentStrip(

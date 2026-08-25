@@ -5,7 +5,6 @@ import '../../../clinical/insights/trend_analysis.dart';
 import '../../models/appointment.dart';
 import '../../models/patient.dart';
 import '../../models/vitals_record.dart';
-import 'language_model.dart';
 
 /// One entry point for everything the app works out on its own.
 ///
@@ -14,16 +13,13 @@ import 'language_model.dart';
 /// makes it instant, free, identical on every device, and explainable to the
 /// clinician who is being asked to act on it.
 ///
-/// [languageModel] is the optional seam for a small on-device model. Every
-/// method here works with it absent, and on most devices it will be.
+/// The optional on-device model deliberately does **not** live here: its
+/// three tasks each have a dedicated owner — question rewriting in
+/// `ai/interpreters/model_interpreter.dart`, note drafting in
+/// `note_drafting.dart` — each with its own gate. A general-purpose handle on
+/// a language model is exactly the affordance that grows ungated uses.
 class AssistService {
-  AssistService({this.languageModel});
-
-  /// Null unless an on-device model has been installed and enabled. Nothing in
-  /// this class requires it.
-  final LanguageModelEngine? languageModel;
-
-  bool get hasLanguageModel => languageModel != null;
+  AssistService();
 
   // ---------------------------------------------------------------------------
   // Registration

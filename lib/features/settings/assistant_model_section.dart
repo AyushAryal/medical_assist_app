@@ -128,12 +128,14 @@ class _AssistantModelSectionState extends State<AssistantModelSection> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           Text(
-            'Adds a translator for questions the built-in matching cannot '
-            'phrase-match: wording it does not recognise is rewritten into '
-            'one of the supported questions, and the same tested matcher '
-            'runs the rewrite. The model never sees the register, never '
-            'leaves this device, and cannot answer anything by itself — a '
-            'rewrite the matcher refuses goes nowhere.',
+            'Three jobs, all rewording. Assistant questions the built-in '
+            'matching cannot phrase-match are translated into supported '
+            'ones, and the same tested matcher runs the translation. In the '
+            'note editor it can sort a dictation into S·O·A·P — refused '
+            'outright if it changes a single word — and reword a plan as '
+            'patient instructions, always previewed and badged. The model '
+            'never sees the register, never leaves this device, and cannot '
+            'write anything into a record by itself.',
             style: context.texts.bodySmall,
           ),
           SizedBox(height: m.spaceMd),
