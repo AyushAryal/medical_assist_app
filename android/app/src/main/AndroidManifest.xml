@@ -1,0 +1,81 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Dictation into clinical note fields. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <!-- Clinical photography (wounds, rashes, ECG strips, documents). -->
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <!-- Fingerprint / face unlock, with the PIN as the mandatory fallback. -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
+
+    <!-- Downloading the on-device speech-recognition model, and nothing else.
+         No patient data is ever transmitted; see Features.md §3b.
+
+         This is the one permission that weakens a guarantee the rest of the app
+         works hard to keep, so it is worth being precise about what it costs.
+         Without this line the release APK *provably* cannot open a socket,
+         which is a property an auditor can verify from the manifest alone
+         rather than having to trust the code. With it, they have to read the
+         code instead.
+
+         Deployments that want the stronger, checkable guarantee should delete
+         this line. The model can still be installed: push it to
+           /sdcard/Android/data/<package>/files/speech_models/<model-id>/
+         (no root and no permission needed for either side), or load the files
+         through Settings › Dictation › Load from a file. Both paths are
+         first-class and neither touches the network. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- No patient data may leave the device via OS backup. All three
+         attributes are needed: allowBackup=false covers legacy adb backup,
+         fullBackupContent=false covers auto-backup on API 23-30, and
+         dataExtractionRules covers Android 12+ cloud backup and
+         device-to-device transfer. -->
+    <application
+        android:label="Clinical Records"
+        android:name="${applicationName}"
+        android:icon="@mipmap/launcher_icon"
+        android:supportsRtl="true"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <!-- Specifies an Android theme to apply to this Activity as soon as
+                 the Android process has started. This theme is visible to the user
+                 while the Flutter UI initializes. After that, this theme continues
+                 to determine the Window background behind the Flutter UI. -->
+            <meta-data
+              android:name="io.flutter.embedding.android.NormalTheme"
+              android:resource="@style/NormalTheme"
+              />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+        <!-- Don't delete the meta-data below.
+             This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+    </application>
+    <!-- Required to query activities that can process text, see:
+         https://developer.android.com/training/package-visibility and
+         https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
+
+         In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT"/>
+            <data android:mimeType="text/plain"/>
+        </intent>
+    </queries>
+</manifest>
