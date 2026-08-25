@@ -48,3 +48,4 @@ app.*.map.json
 # ~100 MB of binary weights that a repository has no business carrying.
 /.speech-models/
 .native/
+native/llm_shim/build-*/
