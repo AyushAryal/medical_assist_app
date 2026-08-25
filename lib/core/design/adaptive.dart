@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart' show kAppNavigationBarHeight;
 import '../theme/theme_scope.dart';
 
 /// How much horizontal room the window actually has.
@@ -28,10 +29,10 @@ enum Breakpoint {
 
   /// Sensible column count for a flow of independent cards.
   int get contentColumns => switch (this) {
-        Breakpoint.compact => 1,
-        Breakpoint.medium => 2,
-        Breakpoint.expanded => 2,
-      };
+    Breakpoint.compact => 1,
+    Breakpoint.medium => 2,
+    Breakpoint.expanded => 2,
+  };
 }
 
 extension BreakpointX on BuildContext {
@@ -54,6 +55,29 @@ extension BreakpointX on BuildContext {
   /// most of the screen.
   bool get isShortLandscape =>
       isLandscape && MediaQuery.sizeOf(this).height < 620;
+
+  /// How much vertical space [AppShell]'s compact bottom navigation bar
+  /// actually occupies, for content that runs underneath it.
+  ///
+  /// The compact shell uses `Scaffold(extendBody: true)` so its glass-blur
+  /// bar has body content to sample through — which means the [Scaffold]
+  /// does *not* auto-inset the body, and every scrollable behind the bar
+  /// must reserve this space itself rather than relying on the framework.
+  ///
+  /// The figure is the bar's themed content height ([kAppNavigationBarHeight])
+  /// plus the device's own bottom inset, because [NavigationBar] wraps
+  /// itself in a [SafeArea] and grows to clear the home indicator or gesture
+  /// bar on top of that configured height. That inset is 0 on some Android
+  /// devices, ~34 on an iPhone with a home indicator, and something else
+  /// again on a foldable or an iPad — hence reading it from [MediaQuery]
+  /// rather than hardcoding it.
+  ///
+  /// Zero on medium/expanded breakpoints: those use a side rail instead of a
+  /// bottom bar, so content never sits underneath anything there.
+  double get bottomBarClearance {
+    if (!breakpoint.isCompact) return 0;
+    return kAppNavigationBarHeight + MediaQuery.paddingOf(this).bottom;
+  }
 }
 
 /// A list beside the thing it opens.
@@ -97,16 +121,15 @@ class TwoPane extends StatelessWidget {
     // Flex first, then clamped: a 2:3 split of a very wide window gives the
     // list more room than a list needs, and a narrow expanded window would
     // otherwise squeeze it below usability.
-    final masterWidth = (width * masterFlex / (masterFlex + detailFlex))
-        .clamp(minMasterWidth, maxMasterWidth);
+    final masterWidth = (width * masterFlex / (masterFlex + detailFlex)).clamp(
+      minMasterWidth,
+      maxMasterWidth,
+    );
 
     return Row(
       children: <Widget>[
         SizedBox(width: masterWidth, child: master),
-        Container(
-          width: m.hairline,
-          color: palette.outline,
-        ),
+        Container(width: m.hairline, color: palette.outline),
         Expanded(child: Builder(builder: detail)),
       ],
     );
@@ -194,7 +217,8 @@ class SplitColumns extends StatelessWidget {
     final m = context.metrics;
     final gap = spacing ?? m.spaceLg;
     final breakpoint = context.breakpoint;
-    final split = breakpoint == Breakpoint.expanded ||
+    final split =
+        breakpoint == Breakpoint.expanded ||
         (force && breakpoint == Breakpoint.medium);
 
     if (!split) {

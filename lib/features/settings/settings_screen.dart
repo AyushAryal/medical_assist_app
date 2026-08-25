@@ -52,9 +52,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final enabled = await lock.isBiometricEnabled();
     final types = await lock.availableBiometrics();
     final pending = await repository.pendingSyncCount();
-    final demo = kDebugMode
-        ? await DemoDataSeeder(repository).count()
-        : 0;
+    final demo = kDebugMode ? await DemoDataSeeder(repository).count() : 0;
 
     if (!mounted) return;
     setState(() {
@@ -74,8 +72,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return 'Biometric unlock';
   }
 
-  Future<void> _runDemoAction(Future<int> Function(DemoDataSeeder) action,
-      String Function(int) describe) async {
+  Future<void> _runDemoAction(
+    Future<int> Function(DemoDataSeeder) action,
+    String Function(int) describe,
+  ) async {
     if (_demoBusy) return;
     setState(() => _demoBusy = true);
 
@@ -89,7 +89,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await _load();
     } on Object catch (error) {
       if (!mounted) return;
-      messenger.showSnackBar(SnackBar(content: Text('Demo data failed: $error')));
+      messenger.showSnackBar(
+        SnackBar(content: Text('Demo data failed: $error')),
+      );
     } finally {
       if (mounted) setState(() => _demoBusy = false);
     }
@@ -132,7 +134,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             m.spaceLg,
             m.spaceLg,
             m.spaceLg,
-            m.space2xl * 2,
+            m.spaceLg + context.bottomBarClearance,
           ),
           children: <Widget>[
             SectionCard(
@@ -219,8 +221,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     title: const Text('Access log'),
-                    subtitle:
-                        const Text('Who opened which record, and when'),
+                    subtitle: const Text('Who opened which record, and when'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => context.push(Routes.auditLog),
                   ),
@@ -231,7 +232,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             SectionCard(
               title: 'Assistant and dictation',
-              subtitle: 'Recording, silence trimming, speech recognition and '
+              subtitle:
+                  'Recording, silence trimming, speech recognition and '
                   'the assistant bubble',
               leading: const Icon(Icons.mic_none_outlined, size: 20),
               child: Column(
@@ -240,9 +242,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     value: context.watch<AppBootstrap>().assistantEnabled,
-                    onChanged: (value) => context
-                        .read<AppBootstrap>()
-                        .setAssistantEnabled(value),
+                    onChanged: (value) =>
+                        context.read<AppBootstrap>().setAssistantEnabled(value),
                     title: const Text('Assistant bubble'),
                     subtitle: const Text(
                       'A floating button on every screen for asking about the '
@@ -255,7 +256,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     subtitle: Text(
                       context.watch<AppBootstrap>().canTranscribe
                           ? 'On device — '
-                              '${context.read<AppBootstrap>().transcription.name}'
+                                '${context.read<AppBootstrap>().transcription.name}'
                           : 'Not set up — dictation is saved as audio only',
                     ),
                     trailing: const Icon(Icons.chevron_right),
@@ -279,7 +280,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             SectionCard(
               title: 'Appearance',
-              subtitle: 'Colours and spacing come from '
+              subtitle:
+                  'Colours and spacing come from '
                   'assets/theme/clinical.json',
               leading: const Icon(Icons.palette_outlined, size: 20),
               child: ChoiceChipRow<ThemeMode>(
@@ -380,9 +382,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             onPressed: _demoBusy
                                 ? null
                                 : () => _runDemoAction(
-                                      (s) => s.seed(),
-                                      (n) => 'Added $n demo patients.',
-                                    ),
+                                    (s) => s.seed(),
+                                    (n) => 'Added $n demo patients.',
+                                  ),
                             icon: const Icon(Icons.add_chart),
                             label: const Text('Load'),
                           ),

@@ -126,20 +126,32 @@ class AppointmentTile extends StatelessWidget {
                       style: context.texts.bodySmall,
                     ),
                     if (waitEstimate case final estimate?)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
+                      // Wrap rather than Row: the AI badge and info dot are
+                      // fixed-width and on a narrow tile there isn't room for
+                      // them plus the estimate text on one line. Wrapping
+                      // the badge onto a second line keeps the full "~Nm"
+                      // readable instead of squeezing it down to one or two
+                      // ellipsized characters.
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: m.spaceXs,
+                        runSpacing: m.spaceXs / 2,
                         children: <Widget>[
-                          Icon(
-                            Icons.hourglass_empty,
-                            size: 12,
-                            color: palette.onSurfaceMuted,
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: <Widget>[
+                              Icon(
+                                Icons.hourglass_empty,
+                                size: 12,
+                                color: palette.onSurfaceMuted,
+                              ),
+                              SizedBox(width: m.spaceXs / 2),
+                              Text(
+                                '~${estimate.wait.inMinutes}m',
+                                style: context.texts.labelSmall,
+                              ),
+                            ],
                           ),
-                          SizedBox(width: m.spaceXs / 2),
-                          Text(
-                            'about ${estimate.wait.inMinutes} min',
-                            style: context.texts.labelSmall,
-                          ),
-                          SizedBox(width: m.spaceXs / 2),
                           const AiBadge(label: 'Estimate', dense: true),
                           InfoDot(
                             explanation:

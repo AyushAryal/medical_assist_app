@@ -107,7 +107,8 @@ class _PatientListScreenState extends State<PatientListScreen> {
             ? const DetailPanePlaceholder(
                 icon: Icons.folder_shared_outlined,
                 title: 'No patient selected',
-                message: 'Choose someone from the list to open their chart '
+                message:
+                    'Choose someone from the list to open their chart '
                     'here, without losing your place.',
               )
             // Keyed so switching patients rebuilds the chart's controller
@@ -124,73 +125,72 @@ class _PatientListScreenState extends State<PatientListScreen> {
     final m = context.metrics;
 
     return ContentWidth(
-        child: Column(
-          children: <Widget>[
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                m.spaceLg,
-                m.spaceMd,
-                m.spaceLg,
-                m.spaceSm,
-              ),
-              child: TextField(
-                controller: _query,
-                onChanged: _onQueryChanged,
-                textInputAction: TextInputAction.search,
-                autocorrect: false,
-                decoration: InputDecoration(
-                  hintText: 'Name, MRN or phone',
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: _query.text.isEmpty
-                      ? null
-                      : IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            _query.clear();
-                            _search('');
-                          },
-                        ),
-                ),
+      child: Column(
+        children: <Widget>[
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              m.spaceLg,
+              m.spaceMd,
+              m.spaceLg,
+              m.spaceSm,
+            ),
+            child: TextField(
+              controller: _query,
+              onChanged: _onQueryChanged,
+              textInputAction: TextInputAction.search,
+              autocorrect: false,
+              decoration: InputDecoration(
+                hintText: 'Name, MRN or phone',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _query.text.isEmpty
+                    ? null
+                    : IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _query.clear();
+                          _search('');
+                        },
+                      ),
               ),
             ),
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _results.isEmpty
-                      ? EmptyState(
-                          icon: Icons.person_search_outlined,
-                          title: _query.text.isEmpty
-                              ? 'No patients registered'
-                              : 'No match for "${_query.text}"',
-                          message: _query.text.isEmpty
-                              ? 'Register the first patient to get started.'
-                              : 'Check the spelling, or register a new patient.',
-                          actionLabel: 'Register patient',
-                          onAction: () async {
-                            await context.push(Routes.patientNew);
-                            if (mounted) _search(_query.text);
-                          },
-                        )
-                      : ListView.separated(
-                          padding: EdgeInsets.fromLTRB(
-                            m.spaceLg,
-                            0,
-                            m.spaceLg,
-                            m.space2xl * 2,
-                          ),
-                          itemCount: _results.length,
-                          separatorBuilder: (_, _) =>
-                              SizedBox(height: m.spaceSm),
-                          itemBuilder: (context, index) => _PatientTile(
-                            patient: _results[index],
-                            isSelected: _results[index].id == _selectedId,
-                            onTap: () => _open(_results[index]),
-                          ),
-                        ),
-            ),
-          ],
-        ),
-      );
+          ),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _results.isEmpty
+                ? EmptyState(
+                    icon: Icons.person_search_outlined,
+                    title: _query.text.isEmpty
+                        ? 'No patients registered'
+                        : 'No match for "${_query.text}"',
+                    message: _query.text.isEmpty
+                        ? 'Register the first patient to get started.'
+                        : 'Check the spelling, or register a new patient.',
+                    actionLabel: 'Register patient',
+                    onAction: () async {
+                      await context.push(Routes.patientNew);
+                      if (mounted) _search(_query.text);
+                    },
+                  )
+                : ListView.separated(
+                    padding: EdgeInsets.fromLTRB(
+                      m.spaceLg,
+                      0,
+                      m.spaceLg,
+                      m.spaceLg + context.bottomBarClearance,
+                    ),
+                    itemCount: _results.length,
+                    separatorBuilder: (_, _) => SizedBox(height: m.spaceSm),
+                    itemBuilder: (context, index) => _PatientTile(
+                      patient: _results[index],
+                      isSelected: _results[index].id == _selectedId,
+                      onTap: () => _open(_results[index]),
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

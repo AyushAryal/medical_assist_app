@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/routing/app_router.dart';
 import '../../core/design/design.dart';
 
 /// Top-level navigation frame.
@@ -23,52 +22,39 @@ import '../../core/design/design.dart';
 /// landscape tablet has room for the product to identify itself and a phone
 /// does not.
 class AppShell extends StatelessWidget {
-  const AppShell({super.key, required this.location, required this.child});
-
-  final String location;
-  final Widget child;
-
+  const AppShell({super.key, required this.navigationShell});
+  final StatefulNavigationShell navigationShell;
   static const List<_Destination> _destinations = <_Destination>[
     _Destination(
-      route: Routes.dashboard,
       label: 'Today',
       icon: Icons.today_outlined,
       selectedIcon: Icons.today,
     ),
     _Destination(
-      route: Routes.schedule,
       label: 'Schedule',
       icon: Icons.event_outlined,
       selectedIcon: Icons.event,
     ),
     _Destination(
-      route: Routes.patients,
       label: 'Patients',
       icon: Icons.people_outline,
       selectedIcon: Icons.people,
     ),
     _Destination(
-      route: Routes.ask,
       label: 'Ask',
       icon: Icons.travel_explore_outlined,
       selectedIcon: Icons.travel_explore,
     ),
     _Destination(
-      route: Routes.settings,
       label: 'Settings',
       icon: Icons.settings_outlined,
       selectedIcon: Icons.settings,
     ),
   ];
 
-  int get _selectedIndex {
-    final index = _destinations.indexWhere((d) => d.route == location);
-    return index < 0 ? 0 : index;
-  }
-
-  void _onSelect(BuildContext context, int index) {
-    final destination = _destinations[index].route;
-    if (destination != location) context.go(destination);
+  void _onSelect(int index) {
+    if (index == navigationShell.currentIndex) return;
+    navigationShell.goBranch(index);
   }
 
   @override
@@ -86,13 +72,12 @@ class AppShell extends StatelessWidget {
             GlassChrome(
               child: NavigationRail(
                 backgroundColor: Colors.transparent,
-                selectedIndex: _selectedIndex,
-                onDestinationSelected: (index) => _onSelect(context, index),
+                selectedIndex: navigationShell.currentIndex,
+                onDestinationSelected: _onSelect,
                 // An extended rail shows its own labels, and asking for
                 // `all` as well throws.
                 extended: extended,
-                labelType:
-                    extended ? null : NavigationRailLabelType.all,
+                labelType: extended ? null : NavigationRailLabelType.all,
                 leading: extended
                     ? Padding(
                         padding: EdgeInsets.only(
@@ -128,48 +113,46 @@ class AppShell extends StatelessWidget {
                     .toList(),
               ),
             ),
-            Expanded(child: child),
+            Expanded(child: navigationShell),
           ],
         ),
       );
     }
 
     return Scaffold(
-        backgroundColor: Colors.transparent,
-        // Content runs under the bar so the blur has something to sample —
-        // the bar reads as a material rather than an opaque strip.
-        extendBody: true,
-        body: child,
-        bottomNavigationBar: GlassChrome(
-          topBorder: true,
-          child: NavigationBar(
-            backgroundColor: Colors.transparent,
-            selectedIndex: _selectedIndex,
-            onDestinationSelected: (index) => _onSelect(context, index),
-            destinations: _destinations
-                .map(
-                  (d) => NavigationDestination(
-                    icon: Icon(d.icon),
-                    selectedIcon: Icon(d.selectedIcon),
-                    label: d.label,
-                  ),
-                )
-                .toList(),
-          ),
+      backgroundColor: Colors.transparent,
+      // Content runs under the bar so the blur has something to sample —
+      // the bar reads as a material rather than an opaque strip.
+      extendBody: true,
+      body: navigationShell,
+      bottomNavigationBar: GlassChrome(
+        topBorder: true,
+        child: NavigationBar(
+          backgroundColor: Colors.transparent,
+          selectedIndex: navigationShell.currentIndex,
+          onDestinationSelected: _onSelect,
+          destinations: _destinations
+              .map(
+                (d) => NavigationDestination(
+                  icon: Icon(d.icon),
+                  selectedIcon: Icon(d.selectedIcon),
+                  label: d.label,
+                ),
+              )
+              .toList(),
         ),
+      ),
     );
   }
 }
 
 class _Destination {
   const _Destination({
-    required this.route,
     required this.label,
     required this.icon,
     required this.selectedIcon,
   });
 
-  final String route;
   final String label;
   final IconData icon;
   final IconData selectedIcon;

@@ -23,6 +23,7 @@ abstract final class Routes {
   static const String dashboard = '/';
   static const String schedule = '/schedule';
   static const String patients = '/patients';
+
   /// The assistant's full page.
   ///
   /// `/ask` rather than `/reports`: it stopped being a reports page when it
@@ -57,8 +58,6 @@ abstract final class Routes {
 abstract final class AppRouter {
   static final GlobalKey<NavigatorState> rootNavigatorKey =
       GlobalKey<NavigatorState>(debugLabel: 'root');
-  static final GlobalKey<NavigatorState> shellNavigatorKey =
-      GlobalKey<NavigatorState>(debugLabel: 'shell');
 
   /// The router this app is running, once built.
   ///
@@ -74,35 +73,62 @@ abstract final class AppRouter {
       navigatorKey: rootNavigatorKey,
       initialLocation: Routes.dashboard,
       routes: <RouteBase>[
-        ShellRoute(
-          navigatorKey: shellNavigatorKey,
-          builder: (context, state, child) =>
-              AppShell(location: state.uri.path, child: child),
-          routes: <RouteBase>[
-            GoRoute(
-              path: Routes.dashboard,
-              builder: (context, state) => const DashboardScreen(),
+        // A stateful shell rather than a plain ShellRoute: each destination
+        // is a branch with its own navigator, kept alive in an IndexedStack
+        // underneath. That's what makes switching tabs an instant, silent
+        // swap of already-built widgets — matching a native tab bar — instead
+        // of go_router's default push/pop page transition, which briefly
+        // showed the outgoing screen sliding out from under the incoming one.
+        // It also means each tab remembers its own scroll position and
+        // navigation stack when you switch away and back.
+        StatefulShellRoute.indexedStack(
+          builder: (context, state, navigationShell) =>
+              AppShell(navigationShell: navigationShell),
+          branches: <StatefulShellBranch>[
+            StatefulShellBranch(
+              routes: <RouteBase>[
+                GoRoute(
+                  path: Routes.dashboard,
+                  builder: (context, state) => const DashboardScreen(),
+                ),
+              ],
             ),
-            GoRoute(
-              path: Routes.schedule,
-              builder: (context, state) => const ScheduleScreen(),
+            StatefulShellBranch(
+              routes: <RouteBase>[
+                GoRoute(
+                  path: Routes.schedule,
+                  builder: (context, state) => const ScheduleScreen(),
+                ),
+              ],
             ),
-            GoRoute(
-              path: Routes.patients,
-              builder: (context, state) => const PatientListScreen(),
+            StatefulShellBranch(
+              routes: <RouteBase>[
+                GoRoute(
+                  path: Routes.patients,
+                  builder: (context, state) => const PatientListScreen(),
+                ),
+              ],
             ),
-            GoRoute(
-              path: Routes.ask,
-              // `q` lets the floating assistant hand a question straight to
-              // the full screen, so the bubble never has to render an answer
-              // in a space too small to show its filters honestly.
-              builder: (context, state) => AskScreen(
-                initialQuestion: state.uri.queryParameters['q'],
-              ),
+            StatefulShellBranch(
+              routes: <RouteBase>[
+                GoRoute(
+                  path: Routes.ask,
+                  // `q` lets the floating assistant hand a question straight
+                  // to the full screen, so the bubble never has to render an
+                  // answer in a space too small to show its filters honestly.
+                  builder: (context, state) => AskScreen(
+                    initialQuestion: state.uri.queryParameters['q'],
+                  ),
+                ),
+              ],
             ),
-            GoRoute(
-              path: Routes.settings,
-              builder: (context, state) => const SettingsScreen(),
+            StatefulShellBranch(
+              routes: <RouteBase>[
+                GoRoute(
+                  path: Routes.settings,
+                  builder: (context, state) => const SettingsScreen(),
+                ),
+              ],
             ),
           ],
         ),
@@ -117,16 +143,14 @@ abstract final class AppRouter {
         GoRoute(
           path: Routes.patientChart,
           parentNavigatorKey: rootNavigatorKey,
-          builder: (context, state) => PatientChartScreen(
-            patientId: state.pathParameters['patientId']!,
-          ),
+          builder: (context, state) =>
+              PatientChartScreen(patientId: state.pathParameters['patientId']!),
         ),
         GoRoute(
           path: Routes.patientEdit,
           parentNavigatorKey: rootNavigatorKey,
-          builder: (context, state) => PatientFormScreen(
-            patientId: state.pathParameters['patientId'],
-          ),
+          builder: (context, state) =>
+              PatientFormScreen(patientId: state.pathParameters['patientId']),
         ),
         GoRoute(
           path: Routes.vitalsEntry,

@@ -55,8 +55,21 @@ class AskComposer extends StatelessWidget {
     final m = context.metrics;
     final palette = context.palette;
 
+    // The keyboard already covers the bottom nav bar while it's up, so
+    // clearance is only needed in the composer's resting state — adding it
+    // unconditionally would push the composer away from the keyboard by the
+    // bar's height even while typing, which reads as a stray gap.
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final bottomPadding =
+        m.spaceMd + (keyboardOpen ? 0 : context.bottomBarClearance);
+
     return Padding(
-      padding: EdgeInsets.fromLTRB(m.spaceLg, m.spaceSm, m.spaceLg, m.spaceMd),
+      padding: EdgeInsets.fromLTRB(
+        m.spaceLg,
+        m.spaceSm,
+        m.spaceLg,
+        bottomPadding,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
@@ -167,13 +180,14 @@ class AskComposer extends StatelessWidget {
                             tooltip: canSpeak
                                 ? 'Ask by voice'
                                 : 'Install a speech model in Settings › '
-                                    'Dictation to ask by voice',
+                                      'Dictation to ask by voice',
                             icon: Icon(
                               Icons.mic_none_outlined,
                               color: canSpeak
                                   ? null
-                                  : palette.onSurfaceMuted
-                                      .withValues(alpha: 0.4),
+                                  : palette.onSurfaceMuted.withValues(
+                                      alpha: 0.4,
+                                    ),
                             ),
                             onPressed: canSpeak ? onStartListening : null,
                           ),
@@ -206,7 +220,8 @@ class AskComposer extends StatelessWidget {
 }
 
 class ListeningStrip extends StatelessWidget {
-  const ListeningStrip({super.key, 
+  const ListeningStrip({
+    super.key,
     required this.level,
     required this.onStop,
     required this.onCancel,

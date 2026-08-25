@@ -2,6 +2,13 @@ import 'package:flutter/material.dart';
 
 import 'theme_config.dart';
 
+/// The bottom [NavigationBar]'s content height, themed below instead of left
+/// at the Material 3 default (80). Shared as a constant because
+/// [BuildContext.bottomBarClearance] (core/design/adaptive.dart) needs the
+/// same number to work out how much space a screen must leave clear above
+/// the bar — keep the two in sync if this changes.
+const double kAppNavigationBarHeight = 68;
+
 /// Builds Flutter [ThemeData] purely from [ThemeConfig] tokens.
 ///
 /// The visual language: surfaces separated by soft shadow rather than hairline
@@ -115,8 +122,11 @@ abstract final class AppTheme {
         enabledBorder: _fieldBorder(m.radiusSm, Colors.transparent, 0),
         focusedBorder: _fieldBorder(m.radiusSm, p.primary, m.focusBorderWidth),
         errorBorder: _fieldBorder(m.radiusSm, p.critical, m.borderWidth),
-        focusedErrorBorder:
-            _fieldBorder(m.radiusSm, p.critical, m.focusBorderWidth),
+        focusedErrorBorder: _fieldBorder(
+          m.radiusSm,
+          p.critical,
+          m.focusBorderWidth,
+        ),
         disabledBorder: _fieldBorder(m.radiusSm, Colors.transparent, 0),
       ),
 
@@ -182,9 +192,7 @@ abstract final class AppTheme {
         showDragHandle: true,
         dragHandleColor: p.outlineStrong,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(
-            top: Radius.circular(m.radiusLg),
-          ),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(m.radiusLg)),
         ),
       ),
 
@@ -212,7 +220,7 @@ abstract final class AppTheme {
         surfaceTintColor: Colors.transparent,
         indicatorColor: p.primaryContainer,
         elevation: 0,
-        height: 68,
+        height: kAppNavigationBarHeight,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         labelTextStyle: WidgetStatePropertyAll(text.labelSmall),
       ),
@@ -224,8 +232,9 @@ abstract final class AppTheme {
         minWidth: 88,
         labelType: NavigationRailLabelType.all,
         selectedLabelTextStyle: text.labelSmall?.copyWith(color: p.primary),
-        unselectedLabelTextStyle:
-            text.labelSmall?.copyWith(color: p.onSurfaceMuted),
+        unselectedLabelTextStyle: text.labelSmall?.copyWith(
+          color: p.onSurfaceMuted,
+        ),
       ),
 
       segmentedButtonTheme: SegmentedButtonThemeData(
@@ -274,18 +283,27 @@ abstract final class AppTheme {
       Color? color,
       double? spacing,
       double? height,
-    }) =>
-        TextStyle(
-          fontSize: size,
-          fontWeight: weight,
-          height: height ?? t.baseHeight,
-          letterSpacing: spacing,
-          color: color ?? p.onSurface,
-        );
+    }) => TextStyle(
+      fontSize: size,
+      fontWeight: weight,
+      height: height ?? t.baseHeight,
+      letterSpacing: spacing,
+      color: color ?? p.onSurface,
+    );
 
     return TextTheme(
-      displaySmall: s(t.displaySize, FontWeight.w700, spacing: -0.8, height: 1.1),
-      headlineMedium: s(t.titleSize + 8, FontWeight.w700, spacing: -0.6, height: 1.12),
+      displaySmall: s(
+        t.displaySize,
+        FontWeight.w700,
+        spacing: -0.8,
+        height: 1.1,
+      ),
+      headlineMedium: s(
+        t.titleSize + 8,
+        FontWeight.w700,
+        spacing: -0.6,
+        height: 1.12,
+      ),
       headlineSmall: s(t.titleSize + 2, FontWeight.w600, height: 1.25),
       titleLarge: s(t.titleSize, FontWeight.w700, spacing: -0.4),
       titleMedium: s(t.sectionSize, FontWeight.w700, spacing: -0.2),
@@ -295,8 +313,12 @@ abstract final class AppTheme {
       bodySmall: s(t.labelSize, FontWeight.w400, color: p.onSurfaceMuted),
       labelLarge: s(t.labelSize + 1, FontWeight.w600),
       labelMedium: s(t.labelSize, FontWeight.w500),
-      labelSmall: s(t.captionSize, FontWeight.w600,
-          color: p.onSurfaceMuted, spacing: 0.3),
+      labelSmall: s(
+        t.captionSize,
+        FontWeight.w600,
+        color: p.onSurfaceMuted,
+        spacing: 0.3,
+      ),
     );
   }
 }

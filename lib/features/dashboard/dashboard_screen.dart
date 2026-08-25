@@ -60,7 +60,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _bookForPatient() async {
     final patientId = await _pickPatient();
     if (patientId == null || !mounted) return;
-    final patient = await context.read<ClinicalRepository>().patients.byId(patientId);
+    final patient = await context.read<ClinicalRepository>().patients.byId(
+      patientId,
+    );
     if (patient == null || !mounted) return;
     await BookAppointmentSheet.show(context, patient: patient);
     await _reload();
@@ -141,7 +143,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         m.spaceLg,
                         0,
                         m.spaceLg,
-                        m.space2xl * 2,
+                        m.spaceLg + context.bottomBarClearance,
                       ),
                       children: <Widget>[
                         SafeArea(
@@ -253,8 +255,11 @@ class _Header extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    Icon(Icons.location_on_outlined,
-                        size: 16, color: palette.primary),
+                    Icon(
+                      Icons.location_on_outlined,
+                      size: 16,
+                      color: palette.primary,
+                    ),
                     SizedBox(width: m.spaceXs + 2),
                     ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 200),
@@ -266,8 +271,11 @@ class _Header extends StatelessWidget {
                       ),
                     ),
                     SizedBox(width: m.spaceXs),
-                    Icon(Icons.unfold_more,
-                        size: 15, color: palette.onSurfaceMuted),
+                    Icon(
+                      Icons.unfold_more,
+                      size: 15,
+                      color: palette.onSurfaceMuted,
+                    ),
                   ],
                 ),
               ),
@@ -323,16 +331,20 @@ class _NextUpCard extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
                   Text(
-                    nothingBooked ? 'No clinic booked today' : 'Clinic list clear',
-                    style: context.texts.titleMedium
-                        ?.copyWith(color: palette.onPrimaryContainer),
+                    nothingBooked
+                        ? 'No clinic booked today'
+                        : 'Clinic list clear',
+                    style: context.texts.titleMedium?.copyWith(
+                      color: palette.onPrimaryContainer,
+                    ),
                   ),
                   Text(
                     nothingBooked
                         ? 'Book a visit, or see a walk-in straight from a chart.'
                         : 'Everyone booked for today has been seen.',
-                    style: context.texts.bodySmall
-                        ?.copyWith(color: palette.onPrimaryContainer),
+                    style: context.texts.bodySmall?.copyWith(
+                      color: palette.onPrimaryContainer,
+                    ),
                   ),
                 ],
               ),
@@ -368,8 +380,9 @@ class _NextUpCard extends StatelessWidget {
               const Spacer(),
               Text(
                 Fmt.time(appointment.scheduledAt),
-                style: context.texts.labelLarge
-                    ?.copyWith(color: palette.onHeroSurface),
+                style: context.texts.labelLarge?.copyWith(
+                  color: palette.onHeroSurface,
+                ),
               ),
             ],
           ),
@@ -378,8 +391,9 @@ class _NextUpCard extends StatelessWidget {
             next.patient.displayName,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: context.texts.headlineSmall
-                ?.copyWith(color: palette.onHeroSurface),
+            style: context.texts.headlineSmall?.copyWith(
+              color: palette.onHeroSurface,
+            ),
           ),
           Text(
             <String>[
@@ -430,7 +444,9 @@ class _NextUpCard extends StatelessWidget {
               IconButton.filledTonal(
                 tooltip: 'Open chart',
                 style: IconButton.styleFrom(
-                  backgroundColor: palette.onHeroSurface.withValues(alpha: 0.18),
+                  backgroundColor: palette.onHeroSurface.withValues(
+                    alpha: 0.18,
+                  ),
                   foregroundColor: palette.onPrimary,
                 ),
                 icon: const Icon(Icons.folder_open_outlined),
@@ -498,8 +514,7 @@ class _QuickActions extends StatelessWidget {
     final columns = switch (context.breakpoint) {
       Breakpoint.expanded => 6,
       Breakpoint.medium => 4,
-      Breakpoint.compact =>
-        MediaQuery.sizeOf(context).width < 400 ? 2 : 4,
+      Breakpoint.compact => MediaQuery.sizeOf(context).width < 400 ? 2 : 4,
     };
 
     return GridView.count(
@@ -510,8 +525,11 @@ class _QuickActions extends StatelessWidget {
       crossAxisSpacing: m.spaceSm,
       // Fixed height rather than an aspect ratio: the tile content is a fixed
       // stack of icon and label, so tying height to width overflows on narrow
-      // screens and leaves dead space on wide ones.
-      mainAxisExtent: 116,
+      // screens and leaves dead space on wide ones. 46px icon + spacing +
+      // up to 2 lines of label (labels like "Waiting room" wrap at these
+      // column widths) plus the tile's own vertical padding needs ~128px;
+      // 116 was too tight and clipped the second label line.
+      mainAxisExtent: 128,
       children: actions,
     );
   }
@@ -551,7 +569,8 @@ class _AtAGlance extends StatelessWidget {
                       : palette.normal,
                   explanation: MetricExplanation(
                     title: 'Unsigned notes',
-                    summary: 'Notes that have been started but not signed, '
+                    summary:
+                        'Notes that have been started but not signed, '
                         'across every patient and every day — not just today.',
                     method: const <String>[
                       'Every clinical note in the database is counted whose '
@@ -564,7 +583,8 @@ class _AtAGlance extends StatelessWidget {
                           'useful.',
                     ],
                     total: '${dashboard.draftNoteCount} unsigned',
-                    caveat: 'An empty note that was opened and abandoned '
+                    caveat:
+                        'An empty note that was opened and abandoned '
                         'counts here too. Opening it and signing or discarding '
                         'it is what clears it.',
                   ),
@@ -595,7 +615,8 @@ class _AtAGlance extends StatelessWidget {
                   tone: palette.accent,
                   explanation: MetricExplanation(
                     title: 'Observation sets today',
-                    summary: 'Sets of vital signs recorded today, across all '
+                    summary:
+                        'Sets of vital signs recorded today, across all '
                         'clinics.',
                     method: const <String>[
                       'Counts rows of recorded observations with today’s date.',
@@ -636,7 +657,8 @@ class _AtAGlance extends StatelessWidget {
                   InfoDot(
                     explanation: MetricExplanation(
                       title: 'Encounters per day',
-                      summary: 'How many encounters were started on each of '
+                      summary:
+                          'How many encounters were started on each of '
                           'the last seven days, oldest on the left.',
                       method: const <String>[
                         'Each bar counts encounters started on that calendar '
@@ -650,7 +672,8 @@ class _AtAGlance extends StatelessWidget {
                             'of them are T and two are S.',
                       ],
                       confidence: ExplainConfidence.measured,
-                      caveat: 'Seven days is enough to see whether this week '
+                      caveat:
+                          'Seven days is enough to see whether this week '
                           'is busier than usual. It is not enough to read a '
                           'trend from, and it is not analytics.',
                     ),
@@ -690,10 +713,7 @@ class _Stat extends StatelessWidget {
     final palette = context.palette;
 
     return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: m.spaceMd,
-        vertical: m.spaceSm,
-      ),
+      padding: EdgeInsets.symmetric(horizontal: m.spaceMd, vertical: m.spaceSm),
       decoration: BoxDecoration(
         color: palette.surfaceMuted,
         borderRadius: BorderRadius.circular(m.radiusSm),
@@ -799,14 +819,16 @@ class _NeedsAttention extends StatelessWidget {
                 Expanded(
                   child: Text(
                     'Needs a second look',
-                    style: context.texts.titleMedium
-                        ?.copyWith(color: palette.critical),
+                    style: context.texts.titleMedium?.copyWith(
+                      color: palette.critical,
+                    ),
                   ),
                 ),
                 InfoDot(
                   explanation: MetricExplanation(
                     title: 'Needs a second look',
-                    summary: 'Patients whose observations today produced an '
+                    summary:
+                        'Patients whose observations today produced an '
                         'elevated early warning score.',
                     method: const <String>[
                       'Only observation sets recorded today are considered.',
@@ -824,7 +846,8 @@ class _NeedsAttention extends StatelessWidget {
                     ],
                     confidence: ExplainConfidence.validated,
                     source: 'Royal College of Physicians, NEWS2 (2017)',
-                    caveat: 'Absence from this list is not reassurance. A '
+                    caveat:
+                        'Absence from this list is not reassurance. A '
                         'patient with no observations recorded today cannot '
                         'appear here, and neither can a child or a pregnant '
                         'patient however unwell they are.',
@@ -860,7 +883,8 @@ class _NeedsAttention extends StatelessWidget {
                 ),
                 trailing: StatusPill(
                   label: 'NEWS ${item.vitals.news2Score}',
-                  tone: News2Risk.values
+                  tone:
+                      News2Risk.values
                               .where((r) => r.name == item.vitals.news2Risk)
                               .firstOrNull ==
                           News2Risk.high
@@ -894,7 +918,8 @@ class _OpenWork extends StatelessWidget {
       padding: EdgeInsets.only(bottom: m.spaceLg),
       child: SectionCard(
         title: 'Unfinished charting',
-        subtitle: '${dashboard.openWork.length} encounter'
+        subtitle:
+            '${dashboard.openWork.length} encounter'
             '${dashboard.openWork.length == 1 ? '' : 's'} to complete',
         leading: const Icon(Icons.edit_note, size: 20),
         child: dashboard.openWork.isEmpty
@@ -909,7 +934,9 @@ class _OpenWork extends StatelessWidget {
                   return ListTile(
                     contentPadding: EdgeInsets.zero,
                     onTap: () async {
-                      await context.push(Routes.encounterFor(item.encounter.id));
+                      await context.push(
+                        Routes.encounterFor(item.encounter.id),
+                      );
                       await onChanged();
                     },
                     leading: PatientAvatar(
@@ -958,7 +985,8 @@ class _RecentPatients extends StatelessWidget {
         child: EmptyState(
           icon: Icons.person_add_alt,
           title: 'No patients yet',
-          message: 'Register a patient to begin, or load demo data from '
+          message:
+              'Register a patient to begin, or load demo data from '
               'Settings to explore the app.',
           actionLabel: 'Register patient',
           onAction: () => context.push(Routes.patientNew),

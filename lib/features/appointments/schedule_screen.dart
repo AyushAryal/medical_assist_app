@@ -141,8 +141,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       _day = switch (_scale) {
         CalendarScale.day => _day.add(Duration(days: units)),
         CalendarScale.week => _day.add(Duration(days: 7 * units)),
-        CalendarScale.month =>
-          DateTime(_day.year, _day.month + units, _day.day),
+        CalendarScale.month => DateTime(
+          _day.year,
+          _day.month + units,
+          _day.day,
+        ),
       };
     });
     _load();
@@ -151,55 +154,61 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   Future<void> _openActions(ScheduleRow row) async {
     final action = await showModalBottomSheet<String>(
       context: context,
+      isScrollControlled: true,
       showDragHandle: true,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.85,
+      ),
       builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            ListTile(
-              leading: PatientAvatar(
-                initials: row.patient.initials,
-                seed: row.patient.id,
-                radius: 20,
-              ),
-              title: Text(row.patient.displayName),
-              subtitle: Text(row.patient.identityLine),
-            ),
-            const Divider(height: 1),
-            if (row.appointment.status == AppointmentStatus.scheduled ||
-                row.appointment.status == AppointmentStatus.confirmed)
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
               ListTile(
-                leading: const Icon(Icons.how_to_reg_outlined),
-                title: const Text('Mark arrived'),
-                subtitle: const Text('Patient has checked in'),
-                onTap: () => Navigator.of(context).pop('arrived'),
+                leading: PatientAvatar(
+                  initials: row.patient.initials,
+                  seed: row.patient.id,
+                  radius: 20,
+                ),
+                title: Text(row.patient.displayName),
+                subtitle: Text(row.patient.identityLine),
               ),
-            if (row.appointment.status.isOpen)
-              ListTile(
-                leading: const Icon(Icons.play_arrow),
-                title: const Text('Start visit'),
-                subtitle: const Text('Opens a new encounter'),
-                onTap: () => Navigator.of(context).pop('start'),
-              ),
-            ListTile(
-              leading: const Icon(Icons.folder_open_outlined),
-              title: const Text('Open chart'),
-              onTap: () => Navigator.of(context).pop('chart'),
-            ),
-            if (!row.appointment.status.isFinished) ...<Widget>[
               const Divider(height: 1),
+              if (row.appointment.status == AppointmentStatus.scheduled ||
+                  row.appointment.status == AppointmentStatus.confirmed)
+                ListTile(
+                  leading: const Icon(Icons.how_to_reg_outlined),
+                  title: const Text('Mark arrived'),
+                  subtitle: const Text('Patient has checked in'),
+                  onTap: () => Navigator.of(context).pop('arrived'),
+                ),
+              if (row.appointment.status.isOpen)
+                ListTile(
+                  leading: const Icon(Icons.play_arrow),
+                  title: const Text('Start visit'),
+                  subtitle: const Text('Opens a new encounter'),
+                  onTap: () => Navigator.of(context).pop('start'),
+                ),
               ListTile(
-                leading: const Icon(Icons.person_off_outlined),
-                title: const Text('Did not attend'),
-                onTap: () => Navigator.of(context).pop('noshow'),
+                leading: const Icon(Icons.folder_open_outlined),
+                title: const Text('Open chart'),
+                onTap: () => Navigator.of(context).pop('chart'),
               ),
-              ListTile(
-                leading: const Icon(Icons.event_busy_outlined),
-                title: const Text('Cancel appointment'),
-                onTap: () => Navigator.of(context).pop('cancel'),
-              ),
+              if (!row.appointment.status.isFinished) ...<Widget>[
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.person_off_outlined),
+                  title: const Text('Did not attend'),
+                  onTap: () => Navigator.of(context).pop('noshow'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.event_busy_outlined),
+                  title: const Text('Cancel appointment'),
+                  onTap: () => Navigator.of(context).pop('cancel'),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -360,56 +369,54 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           child: _loading
               ? const Center(child: CircularProgressIndicator())
               : _rows.isEmpty
-                  ? EmptyState(
-                      icon: Icons.event_available_outlined,
-                      title: _isToday
-                          ? 'Nothing booked today'
-                          : 'Nothing booked on ${Fmt.dateShort(_day)}',
-                      message: 'Book from a patient chart, or see a walk-in '
-                          'without an appointment.',
-                    )
-                  : RefreshIndicator(
-                      onRefresh: _load,
-                      child: ListView.separated(
-                        padding: EdgeInsets.fromLTRB(
-                          m.spaceLg,
-                          m.spaceMd,
-                          m.spaceLg,
-                          m.space2xl * 2,
-                        ),
-                        itemCount: _rows.length,
-                        separatorBuilder: (_, _) => SizedBox(height: m.spaceSm),
-                        itemBuilder: (context, index) {
-                          final row = _rows[index];
-                          return AppointmentTile(
-                            appointment: row.appointment,
-                            patient: row.patient,
-                            waitEstimate: row.wait,
-                            onTap: () => _openActions(row),
-                          );
-                        },
-                      ),
+              ? EmptyState(
+                  icon: Icons.event_available_outlined,
+                  title: _isToday
+                      ? 'Nothing booked today'
+                      : 'Nothing booked on ${Fmt.dateShort(_day)}',
+                  message:
+                      'Book from a patient chart, or see a walk-in '
+                      'without an appointment.',
+                )
+              : RefreshIndicator(
+                  onRefresh: _load,
+                  child: ListView.separated(
+                    padding: EdgeInsets.fromLTRB(
+                      m.spaceLg,
+                      m.spaceMd,
+                      m.spaceLg,
+                      m.spaceLg + context.bottomBarClearance,
                     ),
+                    itemCount: _rows.length,
+                    separatorBuilder: (_, _) => SizedBox(height: m.spaceSm),
+                    itemBuilder: (context, index) {
+                      final row = _rows[index];
+                      return AppointmentTile(
+                        appointment: row.appointment,
+                        patient: row.patient,
+                        waitEstimate: row.wait,
+                        onTap: () => _openActions(row),
+                      );
+                    },
+                  ),
+                ),
         ),
       ],
     );
   }
 
   String get _periodTitle => switch (_scale) {
-        CalendarScale.day =>
-          _isToday ? 'Today' : Fmt.weekday(_day),
-        CalendarScale.week => 'Week of ${Fmt.dateShort(
-            WeekStrip.startOfWeek(_day),
-          )}',
-        CalendarScale.month => Fmt.monthAndYear(_day),
-      };
+    CalendarScale.day => _isToday ? 'Today' : Fmt.weekday(_day),
+    CalendarScale.week =>
+      'Week of ${Fmt.dateShort(WeekStrip.startOfWeek(_day))}',
+    CalendarScale.month => Fmt.monthAndYear(_day),
+  };
 
   String get _periodSubtitle => switch (_scale) {
-        CalendarScale.day => Fmt.date(_day),
-        CalendarScale.week || CalendarScale.month => _isToday
-            ? 'Showing today'
-            : 'Showing ${Fmt.dateShort(_day)}',
-      };
+    CalendarScale.day => Fmt.date(_day),
+    CalendarScale.week || CalendarScale.month =>
+      _isToday ? 'Showing today' : 'Showing ${Fmt.dateShort(_day)}',
+  };
 
   static bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
@@ -499,8 +506,9 @@ class _DayCounts extends StatelessWidget {
 
     final m = context.metrics;
     final waiting = rows.where((r) => r.appointment.status.isWaiting).length;
-    final remaining =
-        rows.where((r) => !r.appointment.status.isFinished).length;
+    final remaining = rows
+        .where((r) => !r.appointment.status.isFinished)
+        .length;
 
     return Wrap(
       spacing: m.spaceSm,
