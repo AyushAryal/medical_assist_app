@@ -261,6 +261,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => context.push(Routes.dictation),
                   ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Assistant language model'),
+                    subtitle: Text(
+                      context.watch<AppBootstrap>().activeAssistModel?.name ??
+                          'Optional — translates wording the built-in '
+                              'matching misses',
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => context.push(Routes.dictation),
+                  ),
                 ],
               ),
             ),

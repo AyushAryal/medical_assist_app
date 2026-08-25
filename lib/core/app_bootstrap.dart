@@ -5,6 +5,10 @@ import 'package:flutter/foundation.dart';
 import '../data/repositories/clinical_repository.dart';
 import '../ai/pipeline.dart';
 import '../data/services/assist/assist_service.dart';
+import '../data/services/assist/assist_model_catalog.dart';
+import '../data/services/assist/assist_model_manager.dart';
+import '../data/services/assist/language_model.dart';
+import '../data/services/assist/llama_engine.dart';
 import '../data/services/dictation_recorder.dart';
 import '../data/services/transcription/speech_model.dart';
 import '../data/services/transcription/transcription_engine.dart';
@@ -55,6 +59,11 @@ class AppBootstrap extends ChangeNotifier {
   /// it is created once and kept, unlike everything above it.
   final SpeechModelManager speechModels = SpeechModelManager();
 
+  /// Same rule as [speechModels]: the manager only handles files, so it lives
+  /// across locks. The *engine* built on those files does not — see
+  /// [refreshAssistEngine].
+  final AssistModelManager assistModels = AssistModelManager();
+
   TranscriptionEngine _transcription = const UnconfiguredTranscriptionEngine();
 
   /// Where the dictation storage-quality preference lives. In `app_meta`, which
@@ -63,6 +72,9 @@ class AppBootstrap extends ChangeNotifier {
 
   /// Which installed speech model to use, when more than one is present.
   static const String speechModelKey = 'speech_model_id';
+
+  /// Which installed assistant model interprets unmatched questions.
+  static const String assistModelKey = 'assist_model_id';
 
   /// Whether the floating assistant appears over every screen.
   static const String assistantEnabledKey = 'assistant_enabled';
@@ -86,6 +98,53 @@ class AppBootstrap extends ChangeNotifier {
   /// installed. Exposed so Settings can mark which of several is live.
   SpeechModel? get activeSpeechModel => _activeSpeechModel;
   SpeechModel? _activeSpeechModel;
+
+  /// The language model behind the assistant, or null when none is installed.
+  AssistModel? get activeAssistModel => _activeAssistModel;
+  AssistModel? _activeAssistModel;
+  LanguageModelEngine? _assistEngine;
+
+  /// Whether an assistant model is installed and live.
+  bool get assistModelActive => _assistEngine != null;
+
+  /// Re-reads which assistant model is installed and rebuilds the engine.
+  ///
+  /// Called at unlock and after every install, switch or removal in Settings.
+  /// The pipeline reads the engine through a provider, so a swap here takes
+  /// effect on the next question without rebuilding the pipeline — which is
+  /// what preserves the conversation across a model change. The stored
+  /// preference wins when its model is actually installed; otherwise the
+  /// first installed model serves, so removing one falls back rather than
+  /// silently switching the feature off.
+  Future<void> refreshAssistEngine() async {
+    final preferredId =
+        _meta == null ? null : await meta.read(assistModelKey);
+    final preferred = AssistModelCatalog.byId(preferredId);
+
+    final model = preferred != null &&
+            await assistModels.installed(preferred) != null
+        ? preferred
+        : await assistModels.firstInstalled();
+
+    final installed =
+        model == null ? null : await assistModels.installed(model);
+
+    await _assistEngine?.dispose();
+    _activeAssistModel = installed?.model;
+    _assistEngine = installed == null
+        ? null
+        : LlamaEngine(
+            modelPath: installed.path,
+            modelName: installed.model.name,
+          );
+    notifyListeners();
+  }
+
+  /// Chooses which installed assistant model answers from now on.
+  Future<void> setAssistModel(AssistModel model) async {
+    await meta.write(assistModelKey, model.id);
+    await refreshAssistEngine();
+  }
 
   BootstrapPhase get phase => _phase;
   Object? get error => _error;
@@ -204,14 +263,18 @@ class AppBootstrap extends ChangeNotifier {
       _pipeline = AssistPipeline(
         repository: repository,
         entitlements: entitlements,
+        // A provider, not an instance: Settings can install or switch models
+        // mid-session, and the conversation must survive the swap.
+        languageModel: () => _assistEngine,
       );
       _assistantEnabled =
           (await meta.read(assistantEnabledKey) ?? 'true') != 'false';
 
       _phase = BootstrapPhase.ready;
-      // Not awaited: it only reads file sizes, and an unlock must not wait on
-      // the filesystem to show the dashboard.
+      // Not awaited: they only read file sizes, and an unlock must not wait
+      // on the filesystem to show the dashboard.
       unawaited(refreshTranscriptionEngine());
+      unawaited(refreshAssistEngine());
     } on Object catch (error) {
       _error = error;
       _phase = BootstrapPhase.failed;
@@ -226,8 +289,14 @@ class AppBootstrap extends ChangeNotifier {
     _dictation?.dispose();
     _dictation = null;
     _assist = null;
-    // Holds a repository handle, so it must go with the database.
+    // Holds a repository handle, so it must go with the database — and the
+    // conversation thread inside it is PHI, gone with the lock.
     _pipeline = null;
+    // The engine holds no PHI, but a worker isolate with a gigabyte of
+    // weights should not sit resident behind a lock screen.
+    unawaited(_assistEngine?.dispose());
+    _assistEngine = null;
+    _activeAssistModel = null;
     await _voiceNotes?.dispose();
     await _database?.close();
     _database = null;

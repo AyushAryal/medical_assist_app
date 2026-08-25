@@ -525,12 +525,18 @@ The assistant now carries state between questions, on both surfaces at once:
   expanding the bubble adopts the computed answer instead of re-running it,
   and reopening the bubble replays the conversation. Locking the app destroys
   the thread with everything else decrypted.
-- **The model slot is real.** When a small on-device model is installed it
-  translates unmatched wordings into the published question bank — a
-  sentence, re-parsed by the same grammars, refused if it only survives as a
-  text grep. Catalogued candidates: Qwen2.5 1.5B (Apache 2.0), Gemma 3 1B,
-  Llama 3.2 1B, SmolLM2 360M — quantised GGUF, exact sizes and licences in
-  `assist_model_catalog.dart`.
+- **The model slot runs.** Settings › On-device AI installs a quantised GGUF
+  (Qwen2.5 1.5B/0.5B, Gemma 3 1B, Llama 3.2 1B, SmolLM2 360M — exact sizes
+  and licences in `assist_model_catalog.dart`; airgapped `adb push` path
+  included). Inference is llama.cpp statically linked into a four-function C
+  shim (`native/llm_shim`, pinned tag, rebuilt by `tool/build_llm_shim.sh`),
+  run in its own isolate so a multi-second answer never blocks the UI. The
+  model translates unmatched wordings into the published question bank — a
+  sentence, re-parsed by the same grammars, refused if it echoes the request
+  or only survives as a text grep. The contract is verified by live
+  host-inference tests (`llama_engine_live_test.dart`) against the real shim
+  and a real model. Swapping models never loses the conversation: the
+  pipeline reads the engine through a provider.
 
 ### 1.10c Searching the narrative — *Built*
 

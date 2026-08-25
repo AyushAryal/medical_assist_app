@@ -37,9 +37,13 @@ class ModelInterpreter implements Interpreter {
     required this.reparse,
   });
 
-  /// The installed model, or null — in which case this interpreter declines
-  /// everything and the chain behaves exactly as if it were absent.
-  final LanguageModelEngine? engine;
+  /// Resolves the installed model at ask time, or null — in which case this
+  /// interpreter declines everything and the chain behaves as if it were
+  /// absent. A provider rather than an instance, because Settings can install
+  /// or switch models mid-session and the swap must not rebuild the pipeline:
+  /// the pipeline owns the conversation, and changing a model is not a reason
+  /// to lose one.
+  final LanguageModelEngine? Function() engine;
 
   /// Runs a rewrite through the coded interpreters. Injected so this file
   /// depends on the contract, not on the chain's construction order.
@@ -52,7 +56,7 @@ class ModelInterpreter implements Interpreter {
   String get name => 'on-device model';
 
   @override
-  String? get modelName => engine?.name;
+  String? get modelName => engine()?.name;
 
   /// The bank the model may translate into — the same one the guide shows.
   static List<String> vocabulary() => <String>[
@@ -65,7 +69,7 @@ class ModelInterpreter implements Interpreter {
     AssistRequest request,
     Preprocessed input,
   ) async {
-    final model = engine;
+    final model = engine();
     if (model == null || !model.runsOnDevice) return null;
     if (!await model.isReady()) return null;
 

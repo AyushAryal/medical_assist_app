@@ -67,7 +67,7 @@ Future<AssistIntent?> reparse(String question) async {
 }
 
 Future<AssistIntent?> interpretVia(ScriptedModel model, String text) {
-  final interpreter = ModelInterpreter(engine: model, reparse: reparse);
+  final interpreter = ModelInterpreter(engine: () => model, reparse: reparse);
   final request = AssistRequest(text: text, source: RequestSource.typed);
   return interpreter.interpret(
     request,
@@ -108,7 +108,7 @@ void main() {
   });
 
   test('no engine means the interpreter is simply absent', () async {
-    final interpreter = ModelInterpreter(engine: null, reparse: reparse);
+    final interpreter = ModelInterpreter(engine: () => null, reparse: reparse);
     final request =
         AssistRequest(text: 'anything', source: RequestSource.typed);
     expect(

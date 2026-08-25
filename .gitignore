@@ -47,3 +47,4 @@ app.*.map.json
 # Speech-recognition models, fetched with tool/fetch_speech_model.sh.
 # ~100 MB of binary weights that a repository has no business carrying.
 /.speech-models/
+.native/

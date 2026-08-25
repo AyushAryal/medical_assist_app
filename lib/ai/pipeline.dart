@@ -93,7 +93,7 @@ class AssistPipeline {
   AssistPipeline({
     required ClinicalRepository repository,
     required Entitlements entitlements,
-    LanguageModelEngine? languageModel,
+    LanguageModelEngine? Function()? languageModel,
     List<Interpreter>? interpreters,
   })  : _queries = QueryHandler(repository),
         _reports = ReportHandler(repository),

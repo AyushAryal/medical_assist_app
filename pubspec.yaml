@@ -9,6 +9,10 @@ environment:
 dependencies:
   collection: ^1.19.1
   crypto: ^3.0.7
+  # Utf8 marshalling for the on-device language model's four-function C shim
+  # (native/llm_shim). Already in the tree transitively; direct because we
+  # call it directly.
+  ffi: ^2.1.0
   file_picker: ^12.0.0
   flutter:
     sdk: flutter

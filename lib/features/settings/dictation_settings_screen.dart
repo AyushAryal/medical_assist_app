@@ -9,6 +9,8 @@ import '../../core/app_bootstrap.dart';
 import '../../core/design/design.dart';
 import '../../data/services/dictation_recorder.dart';
 import '../../data/services/transcription/speech_model.dart';
+import 'assistant_model_section.dart';
+import 'model_row.dart';
 
 /// Dictation and speech recognition settings.
 ///
@@ -303,7 +305,7 @@ class _DictationSettingsScreenState extends State<DictationSettingsScreen> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(title: const Text('Dictation')),
+      appBar: AppBar(title: const Text('On-device AI')),
       body: ContentWidth(
         child: ListView(
           padding: pagePadding(context, floatingBar: false),
@@ -329,8 +331,11 @@ class _DictationSettingsScreenState extends State<DictationSettingsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
                   for (final model in SpeechModel.all) ...<Widget>[
-                    _ModelRow(
-                      model: model,
+                    ModelRow(
+                      name: model.name,
+                      description: model.description,
+                      sizeLabel: model.sizeLabel,
+                      activeLine: 'Transcribing with this model.',
                       isComplete: _complete.contains(model.id),
                       isActive: bootstrap.activeSpeechModel?.id == model.id,
                       isSideloaded: _sideloaded.contains(model.id),
@@ -374,6 +379,10 @@ class _DictationSettingsScreenState extends State<DictationSettingsScreen> {
                 ],
               ),
             ),
+            SizedBox(height: m.spaceMd),
+
+            // The assistant's language models — separate section, same rules.
+            const AssistantModelSection(),
             SizedBox(height: m.spaceMd),
 
             SectionCard(
@@ -546,150 +555,6 @@ class _PrivacyNote extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _ModelRow extends StatelessWidget {
-  const _ModelRow({
-    required this.model,
-    required this.isComplete,
-    required this.isActive,
-    required this.isSideloaded,
-    required this.onUse,
-    required this.bytesOnDisk,
-    required this.isInstalling,
-    required this.progress,
-    required this.onInstall,
-    required this.onCancel,
-    required this.onRemove,
-  });
-
-  final SpeechModel model;
-  final bool isComplete;
-
-  /// The model transcription is currently using. Only one can be.
-  final bool isActive;
-
-  /// Installed from external storage rather than downloaded. Behaves
-  /// identically; worth stating so an operator knows which copy is live.
-  final bool isSideloaded;
-
-  /// Switches to this model. Null when it is already active or not installed.
-  final VoidCallback? onUse;
-  final int bytesOnDisk;
-  final bool isInstalling;
-  final ModelInstallProgress? progress;
-  final VoidCallback? onInstall;
-  final VoidCallback onCancel;
-  final VoidCallback? onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    final m = context.metrics;
-    final palette = context.palette;
-    final partial = !isComplete && bytesOnDisk > 0;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        Row(
-          children: <Widget>[
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(model.name, style: context.texts.titleSmall),
-                  SizedBox(height: m.spaceXs / 2),
-                  Text(model.description, style: context.texts.bodySmall),
-                ],
-              ),
-            ),
-            SizedBox(width: m.spaceSm),
-            if (isActive)
-              StatusPill(
-                label: 'In use',
-                tone: PillTone.normal,
-                icon: Icons.check_circle,
-                dense: true,
-              )
-            else if (isComplete)
-              StatusPill(
-                label: isSideloaded ? 'Loaded from file' : 'Installed',
-                tone: PillTone.neutral,
-                dense: true,
-              )
-            else
-              Text(model.sizeLabel, style: context.texts.labelSmall),
-          ],
-        ),
-        if (isInstalling && progress != null) ...<Widget>[
-          SizedBox(height: m.spaceSm),
-          LinearProgressIndicator(value: progress!.fraction),
-          SizedBox(height: m.spaceXs),
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: Text(
-                  '${(progress!.receivedBytes / (1024 * 1024)).round()} of '
-                  '${(progress!.totalBytes / (1024 * 1024)).round()} MB · '
-                  '${progress!.currentFile}',
-                  style: context.texts.labelSmall,
-                ),
-              ),
-              TextButton(onPressed: onCancel, child: const Text('Cancel')),
-            ],
-          ),
-        ] else ...<Widget>[
-          SizedBox(height: m.spaceSm),
-          Row(
-            children: <Widget>[
-              if (!isComplete)
-                Expanded(
-                  child: FilledButton.tonalIcon(
-                    onPressed: onInstall,
-                    icon: const Icon(Icons.download_outlined, size: 18),
-                    label: Text(
-                      partial
-                          ? 'Resume — '
-                              '${(bytesOnDisk / (1024 * 1024)).round()} of '
-                              '${model.sizeLabel} done'
-                          : 'Install',
-                    ),
-                  ),
-                )
-              else if (onUse != null)
-                Expanded(
-                  child: FilledButton.tonalIcon(
-                    onPressed: onUse,
-                    icon: const Icon(Icons.swap_horiz, size: 18),
-                    label: const Text('Use this one'),
-                  ),
-                )
-              else if (isActive)
-                Expanded(
-                  child: Text(
-                    isSideloaded
-                        ? 'Transcribing with this model, loaded from a file.'
-                        : 'Transcribing with this model.',
-                    style: context.texts.labelSmall,
-                  ),
-                ),
-              if (onRemove != null) ...<Widget>[
-                SizedBox(width: m.spaceSm),
-                TextButton.icon(
-                  onPressed: onRemove,
-                  style: TextButton.styleFrom(
-                    foregroundColor: palette.critical,
-                  ),
-                  icon: const Icon(Icons.delete_outline, size: 18),
-                  label: const Text('Remove'),
-                ),
-              ],
-            ],
-          ),
-        ],
-      ],
     );
   }
 }

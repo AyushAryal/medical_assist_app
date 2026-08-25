@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+
+import '../model_download.dart';
 import 'package:path_provider/path_provider.dart';
 
 /// A Whisper model this app knows how to install and run.
@@ -307,93 +309,34 @@ class SpeechModelManager {
 
   /// Downloads any of the model's files that are missing or the wrong size.
   ///
-  /// Files are written to a `.part` path and renamed on completion, so an
-  /// interrupted install can never leave a truncated file that [installed]
-  /// would go on to accept.
+  /// The semantics — `.part` staging, size pinning, resume-by-skip — live in
+  /// `model_download.dart`, shared with the assistant models so the two
+  /// families cannot drift.
   Future<void> download(
     SpeechModel model, {
     void Function(ModelInstallProgress)? onProgress,
     CancellationToken? cancellation,
   }) async {
-    final directory = await directoryFor(model);
-    if (!await directory.exists()) await directory.create(recursive: true);
-
-    final client = _client ?? HttpClient();
-    client.userAgent = 'ClinicalRecords/speech-model-installer';
-    var completed = 0;
-
-    try {
-      for (final entry in model.files) {
-        final target = File(p.join(directory.path, entry.file));
-        if (await target.exists() && await target.length() == entry.bytes) {
-          completed += entry.bytes;
-          onProgress?.call(
-            ModelInstallProgress(
-              receivedBytes: completed,
-              totalBytes: model.totalBytes,
-              currentFile: entry.file,
-            ),
-          );
-          continue;
-        }
-
-        final partial = File('${target.path}.part');
-        if (await partial.exists()) await partial.delete();
-
-        final request = await client.getUrl(Uri.parse(model.urlFor(entry.file)));
-        final response = await request.close();
-        if (response.statusCode != HttpStatus.ok) {
-          throw ModelInstallException(
-            'The server returned ${response.statusCode} for ${entry.file}.',
-          );
-        }
-
-        final sink = partial.openWrite();
-        var received = 0;
-        try {
-          await for (final chunk in response) {
-            if (cancellation?.isCancelled ?? false) {
-              throw const ModelInstallException('Install cancelled.');
-            }
-            sink.add(chunk);
-            received += chunk.length;
-            onProgress?.call(
-              ModelInstallProgress(
-                receivedBytes: completed + received,
-                totalBytes: model.totalBytes,
-                currentFile: entry.file,
-              ),
-            );
-          }
-          await sink.flush();
-        } finally {
-          await sink.close();
-        }
-
-        // The tokens file is small and its size is not pinned; the two model
-        // files are, and a mismatch means a truncated or substituted download.
-        if (entry.bytes > 1024 * 1024 && received != entry.bytes) {
-          await partial.delete();
-          throw ModelInstallException(
-            '${entry.file} downloaded as $received bytes but should be '
-            '${entry.bytes}. The file was discarded.',
-          );
-        }
-
-        await partial.rename(target.path);
-        completed += received;
-      }
-    } on ModelInstallException {
-      rethrow;
-    } on SocketException catch (error) {
-      throw ModelInstallException(
-        'Could not reach the model host: ${error.message}',
-      );
-    } on HttpException catch (error) {
-      throw ModelInstallException('Download failed: ${error.message}');
-    } finally {
-      if (_client == null) client.close();
-    }
+    await downloadArtefacts(
+      into: await directoryFor(model),
+      artefacts: <ModelArtefact>[
+        for (final entry in model.files)
+          (
+            url: model.urlFor(entry.file),
+            file: entry.file,
+            bytes: entry.bytes,
+            // The tokens file is small and its size is not pinned; the two
+            // model files are, and a mismatch means a truncated or
+            // substituted download.
+            sizePinned: entry.bytes > 1024 * 1024,
+          ),
+      ],
+      totalBytes: model.totalBytes,
+      client: _client,
+      userAgent: 'ClinicalRecords/speech-model-installer',
+      onProgress: onProgress,
+      cancellation: cancellation,
+    );
   }
 
   /// Installs a file the operator supplied themselves — the airgapped path.

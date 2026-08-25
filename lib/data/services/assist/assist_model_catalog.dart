@@ -39,9 +39,14 @@ class AssistModel {
   final String parameters;
 
   String get sizeLabel => '${(bytes / (1024 * 1024)).round()} MB';
+
+  String get url => 'https://huggingface.co/$repository/resolve/main/$file';
 }
 
 abstract final class AssistModelCatalog {
+  static AssistModel? byId(String? id) =>
+      models.where((model) => model.id == id).firstOrNull;
+
   /// In recommendation order.
   ///
   /// Qwen2.5 first: at this size class it follows rewrite instructions most
@@ -57,9 +62,20 @@ abstract final class AssistModelCatalog {
           'unencumbered licence.',
       repository: 'Qwen/Qwen2.5-1.5B-Instruct-GGUF',
       file: 'qwen2.5-1.5b-instruct-q4_k_m.gguf',
-      bytes: 1120000000,
+      bytes: 1117320736,
       licence: 'Apache 2.0',
       parameters: '1.5B',
+    ),
+    AssistModel(
+      id: 'qwen2.5-0.5b-instruct-q4',
+      name: 'Qwen2.5 0.5B Instruct',
+      description: 'Half a gigabyte and answers in about a second on a '
+          'tablet. The one the rewrite contract was verified against.',
+      repository: 'Qwen/Qwen2.5-0.5B-Instruct-GGUF',
+      file: 'qwen2.5-0.5b-instruct-q4_k_m.gguf',
+      bytes: 491400032,
+      licence: 'Apache 2.0',
+      parameters: '0.5B',
     ),
     AssistModel(
       id: 'gemma-3-1b-it-q4',
@@ -67,7 +83,7 @@ abstract final class AssistModelCatalog {
       description: 'Strongest per parameter; Google Gemma terms of use.',
       repository: 'ggml-org/gemma-3-1b-it-GGUF',
       file: 'gemma-3-1b-it-Q4_K_M.gguf',
-      bytes: 806000000,
+      bytes: 806058240,
       licence: 'Gemma Terms of Use',
       parameters: '1B',
     ),
@@ -77,7 +93,7 @@ abstract final class AssistModelCatalog {
       description: 'Widely deployed on-device; Meta community licence.',
       repository: 'bartowski/Llama-3.2-1B-Instruct-GGUF',
       file: 'Llama-3.2-1B-Instruct-Q4_K_M.gguf',
-      bytes: 808000000,
+      bytes: 807694464,
       licence: 'Llama 3.2 Community License',
       parameters: '1B',
     ),
@@ -88,7 +104,7 @@ abstract final class AssistModelCatalog {
           'low-storage devices.',
       repository: 'HuggingFaceTB/SmolLM2-360M-Instruct-GGUF',
       file: 'smollm2-360m-instruct-q8_0.gguf',
-      bytes: 386000000,
+      bytes: 386404992,
       licence: 'Apache 2.0',
       parameters: '360M',
     ),

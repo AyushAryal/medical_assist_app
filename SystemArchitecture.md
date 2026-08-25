@@ -334,10 +334,20 @@ is a **translator, never an author**: the model receives the redacted request
 plus the published question bank and returns *a sentence* — the nearest known
 question form — which then re-enters the same coded grammars, validation and
 authorisation as typed text. A hallucinated rewrite fails to parse and falls
-through to the clarifier; a rewrite that only survives as a free-text grep is
-refused outright. Candidate on-device models are catalogued in
-`data/services/assist/assist_model_catalog.dart` with exact artefacts, sizes
-and licences.
+through to the clarifier; an echo of the request is refused at the engine; a
+rewrite that only survives as a free-text grep is refused at the interpreter.
+
+The runtime is llama.cpp statically linked into a four-function C shim
+(`native/llm_shim/clinical_llm.c`, pinned tag, `tool/build_llm_shim.sh`
+rebuilds host and Android arm64 artefacts). The shim exists because binding
+llama.cpp's own structs from Dart means mirroring layouts that change between
+releases — a wrong offset misreads memory rather than erroring. `LlamaEngine`
+runs the blocking C calls in a dedicated isolate; the model handle never
+crosses it. Models are catalogued with exact artefacts, sizes and licences in
+`data/services/assist/assist_model_catalog.dart`, installed by
+`AssistModelManager` through the same `.part`-staged, size-pinned download
+machinery the speech models use (`model_download.dart`), and hot-swapped
+through a provider so a model change never destroys the conversation.
 
 Coded logic first, always. The schema is eleven tables with a closed clinical
 vocabulary, so hand-written matching covers most of what anyone asks —
