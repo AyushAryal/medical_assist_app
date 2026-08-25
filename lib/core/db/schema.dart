@@ -12,13 +12,14 @@
 /// * Every syncable table carries `updated_at`, `revision` and `sync_status`
 ///   so the offline queue can do last-writer-wins with conflict detection.
 abstract final class Schema {
-  static const int version = 2;
+  static const int version = 3;
 
   /// One list per schema version. Index 0 creates v1, index 1 upgrades v1→v2,
   /// and so on, so `onCreate` and `onUpgrade` replay exactly the same SQL.
   static const List<List<String>> migrations = <List<String>>[
     _v1,
     _v2,
+    _v3,
   ];
 
   static const List<String> _v1 = <String>[
@@ -373,5 +374,17 @@ abstract final class Schema {
     'CREATE INDEX idx_appt_clinic_day ON appointments(clinic_id, scheduled_at)',
     'CREATE INDEX idx_appt_patient ON appointments(patient_id, scheduled_at DESC)',
     'CREATE INDEX idx_appt_status ON appointments(status, scheduled_at)',
+  ];
+
+  /// v3 — working notes.
+  ///
+  /// A scratch field on the note for the raw dictation a consultation
+  /// produces, before any of it has been sorted into S/O/A/P. It is
+  /// deliberately **not** part of `canonicalContent()` and therefore not
+  /// covered by the signature: it is working material, not record. The editor
+  /// clears it at signing and warns first if anything is still sitting in it,
+  /// so unsorted dictation cannot silently fail to reach the record.
+  static const List<String> _v3 = <String>[
+    'ALTER TABLE clinical_notes ADD COLUMN working_notes TEXT',
   ];
 }

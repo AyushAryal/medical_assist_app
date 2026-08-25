@@ -53,6 +53,7 @@ class ClinicalNote {
     this.objective,
     this.assessment,
     this.plan,
+    this.workingNotes,
     this.status = NoteStatus.draft,
     this.signedAt,
     this.signedBy,
@@ -81,6 +82,15 @@ class ClinicalNote {
 
   /// What happens next: investigations, treatment, follow-up, safety-netting.
   final String? plan;
+
+  /// Raw, unsorted material — a whole consultation dictated in one go, before
+  /// any of it has been placed.
+  ///
+  /// Not part of [canonicalContent], so it is not covered by the signature: it
+  /// is scratch, not record. The editor clears it when the note is signed and
+  /// warns first if anything is left in it, which is what stops dictation
+  /// that nobody sorted from quietly never reaching the chart.
+  final String? workingNotes;
 
   final NoteStatus status;
   final DateTime? signedAt;
@@ -140,6 +150,7 @@ class ClinicalNote {
         status: NoteStatusX.parse(map['status'] as String?),
         signedAt: fromEpochOrNull(map['signed_at'] as int?),
         signedBy: map['signed_by'] as String?,
+        workingNotes: map['working_notes'] as String?,
         contentHash: map['content_hash'] as String?,
         createdAt: fromEpoch(map['created_at'] as int),
         updatedAt: fromEpoch(map['updated_at'] as int),
@@ -161,6 +172,7 @@ class ClinicalNote {
         'status': status.name,
         'signed_at': toEpochOrNull(signedAt),
         'signed_by': signedBy,
+        'working_notes': workingNotes,
         'content_hash': contentHash,
         'created_at': toEpoch(createdAt),
         'updated_at': toEpoch(updatedAt),
@@ -179,6 +191,10 @@ class ClinicalNote {
     NoteStatus? status,
     DateTime? signedAt,
     String? signedBy,
+    String? workingNotes,
+    /// Signing empties the scratch, and `workingNotes ?? this.workingNotes`
+    /// can never express that.
+    bool clearWorkingNotes = false,
     String? contentHash,
   }) =>
       ClinicalNote(
@@ -194,6 +210,8 @@ class ClinicalNote {
         status: status ?? this.status,
         signedAt: signedAt ?? this.signedAt,
         signedBy: signedBy ?? this.signedBy,
+        workingNotes:
+            clearWorkingNotes ? null : (workingNotes ?? this.workingNotes),
         contentHash: contentHash ?? this.contentHash,
         createdAt: createdAt,
         updatedAt: DateTime.now(),

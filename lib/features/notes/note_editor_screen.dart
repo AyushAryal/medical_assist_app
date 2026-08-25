@@ -22,7 +22,8 @@ import '../attachments/attachment_strip.dart';
 import '../attachments/field_attach_bar.dart';
 import 'amend_note_sheet.dart';
 import 'dictation_sheet.dart';
-import 'model_draft_sheets.dart';
+import 'draft_review_screen.dart';
+import 'patient_instructions_sheet.dart';
 import '../../data/services/assist/note_drafting.dart';
 import 'template_picker_sheet.dart';
 
@@ -56,6 +57,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   final TextEditingController _assessment = TextEditingController();
   final TextEditingController _plan = TextEditingController();
 
+  /// The rough draft: a whole consultation dictated in one go.
+  ///
+  /// The four SOAP boxes are where a note *ends up*; nobody dictates in that
+  /// order. This is the box people actually talk into, and sorting out of it
+  /// is what the model is for — which is why the model's button lives here
+  /// and not on Subjective, where it used to sit asking clinicians to dump
+  /// everything into one section they would then have to un-dump.
+  final TextEditingController _working = TextEditingController();
+
   Timer? _autosave;
   ClinicalNote? _note;
   Encounter? _encounter;
@@ -88,6 +98,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// CPUs would starve each other.
   bool _drafting = false;
 
+  /// Section key to the exact text the model put there, kept so a section can
+  /// still say it holds generated text — and stop saying it the moment a
+  /// clinician edits a character of it. Comparing the whole field is what
+  /// makes that survive undo, autosave and a reload without a listener to get
+  /// wrong.
+  final Map<String, String> _aiText = <String, String>{};
+
   /// The pending "you can undo that" message, and the timer that retires it.
   ///
   /// Shown as a banner rather than a SnackBar. A SnackBar looked right and
@@ -108,7 +125,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   List<TextEditingController> get _controllers =>
-      <TextEditingController>[_subjective, _objective, _assessment, _plan];
+      <TextEditingController>[
+        _working,
+        _subjective,
+        _objective,
+        _assessment,
+        _plan,
+      ];
 
   @override
   void dispose() {
@@ -148,6 +171,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     }
 
     if (!mounted) return;
+    _working.text = note.workingNotes ?? '';
     _subjective.text = note.subjective ?? '';
     _objective.text = note.objective ?? '';
     _assessment.text = note.assessment ?? '';
@@ -207,6 +231,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       objective: _objective.text,
       assessment: _assessment.text,
       plan: _plan.text,
+      // Saved like everything else: dictation that survives an interruption
+      // only because it was autosaved is the entire point of a scratch field.
+      workingNotes: _working.text,
     );
 
     await context.read<ClinicalRepository>().saveNoteDraft(updated);
@@ -580,15 +607,33 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       return;
     }
 
+    // Anything still in the working notes is about to stop existing: it is
+    // not part of the signed record and the signature clears it. Saying so is
+    // the difference between a scratch pad and a place dictation goes to die.
+    final unsorted = _working.text.trim();
+    final generated = _fields.keys.where(_isGenerated).toList();
+
     final session = context.read<SessionController>();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Sign this note?'),
         content: Text(
-          'The note becomes the final record and can no longer be edited. '
-          'Later corrections are added as amendments, which stay visible '
-          'alongside the original.\n\nSigning as ${session.signatureName}.',
+          <String>[
+            if (unsorted.isNotEmpty)
+              'Your working notes still hold '
+                  '${unsorted.split(RegExp(r'\s+')).length} words that are '
+                  'not in any section. They are not part of the signed record '
+                  'and will be cleared.',
+            if (generated.isNotEmpty)
+              'You have not edited the text the model put into '
+                  '${generated.map((k) => _fieldLabels[k]!).join(' and ')} — '
+                  'read it once more before it becomes the record.',
+            'The note becomes the final record and can no longer be edited. '
+                'Later corrections are added as amendments, which stay '
+                'visible alongside the original.',
+            'Signing as ${session.signatureName}.',
+          ].join('\n\n'),
         ),
         actions: <Widget>[
           TextButton(
@@ -604,9 +649,17 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     );
     if (confirmed != true || !mounted) return;
 
+    // Scratch does not survive signing: the record is the four sections.
+    if (unsorted.isNotEmpty) {
+      await context
+          .read<ClinicalRepository>()
+          .saveNoteDraft(note.copyWith(clearWorkingNotes: true));
+    }
+    if (!mounted) return;
     await context
         .read<ClinicalRepository>()
         .signNote(note, signedBy: session.signatureName);
+    _aiText.clear();
     await _load();
   }
 
@@ -774,6 +827,21 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                     primaryFlex: 3,
                     secondaryFlex: 2,
                     primary: <Widget>[
+                      if (!isLocked)
+                        Padding(
+                          padding: EdgeInsets.only(
+                            bottom: context.metrics.spaceMd,
+                          ),
+                          child: _WorkingNotesCard(
+                            controller: _working,
+                            hasModel: context
+                                .watch<AppBootstrap>()
+                                .assistModelActive,
+                            isDrafting: _drafting,
+                            onSort: _sortWorkingNotes,
+                            onDictate: () => _dictateWorking(),
+                          ),
+                        ),
                       for (final key in _fields.keys) _soapField(key, isLocked),
                     ],
                     secondary: <Widget>[
@@ -824,47 +892,127 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     return 'subjective';
   }
 
-  /// Sorts everything typed or dictated into Subjective across the four
-  /// sections, via the on-device model, gated and previewed.
+  /// Dictation straight into the working notes.
   ///
-  /// Reads from Subjective only, on purpose: it is where the toolbar
-  /// microphone lands whole consultations, which is exactly the pile this
-  /// exists to sort. Text already placed in other sections was placed by a
-  /// person and is not the model's to rearrange.
-  Future<void> _sortIntoSections() async {
+  /// The same recorder, the same on-device transcription and the same
+  /// attachment rules as a section dictation — the audio is filed as evidence
+  /// whatever happens to the text, because the recording is what the record
+  /// falls back on when a transcript is disputed.
+  Future<void> _dictateWorking() async {
+    final outcome = await DictationSheet.show(
+      context,
+      sectionLabel: 'Working notes',
+    );
+    if (outcome == null || !mounted) return;
+
+    await _attach(
+      file: outcome.audio.file,
+      kind: AttachmentKind.audio,
+      section: 'Working notes',
+      mimeType: 'audio/wav',
+      durationMs: outcome.audio.duration.inMilliseconds,
+    );
+    if (outcome.audio.originalFile case final original?) {
+      await _attach(
+        file: original,
+        kind: AttachmentKind.audio,
+        section: 'Working notes · original',
+        mimeType: 'audio/wav',
+        durationMs: outcome.audio.originalDuration.inMilliseconds,
+      );
+    }
+
+    if (!outcome.hasTranscript || !mounted) return;
+    _markUndoPoint();
+    final existing = _working.text.trimRight();
+    setState(() {
+      _working.text = existing.isEmpty
+          ? outcome.transcript!.trim()
+          : '$existing\n${outcome.transcript!.trim()}';
+    });
+    _onChanged();
+    if (mounted) _offerUndo('Transcript added to the working notes.');
+  }
+
+  /// Sorts the working notes into the four sections, via the on-device model.
+  ///
+  /// Reads only the working notes, and empties them of whatever was accepted.
+  /// That is the whole shape of the feature: dictate a consultation into one
+  /// box, have it distributed, and be left with the remainder — so what did
+  /// *not* get sorted stays visible rather than being silently dropped.
+  Future<void> _sortWorkingNotes() async {
     final engine = context.read<AppBootstrap>().assistEngine;
     final messenger = ScaffoldMessenger.of(context);
     if (engine == null || _drafting) return;
 
+    final source = _working.text.trim();
     setState(() => _drafting = true);
     try {
-      final draft =
-          await NoteDrafting.sortIntoSoap(engine, _subjective.text);
+      final draft = await NoteDrafting.sortIntoSoap(engine, source);
       if (!mounted) return;
-      final accepted = await SoapSortSheet.show(context, draft);
-      if (!accepted || !mounted) return;
+
+      final accepted = await DraftReviewScreen.show(
+        context,
+        draft: draft,
+        current: <String, String>{
+          for (final entry in _fields.entries) entry.key: entry.value.text,
+        },
+        source: source,
+      );
+      if (accepted == null || accepted.isEmpty || !mounted) return;
 
       _markUndoPoint();
       setState(() {
-        // Subjective is replaced by its own sorted remainder; the other
-        // sections receive their pieces *appended*, never overwriting what a
-        // person already wrote there.
-        _subjective.text = draft.sections['subjective'] ?? '';
-        for (final key in <String>['objective', 'assessment', 'plan']) {
-          final piece = draft.sections[key];
-          if (piece == null) continue;
-          final existing = _fields[key]!.text.trimRight();
-          _fields[key]!.text =
-              existing.isEmpty ? piece : '$existing\n$piece';
+        for (final entry in accepted.entries) {
+          final field = _fields[entry.key]!;
+          final existing = field.text.trimRight();
+          field.text = existing.isEmpty
+              ? entry.value
+              : '$existing\n${entry.value}';
+          // Remembered exactly, so the section can say it holds generated
+          // text until the moment a clinician edits a character of it.
+          _aiText[entry.key] = field.text;
         }
+        // Only what was accepted leaves the working notes. A discarded
+        // section's words stay in the box, because they still have not been
+        // recorded anywhere.
+        final kept = accepted.values.join(' ');
+        _working.text = _remainderOf(source, kept);
       });
       _onChanged();
-      _offerUndo('Sorted into sections. Check each one before signing.');
+      _offerUndo(
+        'Sorted into ${accepted.length} '
+        '${accepted.length == 1 ? 'section' : 'sections'}. '
+        'Generated text stays marked until you edit it.',
+      );
     } on DraftRefused catch (refusal) {
       messenger.showSnackBar(SnackBar(content: Text(refusal.reason)));
     } finally {
       if (mounted) setState(() => _drafting = false);
     }
+  }
+
+  /// What is left of the working notes once the sorted sentences are removed.
+  ///
+  /// Sentence-wise rather than by string subtraction: the sort rearranges, so
+  /// the accepted text is the same sentences in a different order, and
+  /// matching whole sentences is what survives that. A sentence that cannot be
+  /// matched stays — leaving something behind is a nuisance, dropping
+  /// something a clinician said is a lost record.
+  static String _remainderOf(String source, String kept) {
+    final placed = kept
+        .split(RegExp(r'(?<=[.!?])\s+'))
+        .map((s) => s.trim().toLowerCase())
+        .where((s) => s.isNotEmpty)
+        .toSet();
+
+    final remainder = source
+        .split(RegExp(r'(?<=[.!?])\s+'))
+        .where((sentence) => !placed.contains(sentence.trim().toLowerCase()))
+        .map((sentence) => sentence.trim())
+        .where((sentence) => sentence.isNotEmpty);
+
+    return remainder.join(' ');
   }
 
   /// Rewords the plan as instructions for the patient, via the model.
@@ -873,12 +1021,16 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final messenger = ScaffoldMessenger.of(context);
     if (engine == null || _drafting) return;
 
+    final plan = _plan.text.trim();
     setState(() => _drafting = true);
     try {
-      final draft =
-          await NoteDrafting.patientInstructions(engine, _plan.text);
+      final draft = await NoteDrafting.patientInstructions(engine, plan);
       if (!mounted) return;
-      final action = await PatientInstructionsSheet.show(context, draft);
+      final action = await PatientInstructionsSheet.show(
+        context,
+        draft: draft,
+        plan: plan,
+      );
       if (!mounted) return;
 
       switch (action) {
@@ -887,14 +1039,17 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           setState(() {
             _plan.text = '${_plan.text.trimRight()}\n\n'
                 'For the patient:\n${draft.text}';
+            _aiText['plan'] = _plan.text;
           });
           _onChanged();
           _offerUndo('Instructions added under the plan. Read them as the '
               'patient will.');
         case InstructionsAction.copied:
           messenger.showSnackBar(
-            const SnackBar(content: Text('Copied. Generated text — check it '
-                'against the plan before sharing.')),
+            const SnackBar(
+              content: Text('Copied. Generated text — check it against the '
+                  'plan before sharing.'),
+            ),
           );
         case InstructionsAction.dismissed:
           break;
@@ -906,33 +1061,25 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     }
   }
 
+  /// True while this section still holds exactly what the model put there.
+  bool _isGenerated(String key) =>
+      _aiText[key] != null && _fields[key]!.text == _aiText[key];
+
   /// The model-drafting action under a section, or null where none applies.
   Widget? _aiActionFor(String key, bool isLocked) {
-    if (isLocked) return null;
-    final bootstrap = context.watch<AppBootstrap>();
-    if (!bootstrap.assistModelActive) return null;
-
-    final (label, onPressed) = switch (key) {
-      'subjective' => (
-          'Sort into S · O · A · P',
-          _subjective.text.trim().isEmpty ? null : _sortIntoSections,
-        ),
-      'plan' => (
-          'Explain for the patient',
-          _plan.text.trim().isEmpty ? null : _explainForPatient,
-        ),
-      _ => (null, null),
-    };
-    if (label == null) return null;
+    if (isLocked || key != 'plan') return null;
+    if (!context.watch<AppBootstrap>().assistModelActive) return null;
 
     return Align(
       alignment: Alignment.centerLeft,
       child: TextButton.icon(
-        onPressed: _drafting ? null : onPressed,
+        onPressed: _drafting || _plan.text.trim().isEmpty
+            ? null
+            : _explainForPatient,
         icon: _drafting
             ? const AiSparkleIcon(size: 16)
             : const Icon(Icons.auto_awesome_outlined, size: 16),
-        label: Text(_drafting ? 'Working…' : label),
+        label: Text(_drafting ? 'Working…' : 'Explain for the patient'),
       ),
     );
   }
@@ -969,6 +1116,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         ),
         onDeleteAttachment: _removeAttachment,
         aiAction: _aiActionFor(key, isLocked),
+        isGenerated: _isGenerated(key),
       ),
     );
   }
@@ -996,6 +1144,7 @@ class _SoapField extends StatelessWidget {
     required this.onTranscribe,
     required this.transcribingId,
     this.aiAction,
+    this.isGenerated = false,
   });
 
   final String letter;
@@ -1021,6 +1170,11 @@ class _SoapField extends StatelessWidget {
   /// so the field itself stays what it is everywhere else in the app.
   final Widget? aiAction;
 
+  /// True while this section holds text the model wrote and nobody has edited.
+  /// The badge comes off on the first keystroke — the rule the design system
+  /// states for generated content everywhere.
+  final bool isGenerated;
+
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
@@ -1042,10 +1196,19 @@ class _SoapField extends StatelessWidget {
               ?.copyWith(color: palette.onPrimaryContainer),
         ),
       ),
-      trailing: FieldAttachBar(
-        enabled: enabled,
-        onCaptured: onCaptured,
-        onDictate: onDictate,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          if (isGenerated) ...<Widget>[
+            const AiBadge(dense: true),
+            SizedBox(width: m.spaceXs),
+          ],
+          FieldAttachBar(
+            enabled: enabled,
+            onCaptured: onCaptured,
+            onDictate: onDictate,
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1452,6 +1615,121 @@ class _UndoBanner extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The rough-draft box that sits above the four sections.
+///
+/// It exists because the SOAP structure describes where a note *ends up*, not
+/// how it is produced: a clinician talks through a consultation in the order
+/// it happened, and asking them to pre-sort into four boxes as they speak is
+/// asking them to do the work the structure was supposed to save.
+///
+/// So this is a plain scratch box with a microphone, and — when a model is
+/// installed — one button that distributes what is in it. Without a model it
+/// is still useful on its own: somewhere to put words while a patient is
+/// still talking. It is deliberately not part of the signed record, and the
+/// editor refuses to sign quietly while anything is still sitting in it.
+class _WorkingNotesCard extends StatelessWidget {
+  const _WorkingNotesCard({
+    required this.controller,
+    required this.hasModel,
+    required this.isDrafting,
+    required this.onSort,
+    required this.onDictate,
+  });
+
+  final TextEditingController controller;
+  final bool hasModel;
+  final bool isDrafting;
+  final VoidCallback onSort;
+  final VoidCallback onDictate;
+
+  @override
+  Widget build(BuildContext context) {
+    final m = context.metrics;
+    final palette = context.palette;
+
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) {
+        final hasText = controller.text.trim().isNotEmpty;
+
+        return SectionCard(
+          title: 'Working notes',
+          subtitle: 'Talk or type it all here — sort it after',
+          leading: Container(
+            width: 28,
+            height: 28,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: palette.surfaceMuted,
+              borderRadius: BorderRadius.circular(m.radiusSm - 2),
+            ),
+            child: Icon(
+              Icons.edit_note,
+              size: 18,
+              color: palette.onSurfaceMuted,
+            ),
+          ),
+          trailing: IconButton(
+            tooltip: 'Dictate into the working notes',
+            icon: const Icon(Icons.mic_none_outlined),
+            onPressed: onDictate,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              TextField(
+                controller: controller,
+                maxLines: null,
+                minLines: 3,
+                keyboardType: TextInputType.multiline,
+                textCapitalization: TextCapitalization.sentences,
+                style: context.texts.bodyMedium,
+                decoration: InputDecoration(
+                  hintText: 'Whatever the consultation produced, in any '
+                      'order. Nothing here is part of the signed note.',
+                  hintStyle: context.texts.bodySmall
+                      ?.copyWith(color: palette.onSurfaceMuted),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  filled: false,
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              if (hasText) ...<Widget>[
+                SizedBox(height: m.spaceSm),
+                if (hasModel)
+                  AiGlowBorder(
+                    active: isDrafting,
+                    borderRadius: BorderRadius.circular(m.radiusSm),
+                    child: FilledButton.tonalIcon(
+                      onPressed: isDrafting ? null : onSort,
+                      icon: isDrafting
+                          ? const AiSparkleIcon(size: 18)
+                          : const Icon(Icons.auto_awesome_outlined, size: 18),
+                      label: Text(
+                        isDrafting
+                            ? 'Sorting…'
+                            : 'Sort into S · O · A · P',
+                      ),
+                    ),
+                  )
+                else
+                  Text(
+                    'Install an assistant model in Settings › On-device AI to '
+                    'have this sorted into the four sections for you.',
+                    style: context.texts.labelSmall
+                        ?.copyWith(color: palette.onSurfaceMuted),
+                  ),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 }

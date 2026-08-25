@@ -564,23 +564,42 @@ Two things keep it from becoming noise, and both are tested:
 
 The installed model's other two tasks, both in the note editor, both gated:
 
-- **Sort into S·O·A·P.** A dictated consultation lands in Subjective as one
-  block; with a model active, a button sorts it into the four sections. The
-  gate is mechanical and absolute: every word of the draft must be a word the
-  clinician said (a new drug name, a new number, a new "not" are corruption
-  wearing tidiness), and dropping more than a third of the content refuses
-  the whole draft — checked in code (`note_drafting.dart`), before the
-  preview, which is itself accepted or discarded as a whole. Other sections
-  are appended to, never overwritten: text a person placed is not the
-  model's to rearrange.
-- **Explain for the patient.** Rewords the plan as instructions a patient can
-  follow. Rewording cannot be gated word-by-word — new words are the point —
-  so it gets the weaker mechanical checks (an echo is refused, an essay four
-  times the plan is refused as invention) and carries its caveat and badge
-  into the preview, with copy or append-under-the-plan as the only exits.
+**Working notes** — a scratch box above the four sections, added because SOAP
+describes where a note *ends up*, not how it is produced. Nobody dictates in
+four pre-sorted boxes; they talk through the consultation in the order it
+happened. So there is one box with a microphone to talk into, autosaved like
+everything else, and deliberately outside the signed record: `working_notes`
+is not in `canonicalContent()`, so the signature covers the four sections and
+nothing else. Signing clears it and warns first, with a word count, so
+dictation nobody sorted cannot silently fail to reach the chart.
 
-Both buttons exist only while a model is installed; the note editor is
-unchanged without one.
+- **Sort into S·O·A·P.** With a model active, one button distributes the
+  working notes across the four sections. The gate is mechanical and
+  absolute: every word must be a word the clinician said (a new drug name, a
+  new number, a new "not" are corruption wearing tidiness), and dropping more
+  than a third refuses the whole draft — checked in `note_drafting.dart`
+  before anything is shown.
+- **The review screen** replaced a sheet that applied everything at once and
+  announced it in a snackbar that disappeared. Each section shows what is
+  already there and what would be added, generated text tinted in the accent
+  (never a severity colour — "a machine wrote this" must not borrow the
+  vocabulary that means a patient is unwell), with a per-section keep/discard
+  switch, a toggle to re-read what you actually said, and a commit bar naming
+  how many sections will change. Only accepted sentences leave the working
+  notes; a discarded section's words stay in the box, because they still have
+  not been recorded anywhere.
+- **Generated text stays marked.** A section that holds exactly what the
+  model put there carries an AI badge, and the badge comes off on the first
+  keystroke — the rule the design system already states for generated
+  content. Signing warns about any section still unedited.
+- **Explain for the patient.** Rewords the plan as instructions a patient can
+  follow, shown beside the plan it came from. Rewording cannot be gated
+  word-by-word — new words are the point — so it gets the weaker checks (an
+  echo refused, an essay four times the plan refused as invention) and
+  carries its caveat and badge instead.
+
+The working-notes box works without a model — somewhere to put words while a
+patient is still talking — and tells you where to install one.
 
 ### 1.11 A small language model — *Interface only, deliberately*
 
