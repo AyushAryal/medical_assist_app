@@ -17,6 +17,46 @@ import '../../features/settings/modules_screen.dart';
 import '../../features/shell/app_shell.dart';
 import '../../features/vitals/vitals_entry_screen.dart';
 
+/// Wraps a full-screen route's page in Material's "fade through" pattern
+/// instead of go_router's platform-default push transition.
+///
+/// The default (a slide-with-parallax on iOS, fade-upward on Android)
+/// assumes an opaque page sliding over an opaque one. Every screen here has
+/// a transparent `Scaffold` so the shared ambient background shows through
+/// it, with content drawn on translucent, blurred glass panels (see
+/// `scaffoldBackgroundColor` in app_theme.dart and `GlassPanel`) — so for the
+/// whole length of a plain one-sided fade-in, the outgoing screen sits fully
+/// opaque and unchanged underneath while the incoming screen's translucent
+/// panels blend it in, reading as two screens overlapping rather than one
+/// replacing another. Fading the outgoing page out (driven by its own
+/// `secondaryAnimation`, which every page here reacts to since they all use
+/// this builder) at the same time as fading the incoming page in — with the
+/// outgoing fade finishing before the incoming one really gets going — is
+/// what actually clears it: by the time the new screen is visible enough to
+/// blur-sample what's behind it, the old screen is already gone.
+CustomTransitionPage<void> _fadeThrough(GoRouterState state, Widget child) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 260),
+    reverseTransitionDuration: const Duration(milliseconds: 220),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final entrance = CurvedAnimation(
+        parent: animation,
+        curve: const Interval(0.4, 1.0, curve: Curves.easeOut),
+      );
+      final exit = CurvedAnimation(
+        parent: secondaryAnimation,
+        curve: const Interval(0.0, 0.6, curve: Curves.easeIn),
+      );
+      return FadeTransition(
+        opacity: Tween<double>(begin: 1, end: 0).animate(exit),
+        child: FadeTransition(opacity: entrance, child: child),
+      );
+    },
+  );
+}
+
 /// Route names, referenced by constant everywhere so a path change is a
 /// one-line edit rather than a string hunt.
 abstract final class Routes {
@@ -138,61 +178,75 @@ abstract final class AppRouter {
         GoRoute(
           path: Routes.patientNew,
           parentNavigatorKey: rootNavigatorKey,
-          builder: (context, state) => const PatientFormScreen(),
+          pageBuilder: (context, state) =>
+              _fadeThrough(state, const PatientFormScreen()),
         ),
         GoRoute(
           path: Routes.patientChart,
           parentNavigatorKey: rootNavigatorKey,
-          builder: (context, state) =>
-              PatientChartScreen(patientId: state.pathParameters['patientId']!),
+          pageBuilder: (context, state) => _fadeThrough(
+            state,
+            PatientChartScreen(patientId: state.pathParameters['patientId']!),
+          ),
         ),
         GoRoute(
           path: Routes.patientEdit,
           parentNavigatorKey: rootNavigatorKey,
-          builder: (context, state) =>
-              PatientFormScreen(patientId: state.pathParameters['patientId']),
+          pageBuilder: (context, state) => _fadeThrough(
+            state,
+            PatientFormScreen(patientId: state.pathParameters['patientId']),
+          ),
         ),
         GoRoute(
           path: Routes.vitalsEntry,
           parentNavigatorKey: rootNavigatorKey,
-          builder: (context, state) => VitalsEntryScreen(
-            patientId: state.pathParameters['patientId']!,
-            encounterId: state.uri.queryParameters['encounterId'],
+          pageBuilder: (context, state) => _fadeThrough(
+            state,
+            VitalsEntryScreen(
+              patientId: state.pathParameters['patientId']!,
+              encounterId: state.uri.queryParameters['encounterId'],
+            ),
           ),
         ),
         GoRoute(
           path: Routes.encounter,
           parentNavigatorKey: rootNavigatorKey,
-          builder: (context, state) => EncounterScreen(
-            encounterId: state.pathParameters['encounterId']!,
+          pageBuilder: (context, state) => _fadeThrough(
+            state,
+            EncounterScreen(encounterId: state.pathParameters['encounterId']!),
           ),
         ),
         GoRoute(
           path: Routes.noteEditor,
           parentNavigatorKey: rootNavigatorKey,
-          builder: (context, state) => NoteEditorScreen(
-            encounterId: state.pathParameters['encounterId']!,
+          pageBuilder: (context, state) => _fadeThrough(
+            state,
+            NoteEditorScreen(encounterId: state.pathParameters['encounterId']!),
           ),
         ),
         GoRoute(
           path: Routes.clinics,
           parentNavigatorKey: rootNavigatorKey,
-          builder: (context, state) => const ClinicListScreen(),
+          pageBuilder: (context, state) =>
+              _fadeThrough(state, const ClinicListScreen()),
         ),
         GoRoute(
           path: Routes.modules,
           parentNavigatorKey: rootNavigatorKey,
-          builder: (context, state) => const ModulesScreen(),
+          pageBuilder: (context, state) =>
+              _fadeThrough(state, const ModulesScreen()),
         ),
         GoRoute(
           path: Routes.auditLog,
           parentNavigatorKey: rootNavigatorKey,
-          builder: (context, state) => const AuditLogScreen(),
+          pageBuilder: (context, state) =>
+              _fadeThrough(state, const AuditLogScreen()),
         ),
         GoRoute(
           path: Routes.dictation,
           parentNavigatorKey: rootNavigatorKey,
-          builder: (context, state) => const DictationSettingsScreen(),
+          pageBuilder: (context, state) =>
+              _fadeThrough(state, const DictationSettingsScreen()),
         ),
       ],
       errorBuilder: (context, state) => Scaffold(
