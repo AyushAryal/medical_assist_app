@@ -19,6 +19,13 @@ class ClinicListScreen extends StatelessWidget {
       backgroundColor: Colors.transparent,
       appBar: AppBar(title: const Text('Clinics')),
       floatingActionButton: FloatingActionButton.extended(
+        // Explicit tag: this and the other list screens' FABs otherwise all
+        // share Flutter's default FAB hero tag, and since the shell tabs sit
+        // in an IndexedStack (all branches mounted at once, not just the
+        // visible one), that collision throws "multiple heroes share the
+        // same tag" on every frame rather than only when one is pushed over
+        // the other.
+        heroTag: 'clinicListFab',
         onPressed: () => _ClinicEditorSheet.show(context),
         icon: const Icon(Icons.add),
         label: const Text('Add clinic'),

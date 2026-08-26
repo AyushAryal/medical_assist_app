@@ -292,6 +292,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               ],
             ),
       floatingActionButton: FloatingActionButton.extended(
+        // See clinic_list_screen.dart's heroTag comment: without a distinct
+        // tag this collides with the other shell tabs' FABs, since the
+        // IndexedStack keeps every tab's Scaffold mounted at once.
+        heroTag: 'scheduleFindPatientFab',
         onPressed: () => context.go(Routes.patients),
         icon: const Icon(Icons.person_search),
         label: const Text('Find patient'),

@@ -90,6 +90,10 @@ class _PatientListScreenState extends State<PatientListScreen> {
       backgroundColor: Colors.transparent,
       appBar: AppBar(title: const Text('Patients')),
       floatingActionButton: FloatingActionButton.extended(
+        // See clinic_list_screen.dart's heroTag comment: without a distinct
+        // tag this collides with the other shell tabs' FABs, since the
+        // IndexedStack keeps every tab's Scaffold mounted at once.
+        heroTag: 'patientListFab',
         onPressed: () async {
           await context.push(Routes.patientNew);
           if (mounted) _search(_query.text);
