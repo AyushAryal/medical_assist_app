@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../../core/design/design.dart';
+import '../../core/routing/fade_through_route.dart';
 
 import '../../core/utils/formatters.dart';
 import '../../data/models/attachment.dart';
@@ -33,7 +34,7 @@ class ImageViewer extends StatefulWidget {
     int initialIndex = 0,
   }) {
     return Navigator.of(context).push(
-      MaterialPageRoute<void>(
+      FadeThroughRoute<void>(
         fullscreenDialog: true,
         builder: (_) => ImageViewer(
           images: images,

@@ -16,6 +16,20 @@ import '../../features/settings/dictation_settings_screen.dart';
 import '../../features/settings/modules_screen.dart';
 import '../../features/shell/app_shell.dart';
 import '../../features/vitals/vitals_entry_screen.dart';
+import 'fade_through_route.dart';
+
+/// Full-screen route pages get their own opaque ambient background plus a
+/// fade-through transition instead of go_router's platform default — see
+/// `fade_through_route.dart`.
+CustomTransitionPage<void> _fadeThrough(GoRouterState state, Widget child) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: wrapWithAmbient(child),
+    transitionDuration: const Duration(milliseconds: 260),
+    reverseTransitionDuration: const Duration(milliseconds: 220),
+    transitionsBuilder: buildFadeThroughTransition,
+  );
+}
 
 /// Route names, referenced by constant everywhere so a path change is a
 /// one-line edit rather than a string hunt.
@@ -138,61 +152,75 @@ abstract final class AppRouter {
         GoRoute(
           path: Routes.patientNew,
           parentNavigatorKey: rootNavigatorKey,
-          builder: (context, state) => const PatientFormScreen(),
+          pageBuilder: (context, state) =>
+              _fadeThrough(state, const PatientFormScreen()),
         ),
         GoRoute(
           path: Routes.patientChart,
           parentNavigatorKey: rootNavigatorKey,
-          builder: (context, state) =>
-              PatientChartScreen(patientId: state.pathParameters['patientId']!),
+          pageBuilder: (context, state) => _fadeThrough(
+            state,
+            PatientChartScreen(patientId: state.pathParameters['patientId']!),
+          ),
         ),
         GoRoute(
           path: Routes.patientEdit,
           parentNavigatorKey: rootNavigatorKey,
-          builder: (context, state) =>
-              PatientFormScreen(patientId: state.pathParameters['patientId']),
+          pageBuilder: (context, state) => _fadeThrough(
+            state,
+            PatientFormScreen(patientId: state.pathParameters['patientId']),
+          ),
         ),
         GoRoute(
           path: Routes.vitalsEntry,
           parentNavigatorKey: rootNavigatorKey,
-          builder: (context, state) => VitalsEntryScreen(
-            patientId: state.pathParameters['patientId']!,
-            encounterId: state.uri.queryParameters['encounterId'],
+          pageBuilder: (context, state) => _fadeThrough(
+            state,
+            VitalsEntryScreen(
+              patientId: state.pathParameters['patientId']!,
+              encounterId: state.uri.queryParameters['encounterId'],
+            ),
           ),
         ),
         GoRoute(
           path: Routes.encounter,
           parentNavigatorKey: rootNavigatorKey,
-          builder: (context, state) => EncounterScreen(
-            encounterId: state.pathParameters['encounterId']!,
+          pageBuilder: (context, state) => _fadeThrough(
+            state,
+            EncounterScreen(encounterId: state.pathParameters['encounterId']!),
           ),
         ),
         GoRoute(
           path: Routes.noteEditor,
           parentNavigatorKey: rootNavigatorKey,
-          builder: (context, state) => NoteEditorScreen(
-            encounterId: state.pathParameters['encounterId']!,
+          pageBuilder: (context, state) => _fadeThrough(
+            state,
+            NoteEditorScreen(encounterId: state.pathParameters['encounterId']!),
           ),
         ),
         GoRoute(
           path: Routes.clinics,
           parentNavigatorKey: rootNavigatorKey,
-          builder: (context, state) => const ClinicListScreen(),
+          pageBuilder: (context, state) =>
+              _fadeThrough(state, const ClinicListScreen()),
         ),
         GoRoute(
           path: Routes.modules,
           parentNavigatorKey: rootNavigatorKey,
-          builder: (context, state) => const ModulesScreen(),
+          pageBuilder: (context, state) =>
+              _fadeThrough(state, const ModulesScreen()),
         ),
         GoRoute(
           path: Routes.auditLog,
           parentNavigatorKey: rootNavigatorKey,
-          builder: (context, state) => const AuditLogScreen(),
+          pageBuilder: (context, state) =>
+              _fadeThrough(state, const AuditLogScreen()),
         ),
         GoRoute(
           path: Routes.dictation,
           parentNavigatorKey: rootNavigatorKey,
-          builder: (context, state) => const DictationSettingsScreen(),
+          pageBuilder: (context, state) =>
+              _fadeThrough(state, const DictationSettingsScreen()),
         ),
       ],
       errorBuilder: (context, state) => Scaffold(

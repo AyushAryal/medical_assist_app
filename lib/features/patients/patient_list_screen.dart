@@ -90,6 +90,8 @@ class _PatientListScreenState extends State<PatientListScreen> {
       backgroundColor: Colors.transparent,
       appBar: AppBar(title: const Text('Patients')),
       floatingActionButton: FloatingActionButton.extended(
+        // See clinic_list_screen.dart's heroTag comment.
+        heroTag: 'patientListFab',
         onPressed: () async {
           await context.push(Routes.patientNew);
           if (mounted) _search(_query.text);

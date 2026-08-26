@@ -292,6 +292,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               ],
             ),
       floatingActionButton: FloatingActionButton.extended(
+        // See clinic_list_screen.dart's heroTag comment.
+        heroTag: 'scheduleFindPatientFab',
         onPressed: () => context.go(Routes.patients),
         icon: const Icon(Icons.person_search),
         label: const Text('Find patient'),

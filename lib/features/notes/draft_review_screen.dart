@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/design/design.dart';
+import '../../core/routing/fade_through_route.dart';
 import '../../data/services/assist/note_drafting.dart';
 
 /// One section's proposal, and what the clinician decided about it.
@@ -78,7 +79,7 @@ class DraftReviewScreen extends StatefulWidget {
     required String source,
   }) {
     return Navigator.of(context).push<Map<String, String>>(
-      MaterialPageRoute<Map<String, String>>(
+      FadeThroughRoute<Map<String, String>>(
         fullscreenDialog: true,
         builder: (context) => DraftReviewScreen(
           draft: draft,

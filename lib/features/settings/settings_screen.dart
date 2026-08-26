@@ -8,6 +8,7 @@ import '../../core/design/design.dart';
 
 import '../../core/app_bootstrap.dart';
 import '../../core/routing/app_router.dart';
+import '../../core/routing/fade_through_route.dart';
 import '../../core/security/app_lock_service.dart';
 import '../../core/session/session_controller.dart';
 import '../../core/theme/theme_controller.dart';
@@ -206,7 +207,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: const Text('Change PIN'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
+                      FadeThroughRoute<void>(
                         builder: (_) => const PinSetupScreen(),
                       ),
                     ),
