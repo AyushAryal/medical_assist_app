@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/agentic/agent_host.dart';
 import '../core/agentic/agent_surface.dart';
+import '../core/design/design.dart';
 import 'ui/guided_dictation_sheet.dart';
 
 /// The agentic module: the removable capability that operates a screen's
@@ -37,10 +38,21 @@ class _GuidedDictationAffordance extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return IconButton(
-      tooltip: 'Dictate these fields',
-      icon: const Icon(Icons.mic_none_outlined),
-      onPressed: () => GuidedDictationSheet.show(context, surface),
+    final m = context.metrics;
+    // A gently glowing mic, so the AI voice entry reads as the special thing
+    // it is rather than one more app-bar icon.
+    return Padding(
+      padding: EdgeInsets.only(right: m.spaceXs),
+      child: AiGlowBorder(
+        active: true,
+        borderRadius: BorderRadius.circular(m.radiusMd),
+        child: IconButton(
+          tooltip: 'Dictate these fields',
+          visualDensity: VisualDensity.compact,
+          icon: Icon(Icons.mic_none, color: context.palette.primary),
+          onPressed: () => GuidedDictationSheet.show(context, surface),
+        ),
+      ),
     );
   }
 }
