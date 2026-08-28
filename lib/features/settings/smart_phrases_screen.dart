@@ -49,22 +49,11 @@ class _SmartPhrasesScreenState extends State<SmartPhrasesScreen> {
   }
 
   Future<void> _delete(SmartPhraseRecord record) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Remove \\${record.trigger}?'),
-        content: const Text('This removes the phrase from every field.'),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
+    final ok = await confirmDialog(
+      context,
+      title: 'Remove \\${record.trigger}?',
+      message: 'This removes the phrase from every field.',
+      confirmLabel: 'Remove',
     );
     if (ok != true || !mounted) return;
     await context.read<ClinicalRepository>().smartPhrases.archive(record.id);

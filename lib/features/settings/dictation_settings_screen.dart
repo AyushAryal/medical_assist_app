@@ -161,13 +161,11 @@ class _DictationSettingsScreenState extends State<DictationSettingsScreen> {
     }
   }
 
-  Future<bool?> _confirmDownload(SpeechModel model) {
-    return showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Download the speech model?'),
-        content: Text(
-          'This is the only time this app makes a network request.\n\n'
+  Future<bool> _confirmDownload(SpeechModel model) {
+    return confirmDialog(
+      context,
+      title: 'Download the speech model?',
+      message: 'This is the only time this app makes a network request.\n\n'
           'It downloads ${model.sizeLabel} of model files from a public '
           'repository. No patient information, no identifier and no usage '
           'data is sent — the request contains nothing but the file name.\n\n'
@@ -175,18 +173,7 @@ class _DictationSettingsScreenState extends State<DictationSettingsScreen> {
           'nothing further is ever transmitted.\n\n'
           'If this device must never reach a network, cancel and use "Load '
           'from a file" instead.',
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text('Download ${model.sizeLabel}'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Download ${model.sizeLabel}',
     );
   }
 
@@ -268,27 +255,15 @@ class _DictationSettingsScreenState extends State<DictationSettingsScreen> {
   }
 
   Future<void> _remove(SpeechModel model) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Remove ${model.name}?'),
-        content: Text(
+    final confirmed = await confirmDialog(
+      context,
+      title: 'Remove ${model.name}?',
+      message:
           'Frees ${model.sizeLabel}. Recordings already transcribed keep their '
           'text — transcripts are stored in the note, not regenerated. New '
           'dictation will be attached as audio only until a model is '
           'installed again.',
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Remove',
     );
     if (confirmed != true || !mounted) return;
 

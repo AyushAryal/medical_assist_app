@@ -661,38 +661,25 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final generated = _fields.keys.where(_isGenerated).toList();
 
     final session = context.read<SessionController>();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Sign this note?'),
-        content: Text(
-          <String>[
-            if (unsorted.isNotEmpty)
-              'Your working notes still hold '
-                  '${unsorted.split(RegExp(r'\s+')).length} words that are '
-                  'not in any section. They are not part of the signed record '
-                  'and will be cleared.',
-            if (generated.isNotEmpty)
-              'You have not edited the text the model put into '
-                  '${generated.map((k) => _fieldLabels[k]!).join(' and ')} — '
-                  'read it once more before it becomes the record.',
-            'The note becomes the final record and can no longer be edited. '
-                'Later corrections are added as amendments, which stay '
-                'visible alongside the original.',
-            'Signing as ${session.signatureName}.',
-          ].join('\n\n'),
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Sign'),
-          ),
-        ],
-      ),
+    final confirmed = await confirmDialog(
+      context,
+      title: 'Sign this note?',
+      message: <String>[
+        if (unsorted.isNotEmpty)
+          'Your working notes still hold '
+              '${unsorted.split(RegExp(r'\s+')).length} words that are '
+              'not in any section. They are not part of the signed record '
+              'and will be cleared.',
+        if (generated.isNotEmpty)
+          'You have not edited the text the model put into '
+              '${generated.map((k) => _fieldLabels[k]!).join(' and ')} — '
+              'read it once more before it becomes the record.',
+        'The note becomes the final record and can no longer be edited. '
+            'Later corrections are added as amendments, which stay '
+            'visible alongside the original.',
+        'Signing as ${session.signatureName}.',
+      ].join('\n\n'),
+      confirmLabel: 'Sign',
     );
     if (confirmed != true || !mounted) return;
 
@@ -744,25 +731,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   Future<void> _removeAttachment(Attachment attachment) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Remove attachment?'),
-        content: const Text(
+    final confirmed = await confirmDialog(
+      context,
+      title: 'Remove attachment?',
+      message:
           'The file is deleted from this device. The record of it having been '
           'added remains in the access log.',
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Remove',
     );
     if (confirmed != true || !mounted) return;
     await context.read<ClinicalRepository>().removeAttachment(attachment);
