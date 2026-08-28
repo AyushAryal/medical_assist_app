@@ -31,31 +31,59 @@ class AgentModuleHost implements AgentHost {
 
 /// The control a screen's [AgentSlot] renders — a mic that starts the guided
 /// flow over the surface.
-class _GuidedDictationAffordance extends StatelessWidget {
+///
+/// It breathes the same accent → primary pulse as [AiSparkleIcon] (the AI
+/// bubble's star), so the mic reads as the same living AI element — a glyph
+/// that pulses from purple to blue, not a flat icon.
+class _GuidedDictationAffordance extends StatefulWidget {
   const _GuidedDictationAffordance({required this.surface});
 
   final AgentSurface surface;
 
   @override
+  State<_GuidedDictationAffordance> createState() =>
+      _GuidedDictationAffordanceState();
+}
+
+class _GuidedDictationAffordanceState extends State<_GuidedDictationAffordance>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2200),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    // The mic glyph itself is the accent, gradient-tinted and softly glowing,
-    // so the AI voice entry reads as the special thing it is rather than one
-    // more app-bar icon — no ring around it.
-    return IconButton(
-      tooltip: 'Dictate these fields',
-      onPressed: () => GuidedDictationSheet.show(context, surface),
-      icon: Icon(
-        Icons.mic_none,
-        // The AI accent (the purple the sparkle and generated-content icons
-        // use), not the blue primary — so the mic reads as the same family.
-        color: palette.accent,
-        // A soft halo of the same colour behind the glyph — the icon glows.
-        shadows: <Shadow>[
-          Shadow(color: palette.accent.withValues(alpha: 0.6), blurRadius: 9),
-          Shadow(color: palette.primary.withValues(alpha: 0.3), blurRadius: 16),
-        ],
-      ),
+    final reduced = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+
+    IconButton mic(Color color, double glow) => IconButton(
+          tooltip: 'Dictate these fields',
+          onPressed: () => GuidedDictationSheet.show(context, widget.surface),
+          icon: Icon(
+            Icons.mic_none,
+            color: color,
+            shadows: <Shadow>[
+              Shadow(color: color.withValues(alpha: 0.55), blurRadius: glow),
+            ],
+          ),
+        );
+
+    if (reduced) return mic(palette.accent, 8);
+
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final t = Curves.easeInOut.transform(_controller.value);
+        // The same pulse as the sparkle: accent (purple) → primary (blue).
+        return mic(Color.lerp(palette.accent, palette.primary, t)!, 7 + t * 5);
+      },
     );
   }
 }
