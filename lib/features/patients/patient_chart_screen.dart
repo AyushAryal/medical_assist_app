@@ -8,7 +8,7 @@ import '../../core/routing/app_router.dart';
 import '../../data/models/patient.dart';
 import '../../data/repositories/clinical_repository.dart';
 import '../../core/app_bootstrap.dart';
-import '../vitals/vitals_summary_card.dart';
+import '../vitals/vitals.dart';
 import 'chart_entry_sheets.dart';
 import 'patient_chart_controller.dart';
 import 'visit_record_view.dart';

@@ -20,7 +20,7 @@ import '../../data/models/problem.dart';
 import '../../data/repositories/clinical_repository.dart';
 import '../../core/app_bootstrap.dart';
 import '../../clinical/insights/note_intelligence.dart';
-import '../attachments/attachment_strip.dart';
+import '../attachments/attachments.dart';
 import 'amend_note_sheet.dart';
 import 'dictation_sheet.dart';
 import 'draft_review_screen.dart';

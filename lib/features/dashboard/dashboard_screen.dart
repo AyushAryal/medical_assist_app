@@ -5,8 +5,8 @@ import '../../core/design/design.dart';
 
 import '../../core/session/session_controller.dart';
 import '../../data/repositories/clinical_repository.dart';
-import '../appointments/book_appointment_sheet.dart';
-import '../clinics/clinic_picker_sheet.dart';
+import '../appointments/appointments.dart';
+import '../clinics/clinics.dart';
 import 'dashboard_controller.dart';
 import 'widgets/at_a_glance.dart';
 import 'widgets/header.dart';

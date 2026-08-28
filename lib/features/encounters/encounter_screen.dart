@@ -13,7 +13,7 @@ import '../../data/models/encounter.dart';
 import '../../data/models/patient.dart';
 import '../../data/models/vitals_record.dart';
 import '../../data/repositories/clinical_repository.dart';
-import '../vitals/vitals_summary_card.dart';
+import '../vitals/vitals.dart';
 
 /// The encounter workspace: observations, note and disposition for one visit,
 /// ending in a signature.

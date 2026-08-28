@@ -7,7 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/design/design.dart';
 
 import '../../data/models/attachment.dart';
-import '../notes/voice_note_button.dart';
+import 'voice_note_button.dart';
 
 /// Capture controls that sit on the header of a single note section.
 ///

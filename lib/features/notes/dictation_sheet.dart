@@ -7,7 +7,7 @@ import '../../core/app_bootstrap.dart';
 import '../../core/design/design.dart';
 import '../../data/services/dictation_recorder.dart';
 import '../../data/services/transcription/transcription_engine.dart';
-import '../attachments/inline_audio_player.dart';
+import '../attachments/attachments.dart';
 
 /// What the clinician takes away from a dictation.
 class DictationOutcome {

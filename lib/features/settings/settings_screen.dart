@@ -12,7 +12,7 @@ import '../../core/session/session_controller.dart';
 import '../../core/theme/theme_controller.dart';
 import '../../data/fixtures/demo_data.dart';
 import '../../data/repositories/clinical_repository.dart';
-import '../lock/pin_setup_screen.dart';
+import '../lock/lock.dart';
 import 'smart_phrases_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
