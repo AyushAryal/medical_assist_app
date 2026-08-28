@@ -142,6 +142,9 @@ class _VitalsEntryScreenState extends State<VitalsEntryScreen> {
         label: 'Blood pressure',
         kind: AgentFieldKind.pair,
         unit: 'mmHg',
+        aliases: const <String>['bp', 'pressure'],
+        min: 40,
+        max: 300,
         proposePair: (systolic, diastolic) => setState(() {
           _systolic.text = '$systolic';
           _diastolic.text = '$diastolic';
@@ -152,6 +155,9 @@ class _VitalsEntryScreenState extends State<VitalsEntryScreen> {
         label: 'Pulse',
         kind: AgentFieldKind.integer,
         unit: 'bpm',
+        aliases: const <String>['heart rate', 'hr'],
+        min: 20,
+        max: 300,
         proposeNumber: (v) => setText(_heartRate, v),
       ),
       AgentField(
@@ -159,6 +165,9 @@ class _VitalsEntryScreenState extends State<VitalsEntryScreen> {
         label: 'Respiratory rate',
         kind: AgentFieldKind.integer,
         unit: 'breaths/min',
+        aliases: const <String>['resp', 'respiration', 'breathing'],
+        min: 4,
+        max: 80,
         proposeNumber: (v) => setText(_respiratoryRate, v),
       ),
       AgentField(
@@ -166,6 +175,9 @@ class _VitalsEntryScreenState extends State<VitalsEntryScreen> {
         label: 'Oxygen saturation',
         kind: AgentFieldKind.integer,
         unit: '%',
+        aliases: const <String>['spo2', 'sats', 'sat', 'oxygen', 'saturation'],
+        min: 50,
+        max: 100,
         proposeNumber: (v) => setText(_spo2, v),
       ),
       AgentField(
@@ -173,6 +185,9 @@ class _VitalsEntryScreenState extends State<VitalsEntryScreen> {
         label: 'Temperature',
         kind: AgentFieldKind.decimal,
         unit: '°C',
+        aliases: const <String>['temp'],
+        min: 30,
+        max: 45,
         proposeNumber: (v) => setText(_temperature, v),
       ),
       AgentField(
@@ -180,6 +195,9 @@ class _VitalsEntryScreenState extends State<VitalsEntryScreen> {
         label: 'Blood glucose',
         kind: AgentFieldKind.decimal,
         unit: 'mmol/L',
+        aliases: const <String>['glucose', 'sugar', 'bsl'],
+        min: 1,
+        max: 40,
         proposeNumber: (v) => setText(_glucose, v),
       ),
       AgentField(
@@ -187,6 +205,9 @@ class _VitalsEntryScreenState extends State<VitalsEntryScreen> {
         label: 'Weight',
         kind: AgentFieldKind.decimal,
         unit: 'kg',
+        aliases: const <String>['wt'],
+        min: 1,
+        max: 400,
         proposeNumber: (v) => setText(_weight, v),
       ),
     ]);

@@ -28,6 +28,9 @@ class AgentField {
     required this.label,
     required this.kind,
     this.unit,
+    this.aliases = const <String>[],
+    this.min,
+    this.max,
     this.proposeNumber,
     this.proposePair,
     this.proposeText,
@@ -44,9 +47,46 @@ class AgentField {
 
   final AgentFieldKind kind;
 
+  /// Spoken names that route a value to this field in continuous dictation —
+  /// e.g. `['bp', 'blood pressure', 'pressure']`. The [label] is always an
+  /// implicit alias.
+  final List<String> aliases;
+
+  /// Physiologically plausible bounds. A parsed value outside them is refused
+  /// rather than entered — a misheard "pulse 880" must not reach the record.
+  /// These are *possible* limits, wide on purpose; abnormal-but-real values
+  /// still pass and are flagged later by the reference ranges.
+  final num? min;
+  final num? max;
+
   final void Function(num value)? proposeNumber;
   final void Function(int first, int second)? proposePair;
   final void Function(String value)? proposeText;
+
+  /// Whether [value] is inside this field's plausible bounds.
+  bool accepts(num value) =>
+      (min == null || value >= min!) && (max == null || value <= max!);
+
+  /// The alias (or label) this field is called by in [text], longest first so
+  /// "blood pressure" wins over "pressure". Single-word names must match a
+  /// whole word — otherwise "hr" would match inside "three" — while multi-word
+  /// names match as a phrase.
+  String? matchAlias(String text) {
+    final tokens =
+        text.split(RegExp(r'[^a-z]+')).where((t) => t.isNotEmpty).toSet();
+    final names = <String>[
+      label.toLowerCase(),
+      ...aliases.map((a) => a.toLowerCase()),
+    ]..sort((a, b) => b.length.compareTo(a.length));
+    for (final name in names) {
+      if (name.contains(' ')) {
+        if (text.contains(name)) return name;
+      } else if (tokens.contains(name)) {
+        return name;
+      }
+    }
+    return null;
+  }
 
   /// True when this field can actually be filled by an agent (a matching
   /// propose callback is present for its kind).
