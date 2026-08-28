@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:medical_app/features/vitals/guided/spoken_value.dart';
+import 'package:medical_app/agentic/drivers/spoken_value.dart';
 
 void main() {
   const parser = SpokenValueParser();

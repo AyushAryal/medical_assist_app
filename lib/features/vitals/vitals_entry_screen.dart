@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/agentic/agentic.dart';
 import '../../core/design/design.dart';
 
 import '../../clinical/news2.dart';
@@ -125,6 +126,71 @@ class _VitalsEntryScreenState extends State<VitalsEntryScreen> {
 
   double? _double(TextEditingController controller) =>
       double.tryParse(controller.text.trim());
+
+  /// The fields this screen is willing to have an agent fill. An agent only
+  /// *proposes*: each callback writes into the field's controller, which the
+  /// clinician still reviews and saves. Nothing here knows about the agentic
+  /// module — it publishes a plain [AgentSurface] and an [AgentSlot] renders
+  /// whatever driver, if any, is installed.
+  AgentSurface _agentSurface() {
+    void setText(TextEditingController c, num v) => setState(() {
+          c.text = v == v.roundToDouble() ? '${v.toInt()}' : '$v';
+        });
+    return AgentSurface(<AgentField>[
+      AgentField(
+        id: 'bp',
+        label: 'Blood pressure',
+        kind: AgentFieldKind.pair,
+        unit: 'mmHg',
+        proposePair: (systolic, diastolic) => setState(() {
+          _systolic.text = '$systolic';
+          _diastolic.text = '$diastolic';
+        }),
+      ),
+      AgentField(
+        id: 'pulse',
+        label: 'Pulse',
+        kind: AgentFieldKind.integer,
+        unit: 'bpm',
+        proposeNumber: (v) => setText(_heartRate, v),
+      ),
+      AgentField(
+        id: 'resp',
+        label: 'Respiratory rate',
+        kind: AgentFieldKind.integer,
+        unit: 'breaths/min',
+        proposeNumber: (v) => setText(_respiratoryRate, v),
+      ),
+      AgentField(
+        id: 'spo2',
+        label: 'Oxygen saturation',
+        kind: AgentFieldKind.integer,
+        unit: '%',
+        proposeNumber: (v) => setText(_spo2, v),
+      ),
+      AgentField(
+        id: 'temp',
+        label: 'Temperature',
+        kind: AgentFieldKind.decimal,
+        unit: '°C',
+        proposeNumber: (v) => setText(_temperature, v),
+      ),
+      AgentField(
+        id: 'glucose',
+        label: 'Blood glucose',
+        kind: AgentFieldKind.decimal,
+        unit: 'mmol/L',
+        proposeNumber: (v) => setText(_glucose, v),
+      ),
+      AgentField(
+        id: 'weight',
+        label: 'Weight',
+        kind: AgentFieldKind.decimal,
+        unit: 'kg',
+        proposeNumber: (v) => setText(_weight, v),
+      ),
+    ]);
+  }
 
   News2Input get _news2Input => News2Input(
     respiratoryRate: _int(_respiratoryRate),
@@ -432,6 +498,10 @@ class _VitalsEntryScreenState extends State<VitalsEntryScreen> {
               onPressed: _copyStableValues,
               child: const Text('Copy ht/wt'),
             ),
+          // Publishes these fields to whatever agent is installed. Renders a
+          // mic when the agentic module is present, nothing when it is not —
+          // the screen never depends on the module.
+          AgentSlot(surface: _agentSurface()),
         ],
       ),
       bottomNavigationBar: SafeArea(

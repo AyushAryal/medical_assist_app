@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 
 import 'features/assist/assist.dart';
 
+import 'core/agentic/agent_host.dart';
+import 'core/agentic/agent_scope.dart';
 import 'core/app_bootstrap.dart';
 import 'core/routing/app_router.dart';
 import 'core/security/app_lock_service.dart';
@@ -16,7 +18,12 @@ import 'data/repositories/clinical_repository.dart';
 import 'features/lock/lock.dart';
 
 class MedicalApp extends StatefulWidget {
-  const MedicalApp({super.key});
+  const MedicalApp({super.key, this.agentHost});
+
+  /// The agentic module's host, injected at the composition root. Null when
+  /// the module is not installed — the app then runs with no agent affordances
+  /// and never references anything under `lib/agentic/`.
+  final AgentHost? agentHost;
 
   @override
   State<MedicalApp> createState() => _MedicalAppState();
@@ -76,7 +83,12 @@ class _MedicalAppState extends State<MedicalApp> with WidgetsBindingObserver {
         // Without it the translucent panels would have nothing to sample.
         builder: (context, child) => AmbientBackground(
           child: LockGate(
-            child: _DataScope(child: child ?? const SizedBox.shrink()),
+            child: _DataScope(
+              child: AgentScope(
+                host: widget.agentHost,
+                child: child ?? const SizedBox.shrink(),
+              ),
+            ),
           ),
         ),
       ),

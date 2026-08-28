@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:medical_app/core/agentic/agent_surface.dart';
-import 'package:medical_app/features/vitals/guided/guided_dictation_controller.dart';
-import 'package:medical_app/features/vitals/guided/spoken_value.dart';
+import 'package:medical_app/agentic/drivers/guided_dictation_controller.dart';
+import 'package:medical_app/agentic/drivers/spoken_value.dart';
 
 void main() {
   // A fake vitals surface whose propose callbacks record what was set.

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import 'agentic/agentic_module.dart';
 import 'app.dart';
 import 'core/app_bootstrap.dart';
 import 'core/modules/entitlements.dart';
@@ -46,7 +47,10 @@ Future<void> main() async {
           ),
         ),
       ],
-      child: const MedicalApp(),
+      // The one place the app references the agentic module. Delete
+      // `lib/agentic/` and change this to `const MedicalApp()` (agentHost null)
+      // and the app builds and runs with no agent affordances.
+      child: const MedicalApp(agentHost: AgentModuleHost()),
     ),
   );
 }
