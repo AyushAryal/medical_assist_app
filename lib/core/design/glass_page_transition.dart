@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 /// The iOS page slide, but the moving page is liquid glass.
@@ -12,6 +13,10 @@ import 'package:flutter/material.dart';
 /// incoming page refracts what is behind it (a strong, high-transparency
 /// frost that swells while it travels and clears as it settles), so a screen
 /// change reads as one glass surface sliding over another.
+///
+/// It delegates the slide itself to [CupertinoRouteTransitionMixin], which is
+/// what carries the native interactive edge-swipe-back gesture, and only wraps
+/// that in the refraction — so the glass never costs the back-swipe.
 class GlassPageTransitionsBuilder extends PageTransitionsBuilder {
   const GlassPageTransitionsBuilder();
 
@@ -23,33 +28,14 @@ class GlassPageTransitionsBuilder extends PageTransitionsBuilder {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
-    final slideIn = Tween<Offset>(
-      begin: const Offset(1, 0),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: animation,
-      curve: Curves.easeOutCubic,
-      reverseCurve: Curves.easeInCubic,
-    ));
-
-    // The page beneath drifts left a little as it is covered — the parallax
-    // that gives the stack its depth.
-    final slideOut = Tween<Offset>(
-      begin: Offset.zero,
-      end: const Offset(-0.22, 0),
-    ).animate(CurvedAnimation(
-      parent: secondaryAnimation,
-      curve: Curves.easeOutCubic,
-      reverseCurve: Curves.easeInCubic,
-    ));
-
-    return SlideTransition(
-      position: slideOut,
-      child: SlideTransition(
-        position: slideIn,
-        child: _LiquidGlass(animation: animation, child: child),
-      ),
+    final slide = CupertinoRouteTransitionMixin.buildPageTransitions<T>(
+      route,
+      context,
+      animation,
+      secondaryAnimation,
+      child,
     );
+    return _LiquidGlass(animation: animation, child: slide);
   }
 }
 
