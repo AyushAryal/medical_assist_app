@@ -47,11 +47,13 @@ class _GuidedDictationAffordance extends StatelessWidget {
       onPressed: () => GuidedDictationSheet.show(context, surface),
       icon: Icon(
         Icons.mic_none,
-        color: palette.primary,
+        // The AI accent (the purple the sparkle and generated-content icons
+        // use), not the blue primary — so the mic reads as the same family.
+        color: palette.accent,
         // A soft halo of the same colour behind the glyph — the icon glows.
         shadows: <Shadow>[
-          Shadow(color: palette.primary.withValues(alpha: 0.6), blurRadius: 9),
-          Shadow(color: palette.accent.withValues(alpha: 0.35), blurRadius: 16),
+          Shadow(color: palette.accent.withValues(alpha: 0.6), blurRadius: 9),
+          Shadow(color: palette.primary.withValues(alpha: 0.3), blurRadius: 16),
         ],
       ),
     );
