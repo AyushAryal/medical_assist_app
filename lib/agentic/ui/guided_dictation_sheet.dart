@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -15,22 +14,15 @@ import '../drivers/continuous_dictation_controller.dart';
 // modal sheet is pushed outside the calling context's providers anyway — so it
 // is read once at the call site and handed to the sheet directly.
 
-/// How the clinician gives the values.
-enum _Mode {
-  /// Say each value — "BP 120 over 80, pulse 88". Deterministic parsing.
-  dictate,
-
-  /// Describe the obs freely — "looks unwell, pressure was 120 on 80, a bit
-  /// tachy at 110, febrile" — and the on-device model infers the numbers.
-  describe,
-}
-
-/// Hands-free vitals entry. Tap listen, speak, and pause — the recording stops
-/// on its own, the values are transcribed on device and fill a live preview.
-/// Everything is a proposal the clinician reviews and saves; nothing is trusted
-/// blindly, so a value outside its plausible range is refused rather than
-/// written. The routing, sanitising and model-output validation are unit-
-/// tested; the audio runs on device.
+/// Hands-free vitals entry. Tap start once and speak the set with a pause
+/// between values — "BP one-twenty over eighty" … "pulse eighty-eight" … "skip
+/// glucose" … "done". Each phrase is transcribed on device and staged in a live
+/// checklist; the mic keeps listening between phrases, so nothing needs tapping.
+/// Nothing reaches the form until the clinician taps Approve & fill, and every
+/// value is range-checked, so an impossible reading is refused not written.
+///
+/// The routing, sanitising and status machine are unit-tested; the audio and
+/// the pause detection run on device.
 class GuidedDictationSheet extends StatefulWidget {
   const GuidedDictationSheet({
     super.key,
@@ -48,7 +40,7 @@ class GuidedDictationSheet extends StatefulWidget {
       isScrollControlled: true,
       showDragHandle: true,
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * 0.92,
+        maxHeight: MediaQuery.sizeOf(context).height * 0.9,
       ),
       builder: (_) =>
           GuidedDictationSheet(surface: surface, bootstrap: bootstrap),
@@ -63,7 +55,10 @@ class _GuidedDictationSheetState extends State<GuidedDictationSheet> {
   late final ContinuousDictationController _controller =
       ContinuousDictationController(widget.surface);
 
-  _Mode _mode = _Mode.dictate;
+  /// True while a continuous listening session is running (across phrases).
+  bool _session = false;
+
+  /// True while the mic is actually open (false during the transcribe gap).
   bool _listening = false;
   bool _working = false;
   double _level = 0;
@@ -71,7 +66,7 @@ class _GuidedDictationSheetState extends State<GuidedDictationSheet> {
   String? _heard;
   Timer? _levelTimer;
 
-  static const _silenceStop = Duration(milliseconds: 1400);
+  static const _silenceStop = Duration(milliseconds: 1300);
 
   @override
   void dispose() {
@@ -79,9 +74,27 @@ class _GuidedDictationSheetState extends State<GuidedDictationSheet> {
     super.dispose();
   }
 
-  Future<void> _startListen() async {
+  void _start() {
+    setState(() => _session = true);
+    _beginListen();
+  }
+
+  void _stop() {
+    _session = false;
+    if (_listening) {
+      _capturePhrase();
+    } else {
+      setState(() {});
+    }
+  }
+
+  Future<void> _beginListen() async {
     final started = await widget.bootstrap.dictation.start();
-    if (!mounted || !started) return;
+    if (!mounted) return;
+    if (!started) {
+      setState(() => _session = false);
+      return;
+    }
     setState(() {
       _listening = true;
       _sawSpeech = false;
@@ -92,14 +105,12 @@ class _GuidedDictationSheetState extends State<GuidedDictationSheet> {
       final level = widget.bootstrap.dictation.level;
       if (level.isSpeaking) _sawSpeech = true;
       setState(() => _level = level.current);
-      // Auto-stop once the clinician has spoken and then paused — no button.
-      if (_sawSpeech && level.silenceRun >= _silenceStop) {
-        _stopAndProcess();
-      }
+      // A pause after speech ends the phrase — no button.
+      if (_sawSpeech && level.silenceRun >= _silenceStop) _capturePhrase();
     });
   }
 
-  Future<void> _stopAndProcess() async {
+  Future<void> _capturePhrase() async {
     _levelTimer?.cancel();
     if (!_listening) return;
     setState(() {
@@ -113,50 +124,25 @@ class _GuidedDictationSheetState extends State<GuidedDictationSheet> {
         capture.file,
       );
       // Collapse the token repetition tiny models emit on short/quiet audio
-      // ("21 21 21 21" -> "21") before parsing.
+      // ("21 21 21" -> "21") before parsing.
       final text = ContinuousDictationController.cleanTranscript(result.text);
-      if (mounted) setState(() => _heard = text.isEmpty ? '(nothing heard)' : text);
-
-      if (_mode == _Mode.dictate) {
-        _controller.applyTranscript(text);
-      } else {
-        await _describe(text);
+      _controller.applyTranscript(text);
+      if (mounted) {
+        setState(() => _heard = text.isEmpty ? null : text);
       }
     } on Object {
-      if (mounted) setState(() => _heard = 'Could not transcribe — try again.');
+      if (mounted) setState(() => _heard = 'Did not catch that.');
     } finally {
-      if (mounted) setState(() => _working = false);
-    }
-  }
-
-  Future<void> _describe(String text) async {
-    final engine = widget.bootstrap.assistEngine;
-    var landed = 0;
-    if (engine != null) {
-      final reply = await engine.extractValues(
-        text,
-        fields: widget.surface.fillable.map((f) => f.id).toList(),
-      );
-      final json = _asJson(reply);
-      if (json != null) landed = _controller.applyExtractionJson(json);
-    }
-    // Fall back to the deterministic parser when no model is installed or it
-    // returned nothing usable — a structured description ("BP 120 over 80,
-    // pulse 88") still fills, so Describe is never a dead end.
-    if (landed == 0) _controller.applyTranscript(text);
-  }
-
-  /// The model's reply may carry stray prose; take the first JSON object.
-  Map<String, Object?>? _asJson(String? reply) {
-    if (reply == null) return null;
-    final start = reply.indexOf('{');
-    final end = reply.lastIndexOf('}');
-    if (start < 0 || end <= start) return null;
-    try {
-      final decoded = jsonDecode(reply.substring(start, end + 1));
-      return decoded is Map<String, Object?> ? decoded : null;
-    } on Object {
-      return null;
+      if (mounted) {
+        setState(() => _working = false);
+        // Keep listening for the next value unless the session ended or the
+        // set is complete.
+        if (_session && !_controller.complete) {
+          _beginListen();
+        } else {
+          setState(() => _session = false);
+        }
+      }
     }
   }
 
@@ -174,8 +160,6 @@ class _GuidedDictationSheetState extends State<GuidedDictationSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             _header(context),
-            SizedBox(height: m.spaceSm),
-            _modeToggle(context),
             SizedBox(height: m.spaceMd),
             Flexible(
               child: SingleChildScrollView(
@@ -186,14 +170,14 @@ class _GuidedDictationSheetState extends State<GuidedDictationSheet> {
                         entry: entry,
                         isNext: !_controller.complete &&
                             entry.field.id == _controller.current?.id,
-                        listening: _listening,
+                        listening: _session,
                       ),
                   ],
                 ),
               ),
             ),
             SizedBox(height: m.spaceMd),
-            _listenArea(context),
+            _controls(context),
           ],
         ),
       ),
@@ -218,47 +202,22 @@ class _GuidedDictationSheetState extends State<GuidedDictationSheet> {
     );
   }
 
-  Widget _modeToggle(BuildContext context) {
-    return SegmentedButton<_Mode>(
-      segments: const <ButtonSegment<_Mode>>[
-        ButtonSegment<_Mode>(
-          value: _Mode.dictate,
-          label: Text('Dictate'),
-          icon: Icon(Icons.spatial_audio_off, size: 18),
-        ),
-        ButtonSegment<_Mode>(
-          value: _Mode.describe,
-          label: Text('Describe'),
-          icon: Icon(Icons.auto_awesome, size: 18),
-        ),
-      ],
-      selected: <_Mode>{_mode},
-      showSelectedIcon: false,
-      onSelectionChanged: _listening || _working
-          ? null
-          : (s) => setState(() => _mode = s.first),
-    );
-  }
-
-  Widget _listenArea(BuildContext context) {
+  Widget _controls(BuildContext context) {
     final m = context.metrics;
     final palette = context.palette;
-
-    final hint = _mode == _Mode.dictate
-        ? 'Say each value — "BP 120 over 80, pulse 88, temp 38.6". Say "skip".'
-        : 'Describe the obs in your own words — the assistant reads the numbers.';
+    final active = _session || _working;
+    final filled = _controller.filledCount;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        // The live audio plot while listening, so a working mic is obvious;
-        // the hint or what was heard otherwise. The glow marks it as the AI
-        // feature at work.
+        // A live audio plot while the session runs, so a working mic is
+        // obvious; the glow marks the AI feature at work.
         AiGlowBorder(
-          active: _listening || _working,
+          active: active,
           borderRadius: BorderRadius.circular(m.radiusMd),
           child: Container(
-            height: 64,
+            height: 60,
             padding: EdgeInsets.symmetric(horizontal: m.spaceMd),
             alignment: Alignment.center,
             child: _listening
@@ -266,54 +225,46 @@ class _GuidedDictationSheetState extends State<GuidedDictationSheet> {
                 : Text(
                     _working
                         ? 'Reading what you said…'
-                        : _heard == null
-                            ? hint
-                            : 'Heard: "$_heard"',
+                        : _heard != null
+                            ? 'Heard: "$_heard"'
+                            : 'Tap start, then say each value with a pause '
+                                'between — "BP 120 over 80", "pulse 88", '
+                                '"skip glucose", "done".',
                     style: context.texts.labelMedium
                         ?.copyWith(color: palette.onSurfaceMuted),
                     textAlign: TextAlign.center,
-                    maxLines: 2,
+                    maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                   ),
           ),
         ),
         SizedBox(height: m.spaceMd),
-        // Capture (secondary once there is something to approve).
-        if (_controller.filledCount == 0)
+        if (_session)
           FilledButton.icon(
-            onPressed: _working
-                ? null
-                : (_listening ? _stopAndProcess : _startListen),
-            icon: Icon(_listening ? Icons.stop : Icons.mic),
-            label: Text(_working
-                ? 'Working…'
-                : _listening
-                    ? 'Stop'
-                    : 'Listen'),
+            onPressed: _working ? null : _stop,
+            icon: const Icon(Icons.stop),
+            label: const Text('Stop'),
+          )
+        else if (filled == 0)
+          FilledButton.icon(
+            onPressed: _start,
+            icon: const Icon(Icons.mic),
+            label: const Text('Start listening'),
           )
         else ...<Widget>[
-          OutlinedButton.icon(
-            onPressed: _working
-                ? null
-                : (_listening ? _stopAndProcess : _startListen),
-            icon: Icon(_listening ? Icons.stop : Icons.mic),
-            label: Text(_working
-                ? 'Working…'
-                : _listening
-                    ? 'Stop'
-                    : 'Add more'),
+          FilledButton.icon(
+            onPressed: () {
+              _controller.commit();
+              Navigator.of(context).maybePop();
+            },
+            icon: const Icon(Icons.check),
+            label: Text('Approve & fill ($filled)'),
           ),
           SizedBox(height: m.spaceSm),
-          // The explicit review step: nothing reaches the form until this.
-          FilledButton.icon(
-            onPressed: (_working || _listening)
-                ? null
-                : () {
-                    _controller.commit();
-                    Navigator.of(context).maybePop();
-                  },
-            icon: const Icon(Icons.check),
-            label: Text('Approve & fill (${_controller.filledCount})'),
+          OutlinedButton.icon(
+            onPressed: _start,
+            icon: const Icon(Icons.mic),
+            label: const Text('Continue'),
           ),
         ],
         TextButton(
@@ -325,7 +276,7 @@ class _GuidedDictationSheetState extends State<GuidedDictationSheet> {
   }
 }
 
-/// One field in the live preview, its status shown by icon, colour and value.
+/// One field in the live checklist, its status shown by icon, colour and value.
 class _PreviewRow extends StatelessWidget {
   const _PreviewRow({
     required this.entry,
@@ -347,29 +298,27 @@ class _PreviewRow extends StatelessWidget {
       FieldStatus.skipped => (Icons.remove_circle_outline, palette.onSurfaceMuted),
       FieldStatus.rejected => (Icons.error_outline, palette.caution),
       FieldStatus.pending => (
-          isNext ? Icons.graphic_eq : Icons.circle_outlined,
-          isNext ? palette.primary : palette.onSurfaceMuted,
+          isNext && listening ? Icons.graphic_eq : Icons.circle_outlined,
+          isNext && listening ? palette.primary : palette.onSurfaceMuted,
         ),
     };
 
     final trailing = switch (entry.status) {
       FieldStatus.filled => entry.display ?? '',
       FieldStatus.skipped => 'skipped',
-      FieldStatus.rejected => 'not caught — repeat',
-      // Only say "listening" when the mic is actually open.
+      FieldStatus.rejected => 'not caught',
       FieldStatus.pending => isNext && listening ? 'listening…' : '',
     };
+
+    final highlight = isNext && listening;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       margin: EdgeInsets.only(bottom: m.spaceXs),
       padding: EdgeInsets.symmetric(horizontal: m.spaceMd, vertical: m.spaceSm),
       decoration: BoxDecoration(
-        color: isNext ? palette.primaryContainer : palette.surfaceMuted,
+        color: highlight ? palette.primaryContainer : palette.surfaceMuted,
         borderRadius: BorderRadius.circular(m.radiusSm),
-        border: isNext
-            ? Border.all(color: palette.primary.withValues(alpha: 0.5))
-            : null,
       ),
       child: Row(
         children: <Widget>[
