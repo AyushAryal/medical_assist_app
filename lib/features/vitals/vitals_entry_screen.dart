@@ -12,6 +12,8 @@ import '../../core/utils/ids.dart';
 import '../../data/models/patient.dart';
 import '../../data/models/vitals_record.dart';
 import '../../data/repositories/clinical_repository.dart';
+import 'widgets/news2_preview.dart';
+import 'widgets/pain_scale.dart';
 
 /// Observation entry.
 ///
@@ -386,7 +388,7 @@ class _VitalsEntryScreenState extends State<VitalsEntryScreen> {
             maxLength: 5,
           ),
           SizedBox(height: m.spaceLg),
-          _PainScale(
+          PainScale(
             value: _painScore,
             onChanged: (value) => setState(() => _painScore = value),
           ),
@@ -461,7 +463,7 @@ class _VitalsEntryScreenState extends State<VitalsEntryScreen> {
                     0,
                   ),
                   child: ContentWidth.columns(
-                    child: _News2Preview(
+                    child: News2Preview(
                       input: _news2Input,
                       ageYears: age?.years,
                     ),
@@ -498,156 +500,6 @@ class _VitalsEntryScreenState extends State<VitalsEntryScreen> {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// Live NEWS2 as the observations are typed.
-///
-/// Showing the score during entry, rather than after saving, means a
-/// deteriorating patient is flagged while the clinician is still at the
-/// bedside.
-class _News2Preview extends StatelessWidget {
-  const _News2Preview({required this.input, required this.ageYears});
-
-  final News2Input input;
-  final int? ageYears;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final m = context.metrics;
-
-    final reason = News2Calculator.unavailableReason(
-      ageYears: ageYears,
-      isPregnant: false,
-      input: input,
-    );
-
-    if (reason != null) {
-      final message = switch (reason) {
-        News2Unavailable.ageOutOfScope =>
-          'NEWS2 applies to patients aged 16 and over.',
-        News2Unavailable.pregnancy => 'NEWS2 is not validated in pregnancy.',
-        News2Unavailable.incompleteObservations =>
-          'NEWS2 needs all seven observations — '
-              '${News2Calculator.missingParameters(input).length} still missing.',
-      };
-      return Container(
-        padding: EdgeInsets.all(m.spaceMd),
-        decoration: BoxDecoration(
-          color: palette.surfaceMuted,
-          borderRadius: BorderRadius.circular(m.radiusSm),
-          border: Border.all(color: palette.outline),
-        ),
-        child: Row(
-          children: <Widget>[
-            Icon(Icons.info_outline, size: 16, color: palette.onSurfaceMuted),
-            SizedBox(width: m.spaceSm),
-            Expanded(child: Text(message, style: context.texts.bodySmall)),
-          ],
-        ),
-      );
-    }
-
-    final result = News2Calculator.score(
-      ageYears: ageYears,
-      isPregnant: false,
-      input: input,
-    )!;
-
-    final tone = switch (result.risk) {
-      News2Risk.high => PillTone.critical,
-      News2Risk.medium || News2Risk.lowMedium => PillTone.caution,
-      News2Risk.low => PillTone.normal,
-    };
-
-    return Container(
-      padding: EdgeInsets.all(m.spaceMd),
-      decoration: BoxDecoration(
-        color: palette.surface,
-        borderRadius: BorderRadius.circular(m.radiusSm),
-        border: Border.all(color: palette.outline),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              Text('NEWS2', style: context.texts.titleSmall),
-              SizedBox(width: m.spaceSm),
-              StatusPill(
-                label: '${result.total} · ${result.risk.label}',
-                tone: tone,
-              ),
-              const Spacer(),
-              if (result.hasSingleParameterThree)
-                const StatusPill(
-                  label: 'Single param = 3',
-                  tone: PillTone.caution,
-                  dense: true,
-                ),
-            ],
-          ),
-          SizedBox(height: m.spaceSm),
-          Text(result.risk.response, style: context.texts.bodySmall),
-          SizedBox(height: m.spaceSm),
-          Wrap(
-            spacing: m.spaceSm,
-            runSpacing: m.spaceXs,
-            children: result.parameterScores.entries
-                .where((entry) => entry.value > 0)
-                .map(
-                  (entry) => StatusPill(
-                    label: '${entry.key} +${entry.value}',
-                    tone: entry.value >= 3
-                        ? PillTone.critical
-                        : PillTone.caution,
-                    dense: true,
-                  ),
-                )
-                .toList(),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 0–10 numeric pain scale as tappable targets rather than a slider — a slider
-/// cannot be hit accurately with a gloved thumb.
-class _PainScale extends StatelessWidget {
-  const _PainScale({required this.value, required this.onChanged});
-
-  final int? value;
-  final ValueChanged<int?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final m = context.metrics;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text('Pain score (0–10)', style: context.texts.labelMedium),
-        SizedBox(height: m.spaceSm),
-        Wrap(
-          spacing: m.spaceXs,
-          runSpacing: m.spaceXs,
-          children: List<Widget>.generate(11, (index) {
-            final isSelected = value == index;
-            return SizedBox(
-              width: 40,
-              child: ChoiceChip(
-                label: Center(child: Text('$index')),
-                labelPadding: EdgeInsets.zero,
-                selected: isSelected,
-                onSelected: (selected) => onChanged(selected ? index : null),
-              ),
-            );
-          }),
-        ),
-      ],
     );
   }
 }
