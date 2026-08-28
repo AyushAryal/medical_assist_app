@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/design/design.dart';
 import '../../../core/routing/app_router.dart';
 import '../../../data/models/appointment.dart';
-import '../../appointments/appointment_tile.dart';
+import '../../appointments/appointments.dart';
 import '../dashboard_controller.dart';
 
 class TodaySchedule extends StatelessWidget {

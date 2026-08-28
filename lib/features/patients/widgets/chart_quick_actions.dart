@@ -3,8 +3,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/design/design.dart';
 import '../../../core/routing/app_router.dart';
-import '../../appointments/book_appointment_sheet.dart';
-import '../../encounters/start_encounter_sheet.dart';
+import '../../appointments/appointments.dart';
+import '../../encounters/encounters.dart';
 import '../patient_chart_controller.dart';
 
 /// The three things done most often on an open chart, one tap each.

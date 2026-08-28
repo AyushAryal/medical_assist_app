@@ -5,8 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../core/design/design.dart';
 import '../../../core/smart_phrases/smart_phrase.dart';
 import '../../../data/models/attachment.dart';
-import '../../attachments/attachment_strip.dart';
-import '../../attachments/field_attach_bar.dart';
+import '../../attachments/attachments.dart';
 import 'smart_text_wrap.dart';
 
 /// One of the four SOAP sections: a titled text box with its own attachment
