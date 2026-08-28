@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import 'features/assist/floating_assistant.dart';
+import 'features/assist/assist.dart';
 
 import 'core/app_bootstrap.dart';
 import 'core/routing/app_router.dart';
@@ -13,7 +13,7 @@ import 'core/theme/theme_controller.dart';
 import 'core/theme/theme_scope.dart';
 import 'core/widgets/glass.dart';
 import 'data/repositories/clinical_repository.dart';
-import 'features/lock/lock_gate.dart';
+import 'features/lock/lock.dart';
 
 class MedicalApp extends StatefulWidget {
   const MedicalApp({super.key});
