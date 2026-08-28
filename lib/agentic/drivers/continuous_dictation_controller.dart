@@ -6,15 +6,35 @@ import 'surface_extraction.dart';
 enum FieldStatus { pending, filled, skipped, rejected }
 
 /// A field plus what has happened to it — the row the live preview renders.
+///
+/// A filled entry holds its value *staged* ([number]/[pair]); nothing reaches
+/// the form until [commit] is called, so the clinician reviews the whole set
+/// first and approves it.
 class FieldEntry {
   FieldEntry(this.field);
 
   final AgentField field;
   FieldStatus status = FieldStatus.pending;
 
-  /// The filled value as shown, e.g. `120/80 mmHg` or `88 bpm`. Null unless
+  /// The value as shown, e.g. `120/80 mmHg` or `88 bpm`. Null unless
   /// [status] is [FieldStatus.filled].
   String? display;
+
+  /// The staged value, awaiting [commit].
+  num? number;
+  (int, int)? pair;
+
+  /// Proposes the staged value into the form. Only a filled entry writes.
+  void commit() {
+    if (status != FieldStatus.filled) return;
+    final p = pair;
+    if (p != null) {
+      field.proposePair?.call(p.$1, p.$2);
+      return;
+    }
+    final n = number;
+    if (n != null) field.proposeNumber?.call(n);
+  }
 }
 
 /// What one recognised phrase did — drives the spoken read-back and any
@@ -66,6 +86,23 @@ class ContinuousDictationController {
       if (entry.status == FieldStatus.pending) return entry.field;
     }
     return null;
+  }
+
+  /// Collapses the token repetition small speech models emit on short or quiet
+  /// audio — "21 21 21 21 21" becomes "21", "pulse 88 88" becomes "pulse 88" —
+  /// so a single spoken value is not read as a run of numbers (which the parser
+  /// would then reject as ambiguous). Consecutive identical words only; genuine
+  /// repeats a clinician would never say.
+  static String cleanTranscript(String transcript) {
+    final tokens =
+        transcript.split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
+    final out = <String>[];
+    for (final token in tokens) {
+      if (out.isEmpty || out.last.toLowerCase() != token.toLowerCase()) {
+        out.add(token);
+      }
+    }
+    return out.join(' ');
   }
 
   /// Splits a whole spoken transcript into per-field phrases, so a clinician
@@ -153,15 +190,18 @@ class ContinuousDictationController {
   int applyExtractionJson(Map<String, Object?> json) {
     final result = const SurfaceExtraction().apply(json, _surfaceOf());
     for (final entry in entries) {
-      if (result.filled.contains(entry.field.id)) {
+      final staged = result.values[entry.field.id];
+      if (staged != null) {
+        entry.number = staged.number;
+        entry.pair = staged.pair;
+        entry.display = staged.display;
         entry.status = FieldStatus.filled;
-        entry.display = result.displays[entry.field.id];
       } else if (result.rejected.contains(entry.field.id)) {
         entry.status = FieldStatus.rejected;
         entry.display = null;
       }
     }
-    return result.filledCount;
+    return result.values.length;
   }
 
   ContinuousOutcome apply(String transcript) {
@@ -201,21 +241,17 @@ class ContinuousDictationController {
     switch (utterance) {
       case NumberUtterance(:final value):
         if (field.kind == AgentFieldKind.pair) return ContinuousOutcome.unclear;
-        if (!field.accepts(value)) {
-          entry.status = FieldStatus.rejected;
-          entry.display = null;
-          return ContinuousOutcome.rejected;
-        }
-        field.proposeNumber?.call(value);
+        if (!field.accepts(value)) return _reject(entry);
+        entry.number = value;
+        entry.pair = null;
         return _accept(entry, _withUnit(field, _fmt(value)));
       case PairUtterance(:final first, :final second):
         if (field.kind != AgentFieldKind.pair) return ContinuousOutcome.unclear;
         if (!field.accepts(first) || !field.accepts(second)) {
-          entry.status = FieldStatus.rejected;
-          entry.display = null;
-          return ContinuousOutcome.rejected;
+          return _reject(entry);
         }
-        field.proposePair?.call(first, second);
+        entry.pair = (first, second);
+        entry.number = null;
         return _accept(entry, _withUnit(field, '$first/$second'));
       case CommandUtterance():
       case UnclearUtterance():
@@ -227,6 +263,21 @@ class ContinuousDictationController {
     entry.status = FieldStatus.filled;
     entry.display = display;
     return ContinuousOutcome.filled;
+  }
+
+  ContinuousOutcome _reject(FieldEntry entry) {
+    entry.status = FieldStatus.rejected;
+    entry.display = null;
+    entry.number = null;
+    entry.pair = null;
+    return ContinuousOutcome.rejected;
+  }
+
+  /// Writes every staged value into the form — the "approve & fill" step.
+  void commit() {
+    for (final entry in entries) {
+      entry.commit();
+    }
   }
 
   FieldEntry? _entryFor(AgentField field) {

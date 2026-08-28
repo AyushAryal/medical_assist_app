@@ -112,12 +112,15 @@ class _GuidedDictationSheetState extends State<GuidedDictationSheet> {
       final result = await widget.bootstrap.transcription.transcribe(
         capture.file,
       );
-      if (mounted) setState(() => _heard = result.text);
+      // Collapse the token repetition tiny models emit on short/quiet audio
+      // ("21 21 21 21" -> "21") before parsing.
+      final text = ContinuousDictationController.cleanTranscript(result.text);
+      if (mounted) setState(() => _heard = text.isEmpty ? '(nothing heard)' : text);
 
       if (_mode == _Mode.dictate) {
-        _controller.applyTranscript(result.text);
+        _controller.applyTranscript(text);
       } else {
-        await _describe(result.text);
+        await _describe(text);
       }
     } on Object {
       if (mounted) setState(() => _heard = 'Could not transcribe — try again.');
@@ -128,18 +131,19 @@ class _GuidedDictationSheetState extends State<GuidedDictationSheet> {
 
   Future<void> _describe(String text) async {
     final engine = widget.bootstrap.assistEngine;
-    if (engine == null) {
-      setState(() => _heard =
-          'Describe needs an on-device assistant model (Settings › On-device '
-          'AI). Or switch to Dictate and say each value.');
-      return;
+    var landed = 0;
+    if (engine != null) {
+      final reply = await engine.extractValues(
+        text,
+        fields: widget.surface.fillable.map((f) => f.id).toList(),
+      );
+      final json = _asJson(reply);
+      if (json != null) landed = _controller.applyExtractionJson(json);
     }
-    final reply = await engine.extractValues(
-      text,
-      fields: widget.surface.fillable.map((f) => f.id).toList(),
-    );
-    final json = _asJson(reply);
-    if (json != null) _controller.applyExtractionJson(json);
+    // Fall back to the deterministic parser when no model is installed or it
+    // returned nothing usable — a structured description ("BP 120 over 80,
+    // pulse 88") still fills, so Describe is never a dead end.
+    if (landed == 0) _controller.applyTranscript(text);
   }
 
   /// The model's reply may carry stray prose; take the first JSON object.
@@ -182,6 +186,7 @@ class _GuidedDictationSheetState extends State<GuidedDictationSheet> {
                         entry: entry,
                         isNext: !_controller.complete &&
                             entry.field.id == _controller.current?.id,
+                        listening: _listening,
                       ),
                   ],
                 ),
@@ -273,22 +278,47 @@ class _GuidedDictationSheetState extends State<GuidedDictationSheet> {
           ),
         ),
         SizedBox(height: m.spaceMd),
-        FilledButton.icon(
-          onPressed: _working
-              ? null
-              : (_listening ? _stopAndProcess : _startListen),
-          icon: Icon(_listening ? Icons.stop : Icons.mic),
-          label: Text(
-            _working
+        // Capture (secondary once there is something to approve).
+        if (_controller.filledCount == 0)
+          FilledButton.icon(
+            onPressed: _working
+                ? null
+                : (_listening ? _stopAndProcess : _startListen),
+            icon: Icon(_listening ? Icons.stop : Icons.mic),
+            label: Text(_working
                 ? 'Working…'
                 : _listening
                     ? 'Stop'
-                    : (_controller.filledCount == 0 ? 'Listen' : 'Add more'),
+                    : 'Listen'),
+          )
+        else ...<Widget>[
+          OutlinedButton.icon(
+            onPressed: _working
+                ? null
+                : (_listening ? _stopAndProcess : _startListen),
+            icon: Icon(_listening ? Icons.stop : Icons.mic),
+            label: Text(_working
+                ? 'Working…'
+                : _listening
+                    ? 'Stop'
+                    : 'Add more'),
           ),
-        ),
+          SizedBox(height: m.spaceSm),
+          // The explicit review step: nothing reaches the form until this.
+          FilledButton.icon(
+            onPressed: (_working || _listening)
+                ? null
+                : () {
+                    _controller.commit();
+                    Navigator.of(context).maybePop();
+                  },
+            icon: const Icon(Icons.check),
+            label: Text('Approve & fill (${_controller.filledCount})'),
+          ),
+        ],
         TextButton(
           onPressed: () => Navigator.of(context).maybePop(),
-          child: Text(_controller.complete ? 'Review & save' : 'Close'),
+          child: const Text('Cancel'),
         ),
       ],
     );
@@ -297,10 +327,15 @@ class _GuidedDictationSheetState extends State<GuidedDictationSheet> {
 
 /// One field in the live preview, its status shown by icon, colour and value.
 class _PreviewRow extends StatelessWidget {
-  const _PreviewRow({required this.entry, required this.isNext});
+  const _PreviewRow({
+    required this.entry,
+    required this.isNext,
+    required this.listening,
+  });
 
   final FieldEntry entry;
   final bool isNext;
+  final bool listening;
 
   @override
   Widget build(BuildContext context) {
@@ -321,7 +356,8 @@ class _PreviewRow extends StatelessWidget {
       FieldStatus.filled => entry.display ?? '',
       FieldStatus.skipped => 'skipped',
       FieldStatus.rejected => 'not caught — repeat',
-      FieldStatus.pending => isNext ? 'listening…' : '',
+      // Only say "listening" when the mic is actually open.
+      FieldStatus.pending => isNext && listening ? 'listening…' : '',
     };
 
     return AnimatedContainer(

@@ -1,51 +1,56 @@
 import '../../core/agentic/agent_surface.dart';
 import 'spoken_value.dart';
 
-/// What a structured extraction did to a surface.
+/// A validated value ready to be proposed — held for preview until approved.
+class StagedValue {
+  const StagedValue({this.number, this.pair, required this.display});
+
+  final num? number;
+  final (int, int)? pair;
+
+  /// The value as shown, e.g. `120/80 mmHg`.
+  final String display;
+}
+
+/// What a structured extraction produced.
 class ExtractionResult {
   const ExtractionResult({
-    required this.filled,
+    required this.values,
     required this.rejected,
     required this.unknown,
-    this.displays = const <String, String>{},
   });
 
-  /// Field ids that were proposed a valid value.
-  final List<String> filled;
+  /// Field id → the validated value, for preview and later proposal.
+  final Map<String, StagedValue> values;
 
-  /// Field id → the value as shown, e.g. `120/80`, for the preview.
-  final Map<String, String> displays;
-
-  /// Field ids whose extracted value failed validation (wrong kind, or outside
-  /// the field's plausible bounds) and was refused.
+  /// Field ids whose value failed validation (wrong kind, or outside the
+  /// field's plausible bounds) and was refused.
   final List<String> rejected;
 
   /// Keys the model produced that match no field — dropped.
   final List<String> unknown;
 
-  int get filledCount => filled.length;
+  int get filledCount => values.length;
 }
 
-/// Applies a model's structured extraction (e.g. `{"bp":"120/80","pulse":110}`)
-/// to an [AgentSurface], proposing only values that survive validation.
+/// Validates a model's structured extraction (e.g. `{"bp":"120/80"}`) against
+/// an [AgentSurface] — WITHOUT writing anything.
 ///
 /// This is the guard that makes a model a safe driver. A model may hallucinate
-/// a field that does not exist, or a value that is nonsense — so nothing it
+/// a field that does not exist or a value that is nonsense, so nothing it
 /// returns is trusted: unknown keys are dropped, values are coerced to the
-/// field's kind, and anything outside the field's plausible bounds is refused
-/// rather than proposed. It reuses the same [SpokenValueParser] as the voice
-/// driver to read "120/80" or "one twenty over eighty" out of string values,
-/// so the two drivers accept the same value shapes.
+/// field's kind, and anything outside the field's plausible bounds is refused.
+/// It has no side effects — it returns validated [StagedValue]s that the caller
+/// shows for review and only proposes into the form once the clinician approves.
 class SurfaceExtraction {
   const SurfaceExtraction({this.parser = const SpokenValueParser()});
 
   final SpokenValueParser parser;
 
   ExtractionResult apply(Map<String, Object?> data, AgentSurface surface) {
-    final filled = <String>[];
+    final values = <String, StagedValue>{};
     final rejected = <String>[];
     final unknown = <String>[];
-    final displays = <String, String>{};
 
     for (final entry in data.entries) {
       final field = _resolve(entry.key, surface);
@@ -55,20 +60,18 @@ class SurfaceExtraction {
       }
       final value = entry.value;
       if (value == null) continue; // model left it blank — not an error
-      final display = _fill(field, value);
-      if (display != null) {
-        filled.add(field.id);
-        displays[field.id] = display;
+      final staged = _validate(field, value);
+      if (staged != null) {
+        values[field.id] = staged;
       } else {
         rejected.add(field.id);
       }
     }
 
     return ExtractionResult(
-      filled: filled,
+      values: values,
       rejected: rejected,
       unknown: unknown,
-      displays: displays,
     );
   }
 
@@ -81,37 +84,33 @@ class SurfaceExtraction {
         return field;
       }
     }
-    // Looser: the key contains a field name ("systolic_bp" -> bp).
     for (final field in surface.fillable) {
       if (field.matchAlias(k) != null) return field;
     }
     return null;
   }
 
-  /// Proposes [value] into [field] and returns the value as shown, or null if
-  /// it fails validation and is refused.
-  String? _fill(AgentField field, Object value) {
-    String withUnit(String v) =>
-        field.unit == null ? v : '$v ${field.unit}';
+  StagedValue? _validate(AgentField field, Object value) {
+    String withUnit(String v) => field.unit == null ? v : '$v ${field.unit}';
     switch (field.kind) {
       case AgentFieldKind.pair:
         final pair = _pair(value);
         if (pair == null) return null;
         if (!field.accepts(pair.$1) || !field.accepts(pair.$2)) return null;
-        field.proposePair?.call(pair.$1, pair.$2);
-        return withUnit('${pair.$1}/${pair.$2}');
+        return StagedValue(pair: pair, display: withUnit('${pair.$1}/${pair.$2}'));
       case AgentFieldKind.integer:
       case AgentFieldKind.decimal:
         final number = _num(value);
         if (number == null || !field.accepts(number)) return null;
-        field.proposeNumber?.call(number);
-        return withUnit(
-          number == number.roundToDouble() ? '${number.toInt()}' : '$number',
+        return StagedValue(
+          number: number,
+          display: withUnit(
+            number == number.roundToDouble() ? '${number.toInt()}' : '$number',
+          ),
         );
       case AgentFieldKind.text:
         if (field.proposeText == null) return null;
-        field.proposeText!.call('$value');
-        return '$value';
+        return StagedValue(display: '$value');
     }
   }
 
@@ -138,9 +137,7 @@ class SurfaceExtraction {
     }
     if (value is String) {
       final utterance = parser.parse(value);
-      if (utterance is PairUtterance) {
-        return (utterance.first, utterance.second);
-      }
+      if (utterance is PairUtterance) return (utterance.first, utterance.second);
     }
     return null;
   }
