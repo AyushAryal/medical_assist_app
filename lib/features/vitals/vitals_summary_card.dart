@@ -228,9 +228,14 @@ class VitalsSummaryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Wrap(
-            spacing: m.spaceXl,
-            runSpacing: m.spaceLg,
+          // A width-filling grid rather than a left-packed wrap: a handful of
+          // tiles used to trail off in one row leaving the right of the card
+          // empty. Columns scale with the card's width — two on a phone, more
+          // on a tablet — so the space is used at either size.
+          AdaptiveColumns(
+            minColumnWidth: 150,
+            maxColumns: 4,
+            spacing: m.spaceLg,
             children: tiles,
           ),
           if (vitals.news2Score != null) ...<Widget>[

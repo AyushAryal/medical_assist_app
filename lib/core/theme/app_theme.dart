@@ -222,7 +222,28 @@ abstract final class AppTheme {
         elevation: 0,
         height: kAppNavigationBarHeight,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        labelTextStyle: WidgetStatePropertyAll(text.labelSmall),
+        // The selected destination carries the accent — an accent label and a
+        // full-contrast icon on the indicator pill — while the rest stay muted.
+        // Without this the bar was one flat grey row where the current tab was
+        // barely distinguishable, which is what read as "generic".
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (states) => text.labelSmall?.copyWith(
+            color: states.contains(WidgetState.selected)
+                ? p.primary
+                : p.onSurfaceMuted,
+            fontWeight: states.contains(WidgetState.selected)
+                ? FontWeight.w600
+                : FontWeight.w500,
+          ),
+        ),
+        iconTheme: WidgetStateProperty.resolveWith(
+          (states) => IconThemeData(
+            size: 24,
+            color: states.contains(WidgetState.selected)
+                ? p.onPrimaryContainer
+                : p.onSurfaceMuted,
+          ),
+        ),
       ),
       navigationRailTheme: NavigationRailThemeData(
         backgroundColor: Colors.transparent,
@@ -231,10 +252,15 @@ abstract final class AppTheme {
         // "Schedule" against the rail edge.
         minWidth: 88,
         labelType: NavigationRailLabelType.all,
-        selectedLabelTextStyle: text.labelSmall?.copyWith(color: p.primary),
+        selectedLabelTextStyle: text.labelSmall?.copyWith(
+          color: p.primary,
+          fontWeight: FontWeight.w600,
+        ),
         unselectedLabelTextStyle: text.labelSmall?.copyWith(
           color: p.onSurfaceMuted,
         ),
+        selectedIconTheme: IconThemeData(color: p.onPrimaryContainer),
+        unselectedIconTheme: IconThemeData(color: p.onSurfaceMuted),
       ),
 
       segmentedButtonTheme: SegmentedButtonThemeData(
