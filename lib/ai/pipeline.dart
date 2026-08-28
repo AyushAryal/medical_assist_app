@@ -10,6 +10,7 @@ import 'clarify/paraphrases.dart';
 import 'conversation.dart';
 import 'handlers/analysis_handler.dart';
 import 'handlers/overview_handler.dart';
+import 'handlers/patient_summary_handler.dart';
 import 'handlers/rank_handler.dart';
 import 'handlers/query_handler.dart';
 import 'handlers/report_handler.dart';
@@ -18,6 +19,7 @@ import 'interpreter.dart';
 import 'interpreters/analysis_interpreter.dart';
 import 'interpreters/model_interpreter.dart';
 import 'interpreters/overview_interpreter.dart';
+import 'interpreters/patient_interpreter.dart';
 import 'interpreters/rank_interpreter.dart';
 import 'interpreters/pattern_interpreter.dart';
 import 'preprocess.dart';
@@ -99,6 +101,7 @@ class AssistPipeline {
         _reports = ReportHandler(repository),
         _analyses = AnalysisHandler(AnalysisDao(repository.database)),
         _ranks = RankHandler(repository, AnalysisDao(repository.database)),
+        _summaries = PatientSummaryHandler(repository),
         _authoriser = Authoriser(entitlements),
         _chain = InterpreterChain(
           interpreters ??
@@ -108,6 +111,10 @@ class AssistPipeline {
               // every device, and in a form that can be shown back and argued
               // with. A model belongs after this, filling gaps.
               const <Interpreter>[
+                // First of all: a request that already names an exact patient
+                // (via the `\pat` smart phrase) is about that person, not the
+                // register. It declines instantly for everything else.
+                PatientInterpreter(),
                 // Most-specific first, and each declines fast. The overview
                 // vocabulary is tiny and nothing else wants it; rankings must
                 // run before analysis because "patients with the highest BMI"
@@ -153,6 +160,7 @@ class AssistPipeline {
   final ReportHandler _reports;
   final AnalysisHandler _analyses;
   final RankHandler _ranks;
+  final PatientSummaryHandler _summaries;
 
   /// The conversation, shared by every surface that talks to this pipeline.
   ///
@@ -329,6 +337,9 @@ class AssistPipeline {
 
       case OverviewIntent():
         return _overviews.run(intent, provenance, asOf: request.now);
+
+      case PatientSummaryIntent():
+        return _summaries.run(intent, provenance);
 
       case MutationIntent():
         // Described, never performed. A misread question that runs a read

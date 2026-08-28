@@ -12,7 +12,7 @@
 /// * Every syncable table carries `updated_at`, `revision` and `sync_status`
 ///   so the offline queue can do last-writer-wins with conflict detection.
 abstract final class Schema {
-  static const int version = 3;
+  static const int version = 4;
 
   /// One list per schema version. Index 0 creates v1, index 1 upgrades v1→v2,
   /// and so on, so `onCreate` and `onUpgrade` replay exactly the same SQL.
@@ -20,6 +20,7 @@ abstract final class Schema {
     _v1,
     _v2,
     _v3,
+    _v4,
   ];
 
   static const List<String> _v1 = <String>[
@@ -386,5 +387,60 @@ abstract final class Schema {
   /// so unsorted dictation cannot silently fail to reach the record.
   static const List<String> _v3 = <String>[
     'ALTER TABLE clinical_notes ADD COLUMN working_notes TEXT',
+  ];
+
+  /// v4 — smart phrases.
+  ///
+  /// User-editable text expansions summoned with `\` in any smart field (the
+  /// dynamic macros like `\pat` live in code, not here — they resolve at
+  /// runtime). `trigger` is the word typed after the backslash; `body` is what
+  /// it expands to. Seeded with a handful of popular clinical phrases marked
+  /// `is_builtin`, which the editor may still change or remove — a seed, not a
+  /// lock. Syncable like everything else so a clinic's vocabulary travels.
+  static const List<String> _v4 = <String>[
+    '''
+    CREATE TABLE smart_phrases (
+      id           TEXT PRIMARY KEY,
+      trigger      TEXT NOT NULL,
+      title        TEXT NOT NULL,
+      body         TEXT NOT NULL,
+      is_builtin   INTEGER NOT NULL DEFAULT 0,
+      created_at   INTEGER NOT NULL,
+      updated_at   INTEGER NOT NULL,
+      deleted_at   INTEGER,
+      revision     INTEGER NOT NULL DEFAULT 1,
+      sync_status  TEXT NOT NULL DEFAULT 'pending'
+    )
+    ''',
+    'CREATE INDEX idx_smart_phrase_trigger ON smart_phrases(trigger)',
+
+    // Popular defaults, seeded once. Fixed ids so a replay never duplicates;
+    // timestamps from the DB clock so they sort sensibly. No apostrophes in any
+    // body, so no SQL escaping is needed to keep these const. `\n` becomes a
+    // real newline in the stored text.
+    "INSERT INTO smart_phrases (id, trigger, title, body, is_builtin, created_at, updated_at, revision, sync_status) VALUES "
+        "('seed-normal', 'normal', 'Normal examination', "
+        "'Patient appears well and in no acute distress. Examined systems are within normal limits.', "
+        "1, CAST(strftime('%s','now') AS INTEGER) * 1000, CAST(strftime('%s','now') AS INTEGER) * 1000, 1, 'synced')",
+    "INSERT INTO smart_phrases (id, trigger, title, body, is_builtin, created_at, updated_at, revision, sync_status) VALUES "
+        "('seed-ros', 'ros', 'Review of systems', "
+        "'General: no fever, night sweats or weight change.\nCardiorespiratory: no chest pain, palpitations, cough or breathlessness.\nGI: no abdominal pain, nausea, vomiting or change in bowel habit.\nNeuro: no headache, dizziness, weakness or numbness.', "
+        "1, CAST(strftime('%s','now') AS INTEGER) * 1000, CAST(strftime('%s','now') AS INTEGER) * 1000, 1, 'synced')",
+    "INSERT INTO smart_phrases (id, trigger, title, body, is_builtin, created_at, updated_at, revision, sync_status) VALUES "
+        "('seed-fu1w', 'fu1w', 'Follow up in 1 week', "
+        "'Follow up in 1 week, or sooner if symptoms worsen.', "
+        "1, CAST(strftime('%s','now') AS INTEGER) * 1000, CAST(strftime('%s','now') AS INTEGER) * 1000, 1, 'synced')",
+    "INSERT INTO smart_phrases (id, trigger, title, body, is_builtin, created_at, updated_at, revision, sync_status) VALUES "
+        "('seed-fu2w', 'fu2w', 'Follow up in 2 weeks', "
+        "'Follow up in 2 weeks, or sooner if symptoms worsen.', "
+        "1, CAST(strftime('%s','now') AS INTEGER) * 1000, CAST(strftime('%s','now') AS INTEGER) * 1000, 1, 'synced')",
+    "INSERT INTO smart_phrases (id, trigger, title, body, is_builtin, created_at, updated_at, revision, sync_status) VALUES "
+        "('seed-safety', 'safety', 'Safety-netting', "
+        "'Advised to return immediately if symptoms worsen, breathing becomes difficult, fluids cannot be kept down, or any new concern arises.', "
+        "1, CAST(strftime('%s','now') AS INTEGER) * 1000, CAST(strftime('%s','now') AS INTEGER) * 1000, 1, 'synced')",
+    "INSERT INTO smart_phrases (id, trigger, title, body, is_builtin, created_at, updated_at, revision, sync_status) VALUES "
+        "('seed-counsel', 'counsel', 'Counselling given', "
+        "'Diagnosis, management plan and expected course explained in plain language. Questions answered. Patient understands and agrees with the plan.', "
+        "1, CAST(strftime('%s','now') AS INTEGER) * 1000, CAST(strftime('%s','now') AS INTEGER) * 1000, 1, 'synced')",
   ];
 }

@@ -59,7 +59,7 @@ void main() {
       );
 
   Widget panel({
-    Future<AssistResult> Function(String)? onAsk,
+    Future<AssistResult> Function(String, {String? patientId})? onAsk,
     List<String>? asked,
   }) {
     final log = asked ?? <String>[];
@@ -75,7 +75,7 @@ void main() {
         suggestions: <String>['suggested starting point'],
       ),
       onAsk: onAsk ??
-          (question) async {
+          (question, {String? patientId}) async {
             log.add(question);
             return answerFor(question);
           },
@@ -365,7 +365,7 @@ void main() {
           AssistantPanel(
             guide: const MetricExplanation(title: 'g', summary: 's'),
             greeting: const AssistReply(text: 'hello'),
-            onAsk: (question) async => answerFor(question),
+            onAsk: (question, {String? patientId}) async => answerFor(question),
             onClose: () {},
             onExpand: (_) {},
             onSpeak: () {},

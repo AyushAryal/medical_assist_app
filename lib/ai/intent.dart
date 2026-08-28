@@ -254,6 +254,38 @@ extension MutationOperationX on MutationOperation {
       };
 }
 
+/// Show one patient, whole: their record gathered into a summary, or their
+/// observations read as a progression.
+///
+/// Distinct from every other intent because it is *about a person, not the
+/// register*. It only ever arises when the request carries an exact
+/// [patientId] — resolved by the `\pat` smart phrase — so there is no name to
+/// mis-resolve and nothing here is generated: the summary is assembled from the
+/// record by a handler, the same way a chart screen is.
+class PatientSummaryIntent extends AssistIntent {
+  const PatientSummaryIntent({
+    required this.patientId,
+    this.mode = PatientSummaryMode.summary,
+    this.confidence = 0.97,
+  });
+
+  final String patientId;
+  final PatientSummaryMode mode;
+
+  @override
+  final double confidence;
+
+  @override
+  List<String> describe() => <String>[
+        switch (mode) {
+          PatientSummaryMode.summary => 'Patient summary',
+          PatientSummaryMode.progression => 'How the patient is progressing',
+        },
+      ];
+}
+
+enum PatientSummaryMode { summary, progression }
+
 /// Nothing was understood well enough to act on.
 ///
 /// A first-class intent rather than a null, so the pipeline has one shape of

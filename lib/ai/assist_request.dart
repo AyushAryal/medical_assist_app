@@ -42,6 +42,7 @@ class AssistRequest {
     required this.source,
     this.actor,
     this.clinicId,
+    this.patientId,
     this.asOf,
   }) : parts = List.unmodifiable(<RequestPart>[
           if (text != null) TextPart(text),
@@ -61,6 +62,12 @@ class AssistRequest {
   /// The clinic in context. Some questions are scoped to it and some are not,
   /// and the difference has to be stated in the answer rather than assumed.
   final String? clinicId;
+
+  /// An exact patient the question is about, resolved at the input by the `\pat`
+  /// smart phrase. Present only when the clinician pointed at one specific
+  /// person, which is precisely what lets "how is X doing" become a lookup of a
+  /// known id rather than a fuzzy match on a name the register may hold twice.
+  final String? patientId;
 
   /// Overridable clock, so "this month" is testable.
   final DateTime? asOf;

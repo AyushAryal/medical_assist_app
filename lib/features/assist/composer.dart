@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 
 import '../../core/app_bootstrap.dart';
 import '../../core/design/design.dart';
+import '../../core/smart_phrases/smart_phrase.dart';
+import '../../core/smart_phrases/smart_phrase_field.dart';
 
 /// The composer: the input, its controls, and what was last asked.
 ///
@@ -18,6 +20,7 @@ class AskComposer extends StatelessWidget {
   const AskComposer({
     super.key,
     required this.controller,
+    this.smartPhrases,
     required this.focus,
     required this.listening,
     required this.hasText,
@@ -33,6 +36,11 @@ class AskComposer extends StatelessWidget {
   });
 
   final TextEditingController controller;
+
+  /// When set (and [controller] is a [SmartPhraseController]), typing `\` opens
+  /// the smart-phrase menu over the field.
+  final SmartPhraseRegistry? smartPhrases;
+
   final FocusNode focus;
   final bool listening;
   final bool hasText;
@@ -130,7 +138,9 @@ class AskComposer extends StatelessWidget {
                       onCancel: onCancelListening,
                     ),
                   )
-                : TextField(
+                : _wrapSmart(
+                    context,
+                    TextField(
                     controller: controller,
                     focusNode: focus,
                     textInputAction: TextInputAction.search,
@@ -211,10 +221,24 @@ class AskComposer extends StatelessWidget {
                         ],
                       ),
                     ),
-                  ),
+                  )),
           ),
         ],
       ),
+    );
+  }
+
+  /// Wraps the input in the smart-phrase menu when this composer was given a
+  /// registry and a [SmartPhraseController]; otherwise returns it untouched.
+  Widget _wrapSmart(BuildContext context, Widget field) {
+    final registry = smartPhrases;
+    final ctrl = controller;
+    if (registry == null || ctrl is! SmartPhraseController) return field;
+    return SmartPhraseField(
+      controller: ctrl,
+      focusNode: focus,
+      registry: registry,
+      child: field,
     );
   }
 }

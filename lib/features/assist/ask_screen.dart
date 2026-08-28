@@ -6,6 +6,9 @@ import 'package:provider/provider.dart';
 import '../../ai/assist_request.dart';
 import '../../ai/pipeline.dart';
 import '../../core/design/design.dart';
+import '../../core/smart_phrases/smart_phrase.dart';
+import '../../core/smart_phrases/smart_phrase_library.dart';
+import '../../data/repositories/clinical_repository.dart';
 import 'ask_intro.dart';
 import 'capability_sheet.dart';
 import 'composer.dart';
@@ -35,8 +38,12 @@ class AskScreen extends StatefulWidget {
 }
 
 class _AskScreenState extends State<AskScreen> {
-  final TextEditingController _question = TextEditingController();
+  final SmartPhraseController _question = SmartPhraseController();
   final FocusNode _focus = FocusNode();
+
+  /// Dynamic macros plus the clinic's saved text phrases. Starts with the
+  /// code macros and gains the database ones once they load.
+  SmartPhraseRegistry _registry = buildSmartPhraseRegistry(const []);
 
   bool _hasText = false;
 
@@ -64,6 +71,7 @@ class _AskScreenState extends State<AskScreen> {
     _focus.addListener(() {
       if (mounted) setState(() {});
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadPhrases());
     final seeded = widget.initialQuestion;
     final pipeline = context.read<AppBootstrap>().pipeline;
     if (seeded != null &&
@@ -172,6 +180,20 @@ class _AskScreenState extends State<AskScreen> {
     _focus.requestFocus();
   }
 
+  /// Loads the clinic's saved text phrases and folds them into the registry.
+  /// The built-in macros stand alone if the read fails.
+  Future<void> _loadPhrases() async {
+    try {
+      final records =
+          await context.read<ClinicalRepository>().smartPhrases.all();
+      if (mounted) {
+        setState(() => _registry = buildSmartPhraseRegistry(records));
+      }
+    } on Object {
+      // Keep the built-in macros only.
+    }
+  }
+
   Future<void> _ask(String question) async {
     if (question.trim().isEmpty || _running) return;
 
@@ -188,6 +210,9 @@ class _AskScreenState extends State<AskScreen> {
         source: RequestSource.typed,
         actor: bootstrap.session.signatureName,
         clinicId: bootstrap.session.activeClinic?.id,
+        // The exact patient the `\pat` phrase resolved, if any — this is what
+        // turns "how is X doing" into a lookup instead of a guess.
+        patientId: _question.payloadOf('patient'),
       ),
     );
 
@@ -223,6 +248,7 @@ class _AskScreenState extends State<AskScreen> {
             // over a page; at the bottom it reads as a conversation.
             AskComposer(
               controller: _question,
+              smartPhrases: _registry,
               focus: _focus,
               listening: _listening,
               hasText: _hasText,

@@ -347,7 +347,7 @@ class _FloatingAssistantState extends State<FloatingAssistant> {
                                         // The one pipeline, shared with the full
                                         // search screen. This panel used to carry
                                         // its own copy of the middle of it.
-                                        onAsk: (question) =>
+                                        onAsk: (question, {String? patientId}) =>
                                             bootstrap.pipeline.ask(
                                               AssistRequest(
                                                 text: question,
@@ -359,6 +359,7 @@ class _FloatingAssistantState extends State<FloatingAssistant> {
                                                     .session
                                                     .activeClinic
                                                     ?.id,
+                                                patientId: patientId,
                                               ),
                                             ),
                                         onSpeak: bootstrap.canTranscribe

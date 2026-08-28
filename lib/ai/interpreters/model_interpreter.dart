@@ -124,6 +124,9 @@ class ModelInterpreter implements Interpreter {
       RankIntent(:final spec) =>
         FieldRegistry.byName(spec.table.name) != null,
       OverviewIntent() => true,
+      // Built from an exact id the smart phrase resolved, not from the model's
+      // words, so there is nothing here for a model to have got wrong.
+      PatientSummaryIntent() => true,
       // A change with nothing to change, or with no patient to change it on,
       // is not a proposal anyone can review.
       MutationIntent(:final fields, :final patientId) =>

@@ -71,6 +71,20 @@ class CapabilitySheet extends StatelessWidget {
               ],
             ),
           ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(m.spaceLg, 0, m.spaceLg, m.spaceSm),
+            child: Callout(
+              title: 'Type \\ for smart phrases',
+              icon: Icons.bolt_outlined,
+              tone: context.palette.accent,
+              subtitle: 'Point at one patient with \\pat — then ask "how is '
+                  'this patient progressing" or "summary" and the assistant '
+                  'knows exactly who. Also \\me, \\today, \\clinic, and your '
+                  'own saved phrases (\\ros, \\normal). Manage them in '
+                  'Settings › Smart phrases.',
+              child: const SizedBox.shrink(),
+            ),
+          ),
           const TabBar(
             tabAlignment: TabAlignment.center,
             isScrollable: true,

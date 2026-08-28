@@ -159,6 +159,7 @@ class FollowUps {
       AnalysisIntent() ||
       RankIntent() ||
       OverviewIntent() ||
+      PatientSummaryIntent() ||
       MutationIntent() ||
       UnknownIntent() =>
         (null, null),

@@ -11,12 +11,27 @@ import '../models/vitals_record.dart';
 import '../repositories/clinical_repository.dart';
 import '../../clinical/news2.dart';
 
+/// Whether demo-data seeding is available in this build at all.
+///
+/// Debug builds always allow it. A release build allows it only when it was
+/// compiled with `--dart-define=ALLOW_DEMO_DATA=true` — the one switch that
+/// turns an ordinary release into a reviewer/demo build for putting realistic
+/// content on a real device. A shipped clinical build passes neither, so the
+/// settings section is compiled out and [DemoDataSeeder.seed] refuses to run,
+/// exactly as before: this widens the old debug-only guard by a single
+/// explicit, build-time opt-in and nothing else. There is no runtime toggle,
+/// so a fabricated patient can never appear in a build that was not deliberately
+/// made to hold one.
+const bool demoDataAllowed =
+    kDebugMode || bool.fromEnvironment('ALLOW_DEMO_DATA');
+
 /// Seeds a realistic demo dataset for development and demonstration.
 ///
 /// Three safety rules govern this file, because fabricated patients inside a
 /// clinical record system are genuinely dangerous:
 ///
-/// 1. **Debug builds only.** [seed] refuses to run in a release build.
+/// 1. **Opt-in builds only.** [seed] refuses unless [demoDataAllowed] — a debug
+///    build, or a release compiled with `--dart-define=ALLOW_DEMO_DATA=true`.
 /// 2. **Every record is marked.** Demo patients carry [marker] in their notes
 ///    and a `(DEMO)` name suffix, so they are unmistakable in a patient list
 ///    and cannot be quietly confused with a real chart.
@@ -48,8 +63,11 @@ class DemoDataSeeder {
 
   /// Creates the dataset. Returns the number of patients added.
   Future<int> seed() async {
-    if (kReleaseMode) {
-      throw StateError('Demo data cannot be seeded into a release build.');
+    if (!demoDataAllowed) {
+      throw StateError(
+        'Demo data cannot be seeded into a shipped build. Rebuild with '
+        '--dart-define=ALLOW_DEMO_DATA=true to enable it.',
+      );
     }
 
     final clinic = await _repository.ensureDefaultClinic();

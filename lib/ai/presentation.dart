@@ -335,3 +335,64 @@ class MessagePresentation extends Presentation {
   @override
   final MetricExplanation? explanation;
 }
+
+/// One patient, gathered from the record into a readable whole.
+///
+/// Every field here is already-formatted text, assembled by
+/// `PatientSummaryHandler` straight from the chart — no model, nothing
+/// generated. That is the point: a summary of a medical record has to *be* the
+/// record, rearranged, never a paraphrase of it. Carried as strings so this
+/// layer stays free of the data models, exactly like the other presentations.
+class PatientSummaryPresentation extends Presentation {
+  const PatientSummaryPresentation({
+    required this.headline,
+    required this.patientId,
+    required this.identityLine,
+    this.progression = false,
+    this.allergyLine,
+    this.problems = const <String>[],
+    this.medications = const <String>[],
+    this.vitals = const <({String label, String value})>[],
+    this.news2Line,
+    this.trends = const <String>[],
+    this.visits = const <({String when, String summary})>[],
+    this.upcoming = const <String>[],
+    this.explanation,
+  });
+
+  @override
+  final String headline;
+
+  final String patientId;
+
+  /// Name, age, sex, MRN — the one-line identity strip.
+  final String identityLine;
+
+  /// True for the "how are they progressing" reading, which leads with trends
+  /// and observations rather than the standing record.
+  final bool progression;
+
+  /// The allergy banner text, when there is anything to warn about.
+  final String? allergyLine;
+
+  final List<String> problems;
+  final List<String> medications;
+
+  /// The most recent set of observations, label/value pairs already formatted.
+  final List<({String label, String value})> vitals;
+
+  /// The latest NEWS2 line, e.g. "NEWS2 6 — medium risk (2 h ago)".
+  final String? news2Line;
+
+  /// Observations moving the wrong way, one sentence each.
+  final List<String> trends;
+
+  /// The last few encounters, newest first.
+  final List<({String when, String summary})> visits;
+
+  /// Upcoming appointments, one line each.
+  final List<String> upcoming;
+
+  @override
+  final MetricExplanation? explanation;
+}

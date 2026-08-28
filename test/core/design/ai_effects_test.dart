@@ -46,6 +46,136 @@ void main() {
   Element elementOf(WidgetTester tester) =>
       tester.element(find.byType(EditableText));
 
+  group('GeneratedSpanController', () {
+    // Pulls the leaf spans out of whatever buildTextSpan produced, so a test
+    // can ask which text was styled and which was left plain.
+    List<TextSpan> leaves(TextSpan root) {
+      final out = <TextSpan>[];
+      void walk(InlineSpan span) {
+        if (span is TextSpan) {
+          if (span.text != null) out.add(span);
+          for (final child in span.children ?? const <InlineSpan>[]) {
+            walk(child);
+          }
+        }
+      }
+
+      walk(root);
+      return out;
+    }
+
+    bool isMarked(TextSpan span) =>
+        span.style?.background != null || span.style?.backgroundColor != null;
+
+    testWidgets('highlights exactly the generated span', (tester) async {
+      final controller = GeneratedSpanController(text: 'Cough for 3 days. '
+          'Likely viral.');
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(host(child: TextField(controller: controller)));
+
+      // "Likely viral." is what the model placed; the rest is the clinician's.
+      controller.markGenerated(
+        snapshot: controller.text,
+        range: const TextRange(start: 18, end: 31),
+      );
+
+      final span = controller.buildTextSpan(
+        context: elementOf(tester),
+        style: const TextStyle(),
+        withComposing: false,
+      );
+      final marked = leaves(span).where(isMarked).map((s) => s.text).join();
+      expect(marked, 'Likely viral.');
+    });
+
+    testWidgets('the highlight falls away on the first edit', (tester) async {
+      final controller = GeneratedSpanController(text: 'Likely viral.');
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(host(child: TextField(controller: controller)));
+      controller.markGenerated(
+        snapshot: controller.text,
+        range: const TextRange(start: 0, end: 13),
+      );
+
+      // A clinician types — the snapshot no longer matches.
+      controller.text = 'Likely viral URI.';
+
+      final span = controller.buildTextSpan(
+        context: elementOf(tester),
+        style: const TextStyle(),
+        withComposing: false,
+      );
+      expect(leaves(span).any(isMarked), isFalse);
+    });
+
+    testWidgets('clearGenerated removes the mark', (tester) async {
+      final controller = GeneratedSpanController(text: 'Likely viral.');
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(host(child: TextField(controller: controller)));
+      controller.markGenerated(
+        snapshot: controller.text,
+        range: const TextRange(start: 0, end: 13),
+      );
+      controller.clearGenerated();
+
+      final span = controller.buildTextSpan(
+        context: elementOf(tester),
+        style: const TextStyle(),
+        withComposing: false,
+      );
+      expect(leaves(span).any(isMarked), isFalse);
+    });
+  });
+
+  group('GeneratedText typewriter', () {
+    // Scoped to the GeneratedText so a stray RichText elsewhere can't confuse
+    // the finder; the caret glyph is stripped so we compare only real text.
+    String shown(WidgetTester tester) {
+      final rich = tester.widget<RichText>(
+        find.descendant(
+          of: find.byType(GeneratedText),
+          matching: find.byType(RichText),
+        ),
+      );
+      return (rich.text as TextSpan).toPlainText().replaceAll('▏', '');
+    }
+
+    testWidgets('reveals the text over time, then shows all of it',
+        (tester) async {
+      const full = 'Take paracetamol when you have a fever.';
+      await tester.pumpWidget(host(
+        child: const GeneratedText(text: full, typeIn: true),
+      ));
+      await tester.pump(); // start the reveal
+
+      // Part-way through, only a prefix is on screen.
+      await tester.pump(const Duration(milliseconds: 150));
+      final midway = shown(tester);
+      expect(full.startsWith(midway), isTrue);
+      expect(midway.length, lessThan(full.length));
+
+      // Past the reveal duration the whole text is there. Not pumpAndSettle:
+      // the highlighter sweep loops forever and would never settle.
+      await tester.pump(const Duration(seconds: 2));
+      expect(shown(tester), full);
+    });
+
+    testWidgets('with reduced motion the whole text is shown at once',
+        (tester) async {
+      const full = 'Come back in one week.';
+      // The MediaQuery must sit *below* MaterialApp to be the nearest one the
+      // widget reads, so it is passed as the child rather than wrapping host.
+      await tester.pumpWidget(host(
+        child: const MediaQuery(
+          data: MediaQueryData(disableAnimations: true),
+          child: GeneratedText(text: full, typeIn: true),
+        ),
+      ));
+      await tester.pump();
+      expect(shown(tester), full);
+    });
+  });
+
   group('AiGlowBorder', () {
     testWidgets('keeps the subtree in place when it activates', (tester) async {
       final controller = TextEditingController();

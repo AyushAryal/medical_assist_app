@@ -15,6 +15,7 @@ import '../dao/cohort_dao.dart';
 import '../dao/encounter_dao.dart';
 import '../dao/note_dao.dart';
 import '../dao/patient_dao.dart';
+import '../dao/smart_phrase_dao.dart';
 import '../dao/vitals_dao.dart';
 import '../models/appointment.dart';
 import '../models/attachment.dart';
@@ -45,6 +46,7 @@ class ClinicalRepository {
     required this.attachments,
     required this.attachmentFiles,
     required this.cohorts,
+    required this.smartPhrases,
   });
 
   final AppDatabase database;
@@ -59,6 +61,7 @@ class ClinicalRepository {
   final AttachmentDao attachments;
   final AttachmentService attachmentFiles;
   final CohortDao cohorts;
+  final SmartPhraseDao smartPhrases;
 
   factory ClinicalRepository.wire({
     required AppDatabase database,
@@ -77,6 +80,7 @@ class ClinicalRepository {
       attachments: attachmentDao,
       attachmentFiles: AttachmentService(attachmentDao),
       cohorts: CohortDao(database),
+      smartPhrases: SmartPhraseDao(database),
     );
   }
 

@@ -32,6 +32,12 @@ class _AssistantModelSectionState extends State<AssistantModelSection> {
   CancellationToken? _cancellation;
   String? _error;
 
+  /// The device class the recommendation is tuned to. Defaults to the common
+  /// mid-range clinic tablet; the operator narrows it to their fleet. Held in
+  /// view state only — it steers what is highlighted, it is not a setting that
+  /// changes what runs.
+  DeviceClass _deviceClass = DeviceClass.standard;
+
   @override
   void initState() {
     super.initState();
@@ -99,6 +105,17 @@ class _AssistantModelSectionState extends State<AssistantModelSection> {
     }
   }
 
+  /// How [model] suits the selected device class: the single recommended pick,
+  /// something that merely fits, or something heavier than the class allows.
+  ModelSuitability _suitabilityOf(AssistModel model) {
+    if (model.id == AssistModelCatalog.recommendedFor(_deviceClass).id) {
+      return ModelSuitability.recommended;
+    }
+    return _deviceClass.meets(model.minDeviceClass)
+        ? ModelSuitability.fits
+        : ModelSuitability.heavy;
+  }
+
   Future<void> _use(AssistModel model) async {
     await context.read<AppBootstrap>().setAssistModel(model);
     await _refresh();
@@ -149,11 +166,29 @@ class _AssistantModelSectionState extends State<AssistantModelSection> {
             SizedBox(height: m.spaceSm),
           ],
 
+          _DeviceClassPicker(
+            selected: _deviceClass,
+            onChanged: (value) => setState(() => _deviceClass = value),
+          ),
+          SizedBox(height: m.spaceSm),
+          Text(
+            'A bigger model follows the wording more reliably but needs more '
+            'memory to run beside the record and the transcriber. Pick the '
+            'device you are installing on and the best fit is marked '
+            '“Recommended”; a model too heavy for it is marked, not hidden — '
+            'you can still install it.',
+            style: context.texts.labelSmall
+                ?.copyWith(color: context.palette.onSurfaceMuted),
+          ),
+          SizedBox(height: m.spaceMd),
+
           for (final model in AssistModelCatalog.models) ...<Widget>[
             ModelRow(
               name: '${model.name} · ${model.parameters}',
               description: '${model.description} Licence: ${model.licence}.',
               sizeLabel: model.sizeLabel,
+              memoryLabel: model.runtimeMemoryLabel,
+              suitability: _suitabilityOf(model),
               activeLine: 'Translating unmatched questions with this model.',
               isComplete: _complete.contains(model.id),
               isActive: active?.id == model.id,
@@ -184,6 +219,54 @@ class _AssistantModelSectionState extends State<AssistantModelSection> {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// The device-class chooser above the model list.
+///
+/// A self-select rather than an autodetect: total RAM is not readable without a
+/// platform plugin and free RAM lies moment to moment, so the operator — who
+/// knows the tablet in their hand — sets the band, and the app states what each
+/// model needs against it. Three bands are all the recommendation turns on.
+class _DeviceClassPicker extends StatelessWidget {
+  const _DeviceClassPicker({required this.selected, required this.onChanged});
+
+  final DeviceClass selected;
+  final ValueChanged<DeviceClass> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final m = context.metrics;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          'This device',
+          style: context.texts.labelMedium,
+        ),
+        SizedBox(height: m.spaceXs),
+        SizedBox(
+          width: double.infinity,
+          child: SegmentedButton<DeviceClass>(
+            segments: <ButtonSegment<DeviceClass>>[
+              for (final deviceClass in DeviceClass.values)
+                ButtonSegment<DeviceClass>(
+                  value: deviceClass,
+                  label: Text(
+                    '${deviceClass.label}\n${deviceClass.memoryHint}',
+                    textAlign: TextAlign.center,
+                    style: context.texts.labelSmall,
+                  ),
+                ),
+            ],
+            selected: <DeviceClass>{selected},
+            showSelectedIcon: false,
+            onSelectionChanged: (selection) => onChanged(selection.first),
+          ),
+        ),
+      ],
     );
   }
 }

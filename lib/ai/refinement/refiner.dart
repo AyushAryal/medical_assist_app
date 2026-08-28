@@ -87,7 +87,9 @@ abstract final class Refiner {
       AnalysisIntent() => _refineAnalysis(standing, text, asOf),
       RankIntent() => _refineRank(standing, text, asOf),
       OverviewIntent() => _refineOverview(standing, text, asOf),
-      MutationIntent() || UnknownIntent() => null,
+      // A patient summary is not a standing register query to refine — a
+      // follow-up starts a fresh reading, not a filter tweak.
+      PatientSummaryIntent() || MutationIntent() || UnknownIntent() => null,
     };
 
     // A marker with nothing mergeable ("make it nicer") falls through to the

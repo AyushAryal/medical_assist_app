@@ -69,7 +69,9 @@ class Authoriser {
       case AnalysisIntent():
       case RankIntent():
       case OverviewIntent():
-        // Reading the register the clinician is already holding. An aggregate
+      case PatientSummaryIntent():
+        // Reading the register the clinician is already holding. A summary of
+        // one patient is a read of a chart they can already open — an aggregate
         // is a weaker disclosure than the list it came from, not a stronger
         // one — nobody who can open a chart is being shown something new by an
         // average of it.

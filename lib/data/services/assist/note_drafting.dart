@@ -11,10 +11,20 @@ class DraftRefused implements Exception {
   String toString() => reason;
 }
 
+/// One placed sentence and who decided where it went.
+///
+/// The text is always the clinician's own — nothing here is generated. What
+/// varies is *who filed it*: the deterministic rules, or the model on a
+/// sentence the rules could not read. That distinction is the only thing a
+/// reviewer of this sort needs to look harder at, so it is carried all the way
+/// to the screen rather than flattened into a joined string.
+typedef DraftSentence = ({String text, bool placedByModel});
+
 /// A dictation sorted into SOAP sections, ready to preview.
 class SoapDraft {
   const SoapDraft({
     required this.sections,
+    required this.provenance,
     required this.engineName,
     required this.placed,
     required this.unplaced,
@@ -23,6 +33,13 @@ class SoapDraft {
   /// Section key (`subjective`…`plan`) to text, assembled from the
   /// clinician's own sentences. Only non-empty sections appear.
   final Map<String, String> sections;
+
+  /// The same sections, sentence by sentence, each tagged with who placed it.
+  /// Keyed and ordered identically to [sections]; the joined strings there are
+  /// these sentences' text with a space between. Kept alongside rather than
+  /// replacing [sections] because everything that *applies* a section wants the
+  /// plain string, and only the review screen wants the breakdown.
+  final Map<String, List<DraftSentence>> provenance;
 
   /// Who did the sorting, for the review screen to say.
   final String engineName;
@@ -115,6 +132,7 @@ abstract final class NoteDrafting {
     return _assemble(
       merged,
       engineName: '${engine.name} with $rulesEngineName',
+      modelPlaced: assignments.keys.toSet(),
     );
   }
 
@@ -164,15 +182,24 @@ abstract final class NoteDrafting {
   }
 
   /// Builds the sections from the original sentences, in the order spoken.
+  ///
+  /// [modelPlaced] is the set of sentence indices the model filed; everything
+  /// else was filed by the rules. Empty for a rules-only sort.
   static SoapDraft _assemble(
     List<SectionedSentence> sorted, {
     required String engineName,
+    Set<int> modelPlaced = const <int>{},
   }) {
-    final grouped = <NoteSection, List<String>>{};
+    final grouped = <NoteSection, List<DraftSentence>>{};
     final unplaced = <String>[];
     for (final sentence in sorted) {
       if (sentence.section case final section?) {
-        (grouped[section] ??= <String>[]).add(sentence.text);
+        (grouped[section] ??= <DraftSentence>[]).add(
+          (
+            text: sentence.text,
+            placedByModel: modelPlaced.contains(sentence.index),
+          ),
+        );
       } else {
         unplaced.add(sentence.text);
       }
@@ -182,7 +209,11 @@ abstract final class NoteDrafting {
       sections: <String, String>{
         for (final section in NoteSection.values)
           if (grouped[section] case final lines?)
-            section.key: lines.join(' '),
+            section.key: lines.map((s) => s.text).join(' '),
+      },
+      provenance: <String, List<DraftSentence>>{
+        for (final section in NoteSection.values)
+          if (grouped[section] case final lines?) section.key: lines,
       },
       engineName: engineName,
       placed: sorted.length - unplaced.length,
