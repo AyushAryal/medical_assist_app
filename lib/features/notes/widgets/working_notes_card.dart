@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/design/design.dart';
 import '../../../core/smart_phrases/smart_phrase.dart';
-import '../../../core/smart_phrases/smart_phrase_field.dart';
+import 'smart_text_wrap.dart';
 
 /// The rough-draft box that sits above the four sections.
 ///
@@ -73,8 +73,12 @@ class WorkingNotesCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              _wrapSmart(
-                TextField(
+              smartTextWrap(
+                controller: controller,
+                focusNode: focusNode,
+                registry: smartPhrases,
+                scope: scope,
+                field: TextField(
                   controller: controller,
                   focusNode: focusNode,
                   maxLines: null,
@@ -126,22 +130,6 @@ class WorkingNotesCard extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-
-  Widget _wrapSmart(Widget field) {
-    final registry = smartPhrases;
-    final node = focusNode;
-    final ctrl = controller;
-    if (registry == null || node == null || ctrl is! SmartPhraseController) {
-      return field;
-    }
-    return SmartPhraseField(
-      controller: ctrl,
-      focusNode: node,
-      registry: registry,
-      scope: scope,
-      child: field,
     );
   }
 }

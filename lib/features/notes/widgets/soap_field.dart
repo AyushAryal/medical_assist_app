@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 
 import '../../../core/design/design.dart';
 import '../../../core/smart_phrases/smart_phrase.dart';
-import '../../../core/smart_phrases/smart_phrase_field.dart';
 import '../../../data/models/attachment.dart';
 import '../../attachments/attachment_strip.dart';
 import '../../attachments/field_attach_bar.dart';
+import 'smart_text_wrap.dart';
 
 /// One of the four SOAP sections: a titled text box with its own attachment
 /// bar and, when a model is installed, a drafting action beneath it.
@@ -107,8 +107,12 @@ class SoapField extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          _wrapSmart(
-            TextField(
+          smartTextWrap(
+            controller: controller,
+            focusNode: focusNode,
+            registry: smartPhrases,
+            scope: scope,
+            field: TextField(
               controller: controller,
               focusNode: focusNode,
               enabled: enabled,
@@ -140,22 +144,6 @@ class SoapField extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _wrapSmart(Widget field) {
-    final registry = smartPhrases;
-    final node = focusNode;
-    final ctrl = controller;
-    if (registry == null || node == null || ctrl is! SmartPhraseController) {
-      return field;
-    }
-    return SmartPhraseField(
-      controller: ctrl,
-      focusNode: node,
-      registry: registry,
-      scope: scope,
-      child: field,
     );
   }
 }
