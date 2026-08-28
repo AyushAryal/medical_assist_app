@@ -4,9 +4,17 @@ import 'package:medical_app/data/services/assist/language_model.dart';
 /// point: tests about the *system's* handling of model output need the bad
 /// cases on demand, and a real model would only make them flaky.
 class ScriptedModel implements LanguageModelEngine {
-  ScriptedModel({this.rewrite, this.assignment, this.instructions});
+  ScriptedModel({
+    this.rewrite,
+    this.assignment,
+    this.instructions,
+    this.extraction,
+  });
 
   final String? rewrite;
+
+  /// The raw JSON reply to an extraction request.
+  final String? extraction;
 
   /// The raw reply to a sentence-assignment request, e.g.
   /// `'SUBJECTIVE: 1\nPLAN: 2'`.
@@ -48,6 +56,15 @@ class ScriptedModel implements LanguageModelEngine {
   Future<LanguageModelDraft> plainLanguageInstructions(String plan) async {
     sawText = plan;
     return LanguageModelDraft(text: instructions ?? '', engineName: name);
+  }
+
+  @override
+  Future<String?> extractValues(
+    String description, {
+    required List<String> fields,
+  }) async {
+    sawText = description;
+    return extraction;
   }
 
   @override

@@ -1,5 +1,6 @@
 import '../../core/agentic/agent_surface.dart';
 import 'spoken_value.dart';
+import 'surface_extraction.dart';
 
 /// The state of one field as a continuous dictation progresses.
 enum FieldStatus { pending, filled, skipped, rejected }
@@ -145,6 +146,23 @@ class ContinuousDictationController {
 
   AgentSurface _surfaceOf() =>
       AgentSurface(<AgentField>[for (final e in entries) e.field]);
+
+  /// Applies a model's structured extraction (the *describe* driver) to the
+  /// same preview: valid values fill their field, out-of-bounds or wrong-kind
+  /// ones are flagged rejected, unknown keys ignored. Returns how many landed.
+  int applyExtractionJson(Map<String, Object?> json) {
+    final result = const SurfaceExtraction().apply(json, _surfaceOf());
+    for (final entry in entries) {
+      if (result.filled.contains(entry.field.id)) {
+        entry.status = FieldStatus.filled;
+        entry.display = result.displays[entry.field.id];
+      } else if (result.rejected.contains(entry.field.id)) {
+        entry.status = FieldStatus.rejected;
+        entry.display = null;
+      }
+    }
+    return result.filledCount;
+  }
 
   ContinuousOutcome apply(String transcript) {
     if (_stopped) return ContinuousOutcome.stopped;

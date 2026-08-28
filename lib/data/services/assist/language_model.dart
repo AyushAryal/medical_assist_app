@@ -64,6 +64,19 @@ abstract interface class LanguageModelEngine {
     required List<String> vocabulary,
   });
 
+  /// Reads a free-spoken description of measurements into a JSON object keyed
+  /// by the given [fields] (their ids), or null when the model cannot.
+  ///
+  /// Extraction, not authorship: the reply is expected to be JSON of
+  /// field → value, and every value is then validated against the field's kind
+  /// and bounds before use, so a hallucinated field or an impossible number is
+  /// discarded rather than entered. Returns the raw reply for the caller to
+  /// parse and validate; null is not an error.
+  Future<String?> extractValues(
+    String description, {
+    required List<String> fields,
+  });
+
   Future<void> dispose();
 }
 

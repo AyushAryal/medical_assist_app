@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -12,16 +15,22 @@ import '../drivers/continuous_dictation_controller.dart';
 // modal sheet is pushed outside the calling context's providers anyway — so it
 // is read once at the call site and handed to the sheet directly.
 
-/// Hands-free vitals entry: the clinician taps listen once and says the whole
-/// set — "BP one-twenty over eighty, pulse eighty-eight, temp thirty-eight six,
-/// skip glucose, done" — while a live preview fills each field in, marks what
-/// was skipped, and shows what is still pending. Every value is sanitised and
-/// only *proposed* into the form; the clinician reviews and saves.
-///
-/// The audio + on-device transcription run at this edge; the routing,
-/// sanitising and status machine ([ContinuousDictationController]) are unit-
-/// tested. Live word-by-word streaming is a later on-device refinement — today
-/// the preview updates each time a phrase (or the whole set) is transcribed.
+/// How the clinician gives the values.
+enum _Mode {
+  /// Say each value — "BP 120 over 80, pulse 88". Deterministic parsing.
+  dictate,
+
+  /// Describe the obs freely — "looks unwell, pressure was 120 on 80, a bit
+  /// tachy at 110, febrile" — and the on-device model infers the numbers.
+  describe,
+}
+
+/// Hands-free vitals entry. Tap listen, speak, and pause — the recording stops
+/// on its own, the values are transcribed on device and fill a live preview.
+/// Everything is a proposal the clinician reviews and saves; nothing is trusted
+/// blindly, so a value outside its plausible range is refused rather than
+/// written. The routing, sanitising and model-output validation are unit-
+/// tested; the audio runs on device.
 class GuidedDictationSheet extends StatefulWidget {
   const GuidedDictationSheet({
     super.key,
@@ -39,7 +48,7 @@ class GuidedDictationSheet extends StatefulWidget {
       isScrollControlled: true,
       showDragHandle: true,
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+        maxHeight: MediaQuery.sizeOf(context).height * 0.92,
       ),
       builder: (_) =>
           GuidedDictationSheet(surface: surface, bootstrap: bootstrap),
@@ -54,41 +63,102 @@ class _GuidedDictationSheetState extends State<GuidedDictationSheet> {
   late final ContinuousDictationController _controller =
       ContinuousDictationController(widget.surface);
 
+  _Mode _mode = _Mode.dictate;
   bool _listening = false;
   bool _working = false;
+  double _level = 0;
+  bool _sawSpeech = false;
   String? _heard;
+  Timer? _levelTimer;
 
-  Future<void> _toggleListen() async {
-    final bootstrap = widget.bootstrap;
-    if (!_listening) {
-      final started = await bootstrap.dictation.start();
-      if (mounted) setState(() => _listening = started);
-      return;
-    }
+  static const _silenceStop = Duration(milliseconds: 1400);
 
+  @override
+  void dispose() {
+    _levelTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _startListen() async {
+    final started = await widget.bootstrap.dictation.start();
+    if (!mounted || !started) return;
+    setState(() {
+      _listening = true;
+      _sawSpeech = false;
+      _level = 0;
+    });
+    _levelTimer = Timer.periodic(const Duration(milliseconds: 80), (_) {
+      if (!mounted || !_listening) return;
+      final level = widget.bootstrap.dictation.level;
+      if (level.isSpeaking) _sawSpeech = true;
+      setState(() => _level = level.current);
+      // Auto-stop once the clinician has spoken and then paused — no button.
+      if (_sawSpeech && level.silenceRun >= _silenceStop) {
+        _stopAndProcess();
+      }
+    });
+  }
+
+  Future<void> _stopAndProcess() async {
+    _levelTimer?.cancel();
+    if (!_listening) return;
     setState(() {
       _listening = false;
       _working = true;
     });
     try {
-      final capture = await bootstrap.dictation.stop();
+      final capture = await widget.bootstrap.dictation.stop();
       if (capture == null) throw StateError('nothing recorded');
-      final result = await bootstrap.transcription.transcribe(capture.file);
-      _controller.applyTranscript(result.text);
+      final result = await widget.bootstrap.transcription.transcribe(
+        capture.file,
+      );
       if (mounted) setState(() => _heard = result.text);
-    } on Object {
-      if (mounted) {
-        setState(() => _heard = 'Could not transcribe — try again.');
+
+      if (_mode == _Mode.dictate) {
+        _controller.applyTranscript(result.text);
+      } else {
+        await _describe(result.text);
       }
+    } on Object {
+      if (mounted) setState(() => _heard = 'Could not transcribe — try again.');
     } finally {
       if (mounted) setState(() => _working = false);
+    }
+  }
+
+  Future<void> _describe(String text) async {
+    final engine = widget.bootstrap.assistEngine;
+    if (engine == null) {
+      setState(() => _heard =
+          'Describe needs an on-device assistant model (Settings › On-device '
+          'AI). Or switch to Dictate and say each value.');
+      return;
+    }
+    final reply = await engine.extractValues(
+      text,
+      fields: widget.surface.fillable.map((f) => f.id).toList(),
+    );
+    final json = _asJson(reply);
+    if (json != null) _controller.applyExtractionJson(json);
+  }
+
+  /// The model's reply may carry stray prose; take the first JSON object.
+  Map<String, Object?>? _asJson(String? reply) {
+    if (reply == null) return null;
+    final start = reply.indexOf('{');
+    final end = reply.lastIndexOf('}');
+    if (start < 0 || end <= start) return null;
+    try {
+      final decoded = jsonDecode(reply.substring(start, end + 1));
+      return decoded is Map<String, Object?> ? decoded : null;
+    } on Object {
+      return null;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final m = context.metrics;
-
     if (!widget.bootstrap.canTranscribe) return _NeedsModel(metrics: m);
 
     return SafeArea(
@@ -100,6 +170,8 @@ class _GuidedDictationSheetState extends State<GuidedDictationSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             _header(context),
+            SizedBox(height: m.spaceSm),
+            _modeToggle(context),
             SizedBox(height: m.spaceMd),
             Flexible(
               child: SingleChildScrollView(
@@ -108,7 +180,8 @@ class _GuidedDictationSheetState extends State<GuidedDictationSheet> {
                     for (final entry in _controller.entries)
                       _PreviewRow(
                         entry: entry,
-                        isNext: entry.field.id == _controller.current?.id,
+                        isNext: !_controller.complete &&
+                            entry.field.id == _controller.current?.id,
                       ),
                   ],
                 ),
@@ -128,9 +201,10 @@ class _GuidedDictationSheetState extends State<GuidedDictationSheet> {
       children: <Widget>[
         const AiSparkleIcon(size: 20),
         SizedBox(width: m.spaceSm),
-        Expanded(
-          child: Text('Guided dictation', style: context.texts.titleMedium),
-        ),
+        Text('Voice entry', style: context.texts.titleMedium),
+        SizedBox(width: m.spaceSm),
+        const AiBadge(label: 'AI', dense: true),
+        const Spacer(),
         Text(
           '${_controller.filledCount} / ${_controller.total}',
           style: context.texts.labelMedium,
@@ -139,48 +213,82 @@ class _GuidedDictationSheetState extends State<GuidedDictationSheet> {
     );
   }
 
+  Widget _modeToggle(BuildContext context) {
+    return SegmentedButton<_Mode>(
+      segments: const <ButtonSegment<_Mode>>[
+        ButtonSegment<_Mode>(
+          value: _Mode.dictate,
+          label: Text('Dictate'),
+          icon: Icon(Icons.spatial_audio_off, size: 18),
+        ),
+        ButtonSegment<_Mode>(
+          value: _Mode.describe,
+          label: Text('Describe'),
+          icon: Icon(Icons.auto_awesome, size: 18),
+        ),
+      ],
+      selected: <_Mode>{_mode},
+      showSelectedIcon: false,
+      onSelectionChanged: _listening || _working
+          ? null
+          : (s) => setState(() => _mode = s.first),
+    );
+  }
+
   Widget _listenArea(BuildContext context) {
     final m = context.metrics;
     final palette = context.palette;
 
+    final hint = _mode == _Mode.dictate
+        ? 'Say each value — "BP 120 over 80, pulse 88, temp 38.6". Say "skip".'
+        : 'Describe the obs in your own words — the assistant reads the numbers.';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        SizedBox(
-          height: 40,
-          child: _listening
-              ? const SiriWaveform(level: 0.7, active: true)
-              : Center(
-                  child: Text(
-                    _heard == null
-                        ? 'Say it all in one go — "BP 120 over 80, pulse 88, '
-                            'temp 38.6, skip glucose, done".'
-                        : 'Heard: "$_heard"',
-                    style: context.texts.labelSmall
+        // The live audio plot while listening, so a working mic is obvious;
+        // the hint or what was heard otherwise. The glow marks it as the AI
+        // feature at work.
+        AiGlowBorder(
+          active: _listening || _working,
+          borderRadius: BorderRadius.circular(m.radiusMd),
+          child: Container(
+            height: 64,
+            padding: EdgeInsets.symmetric(horizontal: m.spaceMd),
+            alignment: Alignment.center,
+            child: _listening
+                ? SiriWaveform(level: _level.clamp(0.05, 1.0), active: true)
+                : Text(
+                    _working
+                        ? 'Reading what you said…'
+                        : _heard == null
+                            ? hint
+                            : 'Heard: "$_heard"',
+                    style: context.texts.labelMedium
                         ?.copyWith(color: palette.onSurfaceMuted),
                     textAlign: TextAlign.center,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                ),
+          ),
         ),
-        SizedBox(height: m.spaceSm),
+        SizedBox(height: m.spaceMd),
         FilledButton.icon(
-          onPressed: _working ? null : _toggleListen,
+          onPressed: _working
+              ? null
+              : (_listening ? _stopAndProcess : _startListen),
           icon: Icon(_listening ? Icons.stop : Icons.mic),
           label: Text(
             _working
-                ? 'Transcribing…'
+                ? 'Working…'
                 : _listening
                     ? 'Stop'
-                    : 'Listen',
+                    : (_controller.filledCount == 0 ? 'Listen' : 'Add more'),
           ),
         ),
         TextButton(
           onPressed: () => Navigator.of(context).maybePop(),
-          child: Text(
-            _controller.complete ? 'Review & save' : 'Done',
-          ),
+          child: Text(_controller.complete ? 'Review & save' : 'Close'),
         ),
       ],
     );
@@ -204,7 +312,7 @@ class _PreviewRow extends StatelessWidget {
       FieldStatus.skipped => (Icons.remove_circle_outline, palette.onSurfaceMuted),
       FieldStatus.rejected => (Icons.error_outline, palette.caution),
       FieldStatus.pending => (
-          isNext ? Icons.mic_none_outlined : Icons.circle_outlined,
+          isNext ? Icons.graphic_eq : Icons.circle_outlined,
           isNext ? palette.primary : palette.onSurfaceMuted,
         ),
     };
@@ -213,11 +321,11 @@ class _PreviewRow extends StatelessWidget {
       FieldStatus.filled => entry.display ?? '',
       FieldStatus.skipped => 'skipped',
       FieldStatus.rejected => 'not caught — repeat',
-      FieldStatus.pending => isNext ? 'say this' : '',
+      FieldStatus.pending => isNext ? 'listening…' : '',
     };
 
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
+      duration: const Duration(milliseconds: 200),
       margin: EdgeInsets.only(bottom: m.spaceXs),
       padding: EdgeInsets.symmetric(horizontal: m.spaceMd, vertical: m.spaceSm),
       decoration: BoxDecoration(
@@ -251,8 +359,8 @@ class _PreviewRow extends StatelessWidget {
   }
 }
 
-/// Shown when no speech model is installed — guided dictation transcribes on
-/// device, so it needs one.
+/// Shown when no speech model is installed — voice entry transcribes on device,
+/// so it needs one.
 class _NeedsModel extends StatelessWidget {
   const _NeedsModel({required this.metrics});
 
@@ -272,12 +380,12 @@ class _NeedsModel extends StatelessWidget {
               children: <Widget>[
                 const Icon(Icons.mic_off_outlined),
                 SizedBox(width: m.spaceSm),
-                Text('Guided dictation', style: context.texts.titleMedium),
+                Text('Voice entry', style: context.texts.titleMedium),
               ],
             ),
             SizedBox(height: m.spaceMd),
             Text(
-              'Dictating vitals needs a speech model on this device — it is '
+              'Speaking vitals in needs a speech model on this device — it is '
               'what turns what you say into a value, all on device.',
               style: context.texts.bodyMedium,
             ),

@@ -205,6 +205,25 @@ class LlamaEngine implements LanguageModelEngine {
   }
 
   @override
+  Future<String?> extractValues(
+    String description, {
+    required List<String> fields,
+  }) {
+    // The reply is only ever *proposed* into a form after being validated
+    // field-by-field against the schema (kinds and plausible bounds), so a
+    // hallucinated key or an impossible number is discarded, not entered.
+    return _complete(
+      'You extract clinical measurements from a spoken description into JSON. '
+      'Reply with ONLY a JSON object and nothing else. Use exactly these keys '
+      'and no others: ${fields.join(', ')}. A value is the number said for '
+      'that measurement; blood pressure is "systolic/diastolic" like "120/80". '
+      'Omit any field that is not clearly stated. Invent nothing.',
+      description,
+      maxTokens: 160,
+    );
+  }
+
+  @override
   Future<String?> assignSentencesToSections(
     List<String> numberedSentences,
   ) async {
