@@ -191,6 +191,8 @@ class _GuidedDictationSheetState extends State<GuidedDictationSheet> {
         const AiSparkleIcon(size: 20),
         SizedBox(width: m.spaceSm),
         Text('Voice entry', style: context.texts.titleMedium),
+        SizedBox(width: m.spaceSm),
+        const AiBadge(label: 'AI', dense: true),
         const Spacer(),
         Text(
           '${_controller.filledCount} / ${_controller.total}',
