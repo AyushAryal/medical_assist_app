@@ -37,10 +37,12 @@ class _AiBadgeState extends State<AiBadge>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
-    // Slow enough to read as a sheen rather than a flash. A badge that pulses
-    // urgently competes with the clinical severity colours, which is exactly
-    // what it must not do.
-    duration: const Duration(milliseconds: 4200),
+    // A slow drift, not a scroll. At 4.2s the sheen visibly raced across the
+    // pill and, with the colours tiled twice, read as a repeating pattern
+    // rather than a single sheen. Much slower reads as a barely-moving gleam,
+    // which is what a badge should be — it must never compete with the
+    // clinical severity colours.
+    duration: const Duration(milliseconds: 11000),
   );
 
   @override
