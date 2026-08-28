@@ -3,6 +3,24 @@ import 'package:flutter/material.dart';
 import '../../core/design/design.dart';
 import '../../data/services/model_download.dart';
 
+/// How a model suits the device class the operator has selected.
+///
+/// Only the assistant's language models carry this; the speech models leave it
+/// null and the row shows nothing. It never blocks an install — a clinic that
+/// wants a heavy model on a light device may have reasons the app cannot see —
+/// it only says, plainly, what to expect.
+enum ModelSuitability {
+  /// The best model this device class runs comfortably. The one to pick.
+  recommended,
+
+  /// Runs on this device class, but not the recommended pick.
+  fits,
+
+  /// Needs more memory than this device class has to spare. Installable, but
+  /// likely to be slow or to be killed under load.
+  heavy,
+}
+
 /// One installable model: what it is, what state it is in, what can be done.
 ///
 /// Shared between the speech models and the assistant's language models so
@@ -26,6 +44,8 @@ class ModelRow extends StatelessWidget {
     required this.onInstall,
     required this.onCancel,
     required this.onRemove,
+    this.memoryLabel,
+    this.suitability,
   });
 
   /// What the model is, as plain strings — this row serves both the speech
@@ -56,6 +76,13 @@ class ModelRow extends StatelessWidget {
   final VoidCallback onCancel;
   final VoidCallback? onRemove;
 
+  /// Roughly the working memory the model needs to run, when known. Shown so a
+  /// small download is not mistaken for a small runtime cost.
+  final String? memoryLabel;
+
+  /// How the model suits the selected device class, or null to say nothing.
+  final ModelSuitability? suitability;
+
   @override
   Widget build(BuildContext context) {
     final m = context.metrics;
@@ -71,9 +98,51 @@ class ModelRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text(name, style: context.texts.titleSmall),
+                  Row(
+                    children: <Widget>[
+                      Flexible(
+                        child: Text(name, style: context.texts.titleSmall),
+                      ),
+                      if (suitability == ModelSuitability.recommended) ...<Widget>[
+                        SizedBox(width: m.spaceXs),
+                        StatusPill(
+                          label: 'Recommended',
+                          tone: PillTone.normal,
+                          icon: Icons.verified_outlined,
+                          dense: true,
+                        ),
+                      ],
+                    ],
+                  ),
                   SizedBox(height: m.spaceXs / 2),
                   Text(description, style: context.texts.bodySmall),
+                  if (memoryLabel case final memory?) ...<Widget>[
+                    SizedBox(height: m.spaceXs / 2),
+                    Text(
+                      'Needs about $memory to run',
+                      style: context.texts.labelSmall
+                          ?.copyWith(color: palette.onSurfaceMuted),
+                    ),
+                  ],
+                  if (suitability == ModelSuitability.heavy) ...<Widget>[
+                    SizedBox(height: m.spaceXs),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Icon(Icons.warning_amber_rounded,
+                            size: 13, color: palette.caution),
+                        SizedBox(width: m.spaceXs),
+                        Expanded(
+                          child: Text(
+                            'Heavier than this device class — it may run slowly '
+                            'or be closed under load. Installable anyway.',
+                            style: context.texts.labelSmall
+                                ?.copyWith(color: palette.caution),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

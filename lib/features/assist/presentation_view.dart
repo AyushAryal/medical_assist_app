@@ -13,6 +13,7 @@ import 'views/message_view.dart';
 import 'views/metric_view.dart';
 import 'views/proposal_view.dart';
 import 'views/data_table_card.dart';
+import 'views/patient_summary_view.dart';
 import 'views/view_toggle.dart';
 
 /// Renders whatever the pipeline produced, in this app's own visual language.
@@ -203,6 +204,8 @@ class _AssistPresentationViewState extends State<AssistPresentationView> {
           result: presentation,
           onSuggestion: widget.onSuggestion,
         ),
+      PatientSummaryPresentation() =>
+        PatientSummaryAnswerView(result: presentation),
     };
   }
 

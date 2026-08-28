@@ -491,8 +491,10 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.medapp.medicalApp;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ayusharyal.medicalApp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				DEVELOPMENT_TEAM = J88R3C562B;
+				CODE_SIGN_STYLE = Automatic;
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -673,8 +675,10 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.medapp.medicalApp;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ayusharyal.medicalApp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				DEVELOPMENT_TEAM = J88R3C562B;
+				CODE_SIGN_STYLE = Automatic;
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -695,8 +699,10 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.medapp.medicalApp;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ayusharyal.medicalApp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				DEVELOPMENT_TEAM = J88R3C562B;
+				CODE_SIGN_STYLE = Automatic;
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";

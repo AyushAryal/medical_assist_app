@@ -12,6 +12,7 @@ class SectionProposal {
     required this.title,
     required this.before,
     required this.proposed,
+    required this.sentences,
     this.keep = true,
   });
 
@@ -25,12 +26,21 @@ class SectionProposal {
   /// What the model suggests adding to this section.
   final String proposed;
 
+  /// The proposed text broken out sentence by sentence, each tagged with
+  /// whether the model or the rules filed it. Same words as [proposed]; the
+  /// tags are what let the screen mark the model's decisions.
+  final List<DraftSentence> sentences;
+
   /// Accepted by default — the draft has already passed the word-for-word
   /// gate, and defaulting to discard would make the common case four extra
   /// taps. Every one is still individually refusable.
   bool keep;
 
   bool get isAddition => before.trim().isNotEmpty;
+
+  /// Whether the model filed any sentence in this section — the only case the
+  /// marking, and the caption explaining it, need to appear at all.
+  bool get hasModelPlaced => sentences.any((s) => s.placedByModel);
 }
 
 /// Review a model's sorting, section by section, before any of it lands.
@@ -103,6 +113,7 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
           title: DraftReviewScreen.titles[key]!,
           before: widget.current[key] ?? '',
           proposed: widget.draft.sections[key]!.trim(),
+          sentences: widget.draft.provenance[key] ?? const <DraftSentence>[],
         ),
   ];
 
@@ -252,8 +263,10 @@ class _Preamble extends StatelessWidget {
               SizedBox(height: m.spaceXs),
               Text(
                 'Your sentences, filed — never reworded. Each one below is '
-                'exactly what you dictated. Keep the sections you agree with; '
-                'nothing changes until you apply.',
+                'exactly what you dictated. Highlighted sentences are the ones '
+                'the model filed rather than the rules, so check those first. '
+                'Keep the sections you agree with; nothing changes until you '
+                'apply.',
                 style: context.texts.bodySmall,
               ),
             ],
@@ -331,9 +344,11 @@ class _ProposalCard extends StatelessWidget {
             ),
             SizedBox(height: m.spaceXs),
           ],
-          // The generated text, tinted. The accent and never a severity
-          // colour: red in this app means a patient is unwell, and "a machine
-          // wrote this" must not borrow that vocabulary.
+          // Your words, filed. Nothing here is reworded, so the whole block is
+          // *not* tinted as generated — that would misname the clinician's own
+          // sentences. Only the sentences the model *placed* are marked, in the
+          // accent and never a severity colour: red in this app means a patient
+          // is unwell, and "a machine decided this" must not borrow that.
           AnimatedOpacity(
             duration: const Duration(milliseconds: 180),
             opacity: kept ? 1 : 0.45,
@@ -341,23 +356,15 @@ class _ProposalCard extends StatelessWidget {
               width: double.infinity,
               padding: EdgeInsets.all(m.spaceSm),
               decoration: BoxDecoration(
-                color: kept
-                    ? palette.accentSubtle
-                    : palette.surfaceMuted.withValues(alpha: 0.6),
+                color: palette.surfaceMuted.withValues(alpha: kept ? 1 : 0.6),
                 borderRadius: BorderRadius.circular(m.radiusSm),
                 border: Border.all(
-                  color: kept
+                  color: proposal.hasModelPlaced && kept
                       ? palette.accent.withValues(alpha: 0.45)
                       : palette.outline.withValues(alpha: 0.4),
                 ),
               ),
-              child: Text(
-                proposal.proposed,
-                style: context.texts.bodyMedium?.copyWith(
-                  color: kept ? palette.onSurface : palette.onSurfaceMuted,
-                  decoration: kept ? null : TextDecoration.lineThrough,
-                ),
-              ),
+              child: _ProposedText(proposal: proposal, kept: kept),
             ),
           ),
           SizedBox(height: m.spaceXs),
@@ -369,17 +376,150 @@ class _ProposalCard extends StatelessWidget {
                 color: kept ? palette.accent : palette.onSurfaceMuted,
               ),
               SizedBox(width: m.spaceXs),
-              Text(
-                kept
-                    ? 'Will go into ${proposal.title}'
-                    : 'Discarded — ${proposal.title} stays as it is',
-                style: context.texts.labelSmall
-                    ?.copyWith(color: palette.onSurfaceMuted),
+              Expanded(
+                child: Text(
+                  kept
+                      ? proposal.hasModelPlaced
+                          ? 'Will go into ${proposal.title} — highlighted '
+                              'sentences were filed here by the model, not the '
+                              'rules. Check those against what you said.'
+                          : 'Will go into ${proposal.title} — every sentence '
+                              'filed by the rules.'
+                      : 'Discarded — ${proposal.title} stays as it is',
+                  style: context.texts.labelSmall
+                      ?.copyWith(color: palette.onSurfaceMuted),
+                ),
               ),
             ],
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The proposed section text, with the model's placements highlighted.
+///
+/// The rules place most sentences and place them by an explicit clinical cue,
+/// so those read plainly — they are as trustworthy as the clinician's own
+/// filing. The model places only what the rules could not read, by choosing a
+/// section rather than by any rule the screen can show, so those are the ones
+/// worth a second look and the only ones marked.
+class _ProposedText extends StatefulWidget {
+  const _ProposedText({required this.proposal, required this.kept});
+
+  final SectionProposal proposal;
+  final bool kept;
+
+  @override
+  State<_ProposedText> createState() => _ProposedTextState();
+}
+
+class _ProposedTextState extends State<_ProposedText>
+    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+  // The one-time reveal that streams the section in like an assistant writing.
+  AnimationController? _typer;
+  bool _typingStarted = false;
+
+  /// The section as one string, and a per-character mask of what the model
+  /// placed (and so gets the highlighter). Built once — the sort does not
+  /// change under the screen.
+  late final String _full;
+  late final List<bool> _mask;
+
+  // Keep the card's state alive for as long as it is in the list, so scrolling
+  // it off screen and back does not replay the reveal from zero. See the note
+  // on the same getter in GeneratedText.
+  @override
+  bool get wantKeepAlive => _typer != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final sb = StringBuffer();
+    final mask = <bool>[];
+    final sentences = widget.proposal.sentences;
+    for (var i = 0; i < sentences.length; i++) {
+      if (i > 0) {
+        sb.write(' ');
+        mask.add(false);
+      }
+      final marked = sentences[i].placedByModel;
+      sb.write(sentences[i].text);
+      mask.addAll(List<bool>.filled(sentences[i].text.length, marked));
+    }
+    _full = sb.toString();
+    _mask = mask;
+
+    if (_full.isNotEmpty) {
+      _typer = AnimationController(
+        vsync: this,
+        duration: Duration(milliseconds: (_full.length * 14).clamp(500, 3500)),
+      );
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final typer = _typer;
+    if (typer != null && !_typingStarted) {
+      _typingStarted = true;
+      if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
+        typer.value = 1;
+      } else {
+        typer.forward();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _typer?.dispose();
+    super.dispose();
+  }
+
+  Widget _rich(BuildContext context, double reveal) {
+    final palette = context.palette;
+    final kept = widget.kept;
+    final base = context.texts.bodyMedium?.copyWith(
+          color: kept ? palette.onSurface : palette.onSurfaceMuted,
+          decoration: kept ? null : TextDecoration.lineThrough,
+        ) ??
+        const TextStyle();
+
+    // No provenance (e.g. an older draft) — render the plain string.
+    if (widget.proposal.sentences.isEmpty) {
+      return Text(widget.proposal.proposed, style: base);
+    }
+
+    // Discarded sections keep their words but drop the highlighter — nothing is
+    // going into the record, so there is nothing to flag.
+    final mask = kept ? _mask : List<bool>.filled(_full.length, false);
+    return Text.rich(
+      TextSpan(
+        style: base,
+        children: buildGeneratedSpans(
+          context: context,
+          full: _full,
+          mask: mask,
+          revealExact: reveal * _full.length,
+          textColor: kept ? palette.onSurface : palette.onSurfaceMuted,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context); // AutomaticKeepAliveClientMixin
+    final typer = _typer;
+    if (typer == null || (MediaQuery.maybeDisableAnimationsOf(context) ?? false)) {
+      return _rich(context, 1);
+    }
+    return AnimatedBuilder(
+      animation: typer,
+      builder: (context, _) => _rich(context, Curves.easeOut.transform(typer.value)),
     );
   }
 }

@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../ai/pipeline.dart';
 import '../../ai/presentation.dart';
 import '../../ai/cohort/assist_reply.dart';
 import '../../ai/cohort/query_vocabulary.dart';
 import '../../core/design/design.dart';
+import '../../core/smart_phrases/smart_phrase.dart';
+import '../../core/smart_phrases/smart_phrase_field.dart';
+import '../../core/smart_phrases/smart_phrase_library.dart';
+import '../../data/repositories/clinical_repository.dart';
 import 'presentation_view.dart';
 
 /// One turn in the conversation.
@@ -41,7 +46,8 @@ class AssistantPanel extends StatefulWidget {
   });
 
   /// Answers a question. Everything that needs a database lives behind this.
-  final Future<AssistResult> Function(String question) onAsk;
+  final Future<AssistResult> Function(String question, {String? patientId})
+      onAsk;
 
   final VoidCallback onClose;
 
@@ -100,7 +106,10 @@ class AssistantPanel extends StatefulWidget {
 /// Public so the host can hand a finished transcript back in. The recorder
 /// lives outside the panel — it must survive the panel closing mid-recording.
 class AssistantPanelState extends State<AssistantPanel> {
-  final TextEditingController _question = TextEditingController();
+  final SmartPhraseController _question = SmartPhraseController();
+
+  /// Dynamic macros plus the clinic's saved phrases; loaded once on open.
+  SmartPhraseRegistry _registry = buildSmartPhraseRegistry(const []);
   final ScrollController _scroll = ScrollController();
   final FocusNode _focus = FocusNode();
 
@@ -186,8 +195,24 @@ class AssistantPanelState extends State<AssistantPanel> {
     // Focus explicitly rather than with `autofocus`, so there is exactly one
     // thing deciding when this field takes focus.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _focus.requestFocus();
+      if (!mounted) return;
+      _focus.requestFocus();
+      _loadPhrases();
     });
+  }
+
+  Future<void> _loadPhrases() async {
+    // The dynamic macros work without a database; DB phrases are a bonus, so a
+    // missing repository (or a read that fails) just leaves the built-ins.
+    try {
+      final records =
+          await context.read<ClinicalRepository>().smartPhrases.all();
+      if (mounted) {
+        setState(() => _registry = buildSmartPhraseRegistry(records));
+      }
+    } on Object {
+      // Keep the built-in macros only.
+    }
   }
 
   @override
@@ -225,6 +250,8 @@ class AssistantPanelState extends State<AssistantPanel> {
     final text = question.trim();
     if (text.isEmpty || _running) return;
 
+    // Read the resolved patient before the field is cleared below.
+    final patientId = _question.payloadOf('patient');
     _replayGuard = text;
 
     setState(() {
@@ -241,7 +268,7 @@ class AssistantPanelState extends State<AssistantPanel> {
     });
     _scrollToEnd();
 
-    final answer = await widget.onAsk(text);
+    final answer = await widget.onAsk(text, patientId: patientId);
     if (!mounted) return;
 
     setState(() {
@@ -612,7 +639,11 @@ class AssistantPanelState extends State<AssistantPanel> {
   }
 
   Widget _input(BuildContext context) {
-    return TextField(
+    return SmartPhraseField(
+      controller: _question,
+      focusNode: _focus,
+      registry: _registry,
+      child: TextField(
       // Retires the platform input connection after every question — see the
       // note on [_generation].
       key: ValueKey<int>(_generation),
@@ -675,6 +706,7 @@ class AssistantPanelState extends State<AssistantPanel> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

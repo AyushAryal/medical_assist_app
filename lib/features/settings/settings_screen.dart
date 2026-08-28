@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:local_auth/local_auth.dart';
@@ -15,6 +14,7 @@ import '../../core/theme/theme_controller.dart';
 import '../../data/fixtures/demo_data.dart';
 import '../../data/repositories/clinical_repository.dart';
 import '../lock/pin_setup_screen.dart';
+import 'smart_phrases_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -53,7 +53,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final enabled = await lock.isBiometricEnabled();
     final types = await lock.availableBiometrics();
     final pending = await repository.pendingSyncCount();
-    final demo = kDebugMode ? await DemoDataSeeder(repository).count() : 0;
+    final demo = demoDataAllowed ? await DemoDataSeeder(repository).count() : 0;
 
     if (!mounted) return;
     setState(() {
@@ -177,6 +177,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onTap: () => context.push(Routes.clinics),
                   ),
                 ],
+              ),
+            ),
+            SizedBox(height: m.spaceMd),
+
+            SectionCard(
+              title: 'Smart phrases',
+              subtitle: 'Type \\ in the assistant to summon them',
+              leading: const Icon(Icons.bolt_outlined, size: 20),
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Manage smart phrases'),
+                subtitle: const Text(
+                  'Text expansions like \\ros and \\normal, plus the built-in '
+                  '\\pat, \\me, \\today, \\clinic',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const SmartPhrasesScreen(),
+                  ),
+                ),
               ),
             ),
             SizedBox(height: m.spaceMd),
@@ -342,14 +363,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
 
-            // Debug builds only. Fabricated patients must never be reachable
-            // in a shipped clinical app, so this whole section is compiled
-            // out of release builds rather than merely hidden.
-            if (kDebugMode) ...<Widget>[
+            // Opt-in builds only. Fabricated patients must never be reachable
+            // in a shipped clinical app, so this whole section is compiled out
+            // unless the build asked for it — every debug build, or a release
+            // built with --dart-define=ALLOW_DEMO_DATA=true. A store build
+            // passes neither and the section, like the seeder, does not exist.
+            if (demoDataAllowed) ...<Widget>[
               SizedBox(height: m.spaceMd),
               SectionCard(
                 title: 'Demo data',
-                subtitle: 'Debug builds only — never shipped',
+                subtitle: 'Review builds only — never in a shipped app',
                 leading: const Icon(Icons.science_outlined, size: 20),
                 child: Column(
                   children: <Widget>[

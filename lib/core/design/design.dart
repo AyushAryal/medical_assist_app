@@ -39,7 +39,12 @@ export 'ai_effects.dart'
         AiTextPlaceholder,
         AiBadge,
         AiSparkleIcon,
-        AiAuroraBackground;
+        AiAuroraBackground,
+        GeneratedText,
+        GeneratedTextLegend,
+        GeneratedSpanController,
+        generatedHighlightColor,
+        buildGeneratedSpans;
 export 'ai_waveform.dart' show SiriWaveform;
 export 'playback_waveform.dart' show PlaybackWaveform;
 

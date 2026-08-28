@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/design/design.dart';
+import '../../core/smart_phrases/smart_phrase.dart';
+import '../../core/smart_phrases/smart_phrase_field.dart';
+import '../../core/smart_phrases/smart_phrase_library.dart';
 
 import '../../core/session/session_controller.dart';
 import '../../core/utils/formatters.dart';
@@ -52,10 +55,13 @@ class NoteEditorScreen extends StatefulWidget {
 }
 
 class _NoteEditorScreenState extends State<NoteEditorScreen> {
-  final TextEditingController _subjective = TextEditingController();
-  final TextEditingController _objective = TextEditingController();
-  final TextEditingController _assessment = TextEditingController();
-  final TextEditingController _plan = TextEditingController();
+  // Generated-span controllers: the model can fill any SOAP section, and each
+  // marks the exact text it wrote until a clinician edits it. See
+  // [GeneratedSpanController].
+  final GeneratedSpanController _subjective = GeneratedSpanController();
+  final GeneratedSpanController _objective = GeneratedSpanController();
+  final GeneratedSpanController _assessment = GeneratedSpanController();
+  final GeneratedSpanController _plan = GeneratedSpanController();
 
   /// The rough draft: a whole consultation dictated in one go.
   ///
@@ -64,7 +70,24 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// is what the model is for — which is why the model's button lives here
   /// and not on Subjective, where it used to sit asking clinicians to dump
   /// everything into one section they would then have to un-dump.
-  final TextEditingController _working = TextEditingController();
+  final SmartPhraseController _working = SmartPhraseController();
+
+  /// One focus node per field, so the smart-phrase menu knows which field it is
+  /// floating over and whether that field has focus.
+  final Map<String, FocusNode> _fieldFocus = <String, FocusNode>{
+    'subjective': FocusNode(),
+    'objective': FocusNode(),
+    'assessment': FocusNode(),
+    'plan': FocusNode(),
+  };
+  final FocusNode _workingFocus = FocusNode();
+
+  /// The clinic's smart phrases, loaded once. Every field in this editor shares
+  /// it, scoped to this encounter's patient so `\vitals` and `\hopi` fetch the
+  /// right chart with no extra tap.
+  SmartPhraseRegistry _registry = buildSmartPhraseRegistry(const []);
+
+  SmartPhraseScope get _scope => SmartPhraseScope(patientId: _patient?.id);
 
   Timer? _autosave;
   ClinicalNote? _note;
@@ -118,9 +141,24 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _load();
+      _loadPhrases();
+    });
     for (final controller in _controllers) {
       controller.addListener(_onChanged);
+    }
+  }
+
+  Future<void> _loadPhrases() async {
+    try {
+      final records =
+          await context.read<ClinicalRepository>().smartPhrases.all();
+      if (mounted) {
+        setState(() => _registry = buildSmartPhraseRegistry(records));
+      }
+    } on Object {
+      // Keep the built-in macros only.
     }
   }
 
@@ -144,6 +182,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       controller.removeListener(_onChanged);
       controller.dispose();
     }
+    for (final node in _fieldFocus.values) {
+      node.dispose();
+    }
+    _workingFocus.dispose();
     super.dispose();
   }
 
@@ -176,6 +218,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _objective.text = note.objective ?? '';
     _assessment.text = note.assessment ?? '';
     _plan.text = note.plan ?? '';
+    // Loaded text is the stored record, not something generated this session.
+    _aiText.clear();
+    for (final field in _fields.values) {
+      field.clearGenerated();
+    }
 
     setState(() {
       _encounter = encounter;
@@ -245,8 +292,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     });
   }
 
-  Map<String, TextEditingController> get _fields =>
-      <String, TextEditingController>{
+  Map<String, GeneratedSpanController> get _fields =>
+      <String, GeneratedSpanController>{
         'subjective': _subjective,
         'objective': _objective,
         'assessment': _assessment,
@@ -834,6 +881,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                           ),
                           child: _WorkingNotesCard(
                             controller: _working,
+                            focusNode: _workingFocus,
+                            smartPhrases: _registry,
+                            scope: _scope,
                             hasModel: context
                                 .watch<AppBootstrap>()
                                 .assistModelActive,
@@ -980,12 +1030,20 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         for (final entry in accepted.entries) {
           final field = _fields[entry.key]!;
           final existing = field.text.trimRight();
+          // Where the model's text begins: at the start of an empty field, or
+          // just after the existing text and the newline that separates them.
+          final start = existing.isEmpty ? 0 : existing.length + 1;
           field.text = existing.isEmpty
               ? entry.value
               : '$existing\n${entry.value}';
           // Remembered exactly, so the section can say it holds generated
-          // text until the moment a clinician edits a character of it.
+          // text — and highlight precisely the words the model added — until
+          // the moment a clinician edits a character of it.
           _aiText[entry.key] = field.text;
+          field.markGenerated(
+            snapshot: field.text,
+            range: TextRange(start: start, end: field.text.length),
+          );
         }
         // Only what was accepted leaves the working notes. A discarded
         // section's words stay in the box, because they still have not been
@@ -1050,9 +1108,19 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         case InstructionsAction.appended:
           _markUndoPoint();
           setState(() {
-            _plan.text = '${_plan.text.trimRight()}\n\n'
-                'For the patient:\n${draft.text}';
+            final existing = _plan.text.trimRight();
+            // The model's block starts after the existing plan and the blank
+            // line that sets it off — the "For the patient:" heading and the
+            // reworded text below it are all generated.
+            final start = existing.isEmpty ? 0 : existing.length + 2;
+            _plan.text = existing.isEmpty
+                ? 'For the patient:\n${draft.text}'
+                : '$existing\n\nFor the patient:\n${draft.text}';
             _aiText['plan'] = _plan.text;
+            _plan.markGenerated(
+              snapshot: _plan.text,
+              range: TextRange(start: start, end: _plan.text.length),
+            );
           });
           _onChanged();
           _offerUndo('Instructions added under the plan. Read them as the '
@@ -1130,6 +1198,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         onDeleteAttachment: _removeAttachment,
         aiAction: _aiActionFor(key, isLocked),
         isGenerated: _isGenerated(key),
+        focusNode: _fieldFocus[key],
+        smartPhrases: _registry,
+        scope: _scope,
       ),
     );
   }
@@ -1158,12 +1229,21 @@ class _SoapField extends StatelessWidget {
     required this.transcribingId,
     this.aiAction,
     this.isGenerated = false,
+    this.focusNode,
+    this.smartPhrases,
+    this.scope = const SmartPhraseScope(),
   });
 
   final String letter;
   final String title;
   final String hint;
   final TextEditingController controller;
+  final FocusNode? focusNode;
+
+  /// The smart-phrase vocabulary, and the patient this note is about, so a `\`
+  /// menu here can fetch this patient's record.
+  final SmartPhraseRegistry? smartPhrases;
+  final SmartPhraseScope scope;
   final bool enabled;
   final List<Attachment> attachments;
   final Map<String, String> paths;
@@ -1213,7 +1293,9 @@ class _SoapField extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           if (isGenerated) ...<Widget>[
-            const AiBadge(dense: true),
+            // Short label — the section title is right beside it, so "AI" reads
+            // clearly without the width of "AI generated".
+            const AiBadge(label: 'AI', dense: true),
             SizedBox(width: m.spaceXs),
           ],
           FieldAttachBar(
@@ -1226,22 +1308,25 @@ class _SoapField extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          TextField(
-            controller: controller,
-            enabled: enabled,
-            maxLines: null,
-            minLines: 3,
-            keyboardType: TextInputType.multiline,
-            textCapitalization: TextCapitalization.sentences,
-            style: context.texts.bodyMedium,
-            decoration: InputDecoration(
-              hintText: hint,
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
-              disabledBorder: InputBorder.none,
-              filled: false,
-              contentPadding: EdgeInsets.zero,
+          _wrapSmart(
+            TextField(
+              controller: controller,
+              focusNode: focusNode,
+              enabled: enabled,
+              maxLines: null,
+              minLines: 3,
+              keyboardType: TextInputType.multiline,
+              textCapitalization: TextCapitalization.sentences,
+              style: context.texts.bodyMedium,
+              decoration: InputDecoration(
+                hintText: hint,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                filled: false,
+                contentPadding: EdgeInsets.zero,
+              ),
             ),
           ),
           ?aiAction,
@@ -1256,6 +1341,22 @@ class _SoapField extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _wrapSmart(Widget field) {
+    final registry = smartPhrases;
+    final node = focusNode;
+    final ctrl = controller;
+    if (registry == null || node == null || ctrl is! SmartPhraseController) {
+      return field;
+    }
+    return SmartPhraseField(
+      controller: ctrl,
+      focusNode: node,
+      registry: registry,
+      scope: scope,
+      child: field,
     );
   }
 }
@@ -1651,9 +1752,15 @@ class _WorkingNotesCard extends StatelessWidget {
     required this.isDrafting,
     required this.onSort,
     required this.onDictate,
+    this.focusNode,
+    this.smartPhrases,
+    this.scope = const SmartPhraseScope(),
   });
 
   final TextEditingController controller;
+  final FocusNode? focusNode;
+  final SmartPhraseRegistry? smartPhrases;
+  final SmartPhraseScope scope;
   final bool hasModel;
   final bool isDrafting;
   final VoidCallback onSort;
@@ -1694,23 +1801,26 @@ class _WorkingNotesCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              TextField(
-                controller: controller,
-                maxLines: null,
-                minLines: 3,
-                keyboardType: TextInputType.multiline,
-                textCapitalization: TextCapitalization.sentences,
-                style: context.texts.bodyMedium,
-                decoration: InputDecoration(
-                  hintText: 'Whatever the consultation produced, in any '
-                      'order. Nothing here is part of the signed note.',
-                  hintStyle: context.texts.bodySmall
-                      ?.copyWith(color: palette.onSurfaceMuted),
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  filled: false,
-                  contentPadding: EdgeInsets.zero,
+              _wrapSmart(
+                TextField(
+                  controller: controller,
+                  focusNode: focusNode,
+                  maxLines: null,
+                  minLines: 3,
+                  keyboardType: TextInputType.multiline,
+                  textCapitalization: TextCapitalization.sentences,
+                  style: context.texts.bodyMedium,
+                  decoration: InputDecoration(
+                    hintText: 'Whatever the consultation produced, in any '
+                        'order. Nothing here is part of the signed note.',
+                    hintStyle: context.texts.bodySmall
+                        ?.copyWith(color: palette.onSurfaceMuted),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    filled: false,
+                    contentPadding: EdgeInsets.zero,
+                  ),
                 ),
               ),
               if (hasText) ...<Widget>[
@@ -1744,6 +1854,22 @@ class _WorkingNotesCard extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  Widget _wrapSmart(Widget field) {
+    final registry = smartPhrases;
+    final node = focusNode;
+    final ctrl = controller;
+    if (registry == null || node == null || ctrl is! SmartPhraseController) {
+      return field;
+    }
+    return SmartPhraseField(
+      controller: ctrl,
+      focusNode: node,
+      registry: registry,
+      scope: scope,
+      child: field,
     );
   }
 }

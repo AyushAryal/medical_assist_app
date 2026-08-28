@@ -107,6 +107,32 @@ void main() {
       );
       expect(draft.sections, NoteDrafting.sortByRules(transcript).sections);
     });
+
+    test('provenance marks only the sentence the model filed', () async {
+      const text = 'Patient reports a cough. '
+          'Mother is worried about school. '
+          'Review in one week.';
+      final model = ScriptedModel(assignment: 'SUBJECTIVE: 1');
+      final draft = await NoteDrafting.sortWithModel(model, text);
+
+      final subjective = draft.provenance['subjective']!;
+      final worried =
+          subjective.firstWhere((s) => s.text.contains('Mother is worried'));
+      final cough =
+          subjective.firstWhere((s) => s.text.contains('reports a cough'));
+      // The rules read the cough; the model was asked only about the sentence
+      // with no cue, and only that one is flagged for a second look.
+      expect(worried.placedByModel, isTrue);
+      expect(cough.placedByModel, isFalse);
+    });
+
+    test('a rules-only sort flags nothing as model-placed', () {
+      final draft = NoteDrafting.sortByRules(transcript);
+      final flagged = draft.provenance.values
+          .expand((s) => s)
+          .where((s) => s.placedByModel);
+      expect(flagged, isEmpty);
+    });
   });
 
   group('rewording a plan for the patient', () {

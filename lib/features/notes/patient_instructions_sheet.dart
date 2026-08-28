@@ -113,11 +113,22 @@ class PatientInstructionsSheet extends StatelessWidget {
                           color: palette.accent.withValues(alpha: 0.45),
                         ),
                       ),
-                      child: Text(
-                        draft.text,
+                      // Every word the model added — anything not already in the
+                      // plan — is marked, so "read every line against the plan"
+                      // becomes "read these words", which a busy clinician will
+                      // actually do.
+                      child: GeneratedText(
+                        text: draft.text,
+                        source: plan,
                         style: context.texts.bodyMedium,
+                        // First sight of freshly reworded text: let it write
+                        // itself in, so the sheet reads as the model working
+                        // rather than a paragraph that was always there.
+                        typeIn: true,
                       ),
                     ),
+                    SizedBox(height: m.spaceXs),
+                    const GeneratedTextLegend(),
                   ],
                 ),
               ),
