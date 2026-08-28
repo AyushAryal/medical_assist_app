@@ -38,20 +38,21 @@ class _GuidedDictationAffordance extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final m = context.metrics;
-    // A gently glowing mic, so the AI voice entry reads as the special thing
-    // it is rather than one more app-bar icon.
-    return Padding(
-      padding: EdgeInsets.only(right: m.spaceXs),
-      child: AiGlowBorder(
-        active: true,
-        borderRadius: BorderRadius.circular(m.radiusMd),
-        child: IconButton(
-          tooltip: 'Dictate these fields',
-          visualDensity: VisualDensity.compact,
-          icon: Icon(Icons.mic_none, color: context.palette.primary),
-          onPressed: () => GuidedDictationSheet.show(context, surface),
-        ),
+    final palette = context.palette;
+    // The mic glyph itself is the accent, gradient-tinted and softly glowing,
+    // so the AI voice entry reads as the special thing it is rather than one
+    // more app-bar icon — no ring around it.
+    return IconButton(
+      tooltip: 'Dictate these fields',
+      onPressed: () => GuidedDictationSheet.show(context, surface),
+      icon: Icon(
+        Icons.mic_none,
+        color: palette.primary,
+        // A soft halo of the same colour behind the glyph — the icon glows.
+        shadows: <Shadow>[
+          Shadow(color: palette.primary.withValues(alpha: 0.6), blurRadius: 9),
+          Shadow(color: palette.accent.withValues(alpha: 0.35), blurRadius: 16),
+        ],
       ),
     );
   }
