@@ -107,67 +107,47 @@ class _StartEncounterSheetState extends State<StartEncounterSheet> {
     final session = context.watch<SessionController>();
     final m = context.metrics;
 
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: m.spaceLg,
-          right: m.spaceLg,
-          bottom: MediaQuery.viewInsetsOf(context).bottom + m.spaceLg,
+    return SheetScaffold(
+      title: 'Start visit',
+      subtitle: '${widget.patient.displayName} · '
+          '${session.activeClinic?.name ?? 'No clinic'}',
+      onSave: _busy ? null : _start,
+      saveLabel: 'Start visit',
+      saveIcon: Icons.play_arrow,
+      children: <Widget>[
+        ChoiceChipRow<EncounterType>(
+          label: 'Visit type',
+          values: EncounterType.values,
+          labelOf: (t) => t.label,
+          selected: _type,
+          onSelected: (t) => setState(() => _type = t ?? _type),
         ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              Text('Start visit', style: context.texts.titleMedium),
-              Text(
-                '${widget.patient.displayName} · '
-                '${session.activeClinic?.name ?? 'No clinic'}',
-                style: context.texts.bodySmall,
-              ),
-              SizedBox(height: m.spaceLg),
-              ChoiceChipRow<EncounterType>(
-                label: 'Visit type',
-                values: EncounterType.values,
-                labelOf: (t) => t.label,
-                selected: _type,
-                onSelected: (t) => setState(() => _type = t ?? _type),
-              ),
-              SizedBox(height: m.spaceLg),
-              LabeledField(
-                label: 'Presenting complaint',
-                controller: _complaint,
-                hint: "In the patient's own words",
-                autofocus: true,
-              ),
-              SizedBox(height: m.spaceMd),
-              Wrap(
-                spacing: m.spaceSm,
-                runSpacing: m.spaceSm,
-                children: _commonComplaints.map((complaint) {
-                  return ActionChip(
-                    label: Text(complaint),
-                    onPressed: () {
-                      final current = _complaint.text.trim();
-                      _complaint.text =
-                          current.isEmpty ? complaint : '$current, $complaint';
-                      _complaint.selection = TextSelection.collapsed(
-                        offset: _complaint.text.length,
-                      );
-                    },
-                  );
-                }).toList(),
-              ),
-              SizedBox(height: m.spaceXl),
-              FilledButton.icon(
-                onPressed: _busy ? null : _start,
-                icon: const Icon(Icons.play_arrow),
-                label: const Text('Start visit'),
-              ),
-            ],
-          ),
+        SizedBox(height: m.spaceLg),
+        LabeledField(
+          label: 'Presenting complaint',
+          controller: _complaint,
+          hint: "In the patient's own words",
+          autofocus: true,
         ),
-      ),
+        SizedBox(height: m.spaceMd),
+        Wrap(
+          spacing: m.spaceSm,
+          runSpacing: m.spaceSm,
+          children: _commonComplaints.map((complaint) {
+            return ActionChip(
+              label: Text(complaint),
+              onPressed: () {
+                final current = _complaint.text.trim();
+                _complaint.text =
+                    current.isEmpty ? complaint : '$current, $complaint';
+                _complaint.selection = TextSelection.collapsed(
+                  offset: _complaint.text.length,
+                );
+              },
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 }

@@ -25,6 +25,7 @@ export '../theme/theme_scope.dart';
 export '../widgets/glass.dart'
     show GlassPanel, GlassChrome, AmbientBackground, StatusBarScrim;
 export '../widgets/section_card.dart' show SectionCard;
+export '../widgets/sheet_scaffold.dart' show SheetScaffold;
 
 // Layout and responsive behaviour.
 export 'layout.dart';

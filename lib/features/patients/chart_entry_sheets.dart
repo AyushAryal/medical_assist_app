@@ -75,7 +75,7 @@ class _AllergySheetState extends State<AllergySheet> {
   Widget build(BuildContext context) {
     final m = context.metrics;
 
-    return _SheetFrame(
+    return SheetScaffold(
       title: 'Add allergy',
       onSave: _busy ? null : _save,
       children: <Widget>[
@@ -178,7 +178,7 @@ class _ProblemSheetState extends State<ProblemSheet> {
   Widget build(BuildContext context) {
     final m = context.metrics;
 
-    return _SheetFrame(
+    return SheetScaffold(
       title: 'Add problem',
       onSave: _busy ? null : _save,
       children: <Widget>[
@@ -273,7 +273,7 @@ class _MedicationSheetState extends State<MedicationSheet> {
   Widget build(BuildContext context) {
     final m = context.metrics;
 
-    return _SheetFrame(
+    return SheetScaffold(
       title: 'Add medication',
       onSave: _busy ? null : _save,
       children: <Widget>[
@@ -315,42 +315,3 @@ class _MedicationSheetState extends State<MedicationSheet> {
   }
 }
 
-class _SheetFrame extends StatelessWidget {
-  const _SheetFrame({
-    required this.title,
-    required this.onSave,
-    required this.children,
-  });
-
-  final String title;
-  final VoidCallback? onSave;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    final m = context.metrics;
-
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: m.spaceLg,
-          right: m.spaceLg,
-          bottom: MediaQuery.viewInsetsOf(context).bottom + m.spaceLg,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              Text(title, style: context.texts.titleMedium),
-              SizedBox(height: m.spaceLg),
-              ...children,
-              SizedBox(height: m.spaceXl),
-              FilledButton(onPressed: onSave, child: const Text('Save')),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}

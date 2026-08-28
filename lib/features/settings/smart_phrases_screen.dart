@@ -179,12 +179,7 @@ class _SmartPhraseEditor extends StatefulWidget {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.viewInsetsOf(context).bottom,
-        ),
-        child: _SmartPhraseEditor(existing: existing),
-      ),
+      builder: (_) => _SmartPhraseEditor(existing: existing),
     );
   }
 
@@ -244,53 +239,38 @@ class _SmartPhraseEditorState extends State<_SmartPhraseEditor> {
   Widget build(BuildContext context) {
     final m = context.metrics;
 
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(m.spaceLg, 0, m.spaceLg, m.spaceLg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Text(
-              widget.existing == null ? 'New phrase' : 'Edit phrase',
-              style: context.texts.titleMedium,
-            ),
-            SizedBox(height: m.spaceMd),
-            LabeledField(
-              label: 'Trigger',
-              controller: _trigger,
-              hint: 'ros',
-              helper: 'Typed after the backslash, no spaces.',
-            ),
-            SizedBox(height: m.spaceSm),
-            LabeledField(
-              label: 'Title',
-              controller: _title,
-              hint: 'Review of systems',
-            ),
-            SizedBox(height: m.spaceSm),
-            LabeledField(
-              label: 'Expands to',
-              controller: _body,
-              hint: 'The text this phrase inserts…',
-              maxLines: 5,
-            ),
-            if (_error case final error?) ...<Widget>[
-              SizedBox(height: m.spaceSm),
-              Text(
-                error,
-                style: context.texts.bodySmall
-                    ?.copyWith(color: context.palette.critical),
-              ),
-            ],
-            SizedBox(height: m.spaceMd),
-            FilledButton(
-              onPressed: _save,
-              child: const Text('Save'),
-            ),
-          ],
+    return SheetScaffold(
+      title: widget.existing == null ? 'New phrase' : 'Edit phrase',
+      onSave: _save,
+      children: <Widget>[
+        LabeledField(
+          label: 'Trigger',
+          controller: _trigger,
+          hint: 'ros',
+          helper: 'Typed after the backslash, no spaces.',
         ),
-      ),
+        SizedBox(height: m.spaceSm),
+        LabeledField(
+          label: 'Title',
+          controller: _title,
+          hint: 'Review of systems',
+        ),
+        SizedBox(height: m.spaceSm),
+        LabeledField(
+          label: 'Expands to',
+          controller: _body,
+          hint: 'The text this phrase inserts…',
+          maxLines: 5,
+        ),
+        if (_error case final error?) ...<Widget>[
+          SizedBox(height: m.spaceSm),
+          Text(
+            error,
+            style: context.texts.bodySmall
+                ?.copyWith(color: context.palette.critical),
+          ),
+        ],
+      ],
     );
   }
 }

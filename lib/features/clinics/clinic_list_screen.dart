@@ -156,55 +156,36 @@ class _ClinicEditorSheetState extends State<_ClinicEditorSheet> {
   Widget build(BuildContext context) {
     final m = context.metrics;
 
-    return Padding(
-      padding: EdgeInsets.only(
-        left: m.spaceLg,
-        right: m.spaceLg,
-        bottom: MediaQuery.viewInsetsOf(context).bottom + m.spaceLg,
-      ),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Text(
-              widget.clinic == null ? 'Add clinic' : 'Edit clinic',
-              style: context.texts.titleMedium,
-            ),
-            SizedBox(height: m.spaceLg),
-            LabeledField(
-              label: 'Name',
-              controller: _name,
-              autofocus: true,
-              validator: (value) => (value ?? '').trim().isEmpty
-                  ? 'A clinic needs a name'
-                  : null,
-            ),
-            SizedBox(height: m.spaceMd),
-            ChoiceChipRow<ClinicType>(
-              label: 'Type',
-              values: ClinicType.values,
-              labelOf: (t) => t.label,
-              selected: _type,
-              onSelected: (t) => setState(() => _type = t ?? _type),
-            ),
-            SizedBox(height: m.spaceMd),
-            LabeledField(label: 'City / town', controller: _city),
-            SizedBox(height: m.spaceMd),
-            LabeledField(
-              label: 'Phone',
-              controller: _phone,
-              keyboardType: TextInputType.phone,
-            ),
-            SizedBox(height: m.spaceLg),
-            FilledButton(
-              onPressed: _busy ? null : _save,
-              child: Text(widget.clinic == null ? 'Add clinic' : 'Save'),
-            ),
-          ],
+    return SheetScaffold(
+      title: widget.clinic == null ? 'Add clinic' : 'Edit clinic',
+      formKey: _formKey,
+      onSave: _busy ? null : _save,
+      saveLabel: widget.clinic == null ? 'Add clinic' : 'Save',
+      children: <Widget>[
+        LabeledField(
+          label: 'Name',
+          controller: _name,
+          autofocus: true,
+          validator: (value) =>
+              (value ?? '').trim().isEmpty ? 'A clinic needs a name' : null,
         ),
-      ),
+        SizedBox(height: m.spaceMd),
+        ChoiceChipRow<ClinicType>(
+          label: 'Type',
+          values: ClinicType.values,
+          labelOf: (t) => t.label,
+          selected: _type,
+          onSelected: (t) => setState(() => _type = t ?? _type),
+        ),
+        SizedBox(height: m.spaceMd),
+        LabeledField(label: 'City / town', controller: _city),
+        SizedBox(height: m.spaceMd),
+        LabeledField(
+          label: 'Phone',
+          controller: _phone,
+          keyboardType: TextInputType.phone,
+        ),
+      ],
     );
   }
 }

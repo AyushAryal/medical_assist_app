@@ -83,68 +83,43 @@ class _AmendNoteSheetState extends State<AmendNoteSheet> {
   Widget build(BuildContext context) {
     final m = context.metrics;
 
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: m.spaceLg,
-          right: m.spaceLg,
-          bottom: MediaQuery.viewInsetsOf(context).bottom + m.spaceLg,
+    return SheetScaffold(
+      title: 'Add amendment',
+      subtitle: 'The signed note stays exactly as it was. This is appended '
+          'below it and both remain part of the record.',
+      formKey: _formKey,
+      onSave: _busy ? null : _save,
+      saveLabel: 'Append amendment',
+      children: <Widget>[
+        LabeledField(
+          label: 'Reason for amendment',
+          controller: _reason,
+          validator: (value) =>
+              (value ?? '').trim().isEmpty ? 'A reason is required' : null,
         ),
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                Text('Add amendment', style: context.texts.titleMedium),
-                SizedBox(height: m.spaceXs),
-                Text(
-                  'The signed note stays exactly as it was. This is appended '
-                  'below it and both remain part of the record.',
-                  style: context.texts.bodySmall,
+        SizedBox(height: m.spaceSm),
+        Wrap(
+          spacing: m.spaceSm,
+          runSpacing: m.spaceSm,
+          children: _commonReasons
+              .map(
+                (reason) => ActionChip(
+                  label: Text(reason),
+                  onPressed: () => _reason.text = reason,
                 ),
-                SizedBox(height: m.spaceLg),
-                LabeledField(
-                  label: 'Reason for amendment',
-                  controller: _reason,
-                  validator: (value) => (value ?? '').trim().isEmpty
-                      ? 'A reason is required'
-                      : null,
-                ),
-                SizedBox(height: m.spaceSm),
-                Wrap(
-                  spacing: m.spaceSm,
-                  runSpacing: m.spaceSm,
-                  children: _commonReasons
-                      .map(
-                        (reason) => ActionChip(
-                          label: Text(reason),
-                          onPressed: () => _reason.text = reason,
-                        ),
-                      )
-                      .toList(),
-                ),
-                SizedBox(height: m.spaceLg),
-                LabeledField(
-                  label: 'Amendment',
-                  controller: _body,
-                  maxLines: 6,
-                  minLines: 3,
-                  validator: (value) => (value ?? '').trim().isEmpty
-                      ? 'Enter the correction'
-                      : null,
-                ),
-                SizedBox(height: m.spaceXl),
-                FilledButton(
-                  onPressed: _busy ? null : _save,
-                  child: const Text('Append amendment'),
-                ),
-              ],
-            ),
-          ),
+              )
+              .toList(),
         ),
-      ),
+        SizedBox(height: m.spaceLg),
+        LabeledField(
+          label: 'Amendment',
+          controller: _body,
+          maxLines: 6,
+          minLines: 3,
+          validator: (value) =>
+              (value ?? '').trim().isEmpty ? 'Enter the correction' : null,
+        ),
+      ],
     );
   }
 }
