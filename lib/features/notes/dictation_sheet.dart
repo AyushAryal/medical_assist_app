@@ -504,7 +504,7 @@ class _DictationSheetState extends State<DictationSheet> {
                   busy: _busy,
                 ),
                 SizedBox(height: m.spaceMd),
-                SwitchListTile(
+                SwitchListTile.adaptive(
                   contentPadding: EdgeInsets.zero,
                   dense: true,
                   value: _keepOriginal,

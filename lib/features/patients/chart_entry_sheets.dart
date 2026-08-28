@@ -196,7 +196,7 @@ class _ProblemSheetState extends State<ProblemSheet> {
           textCapitalization: TextCapitalization.characters,
         ),
         SizedBox(height: m.spaceMd),
-        SwitchListTile(
+        SwitchListTile.adaptive(
           contentPadding: EdgeInsets.zero,
           value: _isChronic,
           onChanged: (value) => setState(() => _isChronic = value),

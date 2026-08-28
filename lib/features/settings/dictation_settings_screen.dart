@@ -386,7 +386,7 @@ class _DictationSettingsScreenState extends State<DictationSettingsScreen> {
                     ),
                   ),
                   SectionCard.divider(context),
-                  SwitchListTile(
+                  SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
                     value: _keepOriginal,
                     onChanged: _setKeepOriginal,

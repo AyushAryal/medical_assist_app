@@ -193,7 +193,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               leading: const Icon(Icons.lock_outline, size: 20),
               child: Column(
                 children: <Widget>[
-                  SwitchListTile(
+                  SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
                     value: _biometricEnabled && _biometricAvailable,
                     onChanged: _biometricAvailable
@@ -247,7 +247,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  SwitchListTile(
+                  SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
                     value: context.watch<AppBootstrap>().assistantEnabled,
                     onChanged: (value) =>

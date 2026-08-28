@@ -230,7 +230,7 @@ class _VitalsEntryScreenState extends State<VitalsEntryScreen> {
             ],
           ),
           SizedBox(height: m.spaceMd),
-          SwitchListTile(
+          SwitchListTile.adaptive(
             contentPadding: EdgeInsets.zero,
             value: _onOxygen,
             onChanged: (value) => setState(() => _onOxygen = value),

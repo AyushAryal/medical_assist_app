@@ -40,7 +40,7 @@ class ProposalCard extends StatelessWidget {
           ),
         ),
       ),
-      trailing: Switch(
+      trailing: Switch.adaptive(
         value: kept,
         onChanged: onChanged,
       ),
