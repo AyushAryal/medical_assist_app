@@ -307,8 +307,19 @@ class _PreviewRow extends StatelessWidget {
       FieldStatus.filled => entry.display ?? '',
       FieldStatus.skipped => 'skipped',
       FieldStatus.rejected => 'not caught',
-      FieldStatus.pending => isNext && listening ? 'listening…' : '',
+      FieldStatus.pending => '',
     };
+
+    // For a pending field, show its unit and an example of what to say, so the
+    // clinician is never guessing — "mmHg · say "120 over 80"".
+    String? subtitle;
+    if (entry.status == FieldStatus.pending) {
+      final parts = <String>[
+        if (entry.field.unit != null) entry.field.unit!,
+        if (entry.field.example != null) 'say "${entry.field.example}"',
+      ];
+      if (parts.isNotEmpty) subtitle = parts.join('  ·  ');
+    }
 
     final highlight = isNext && listening;
 
@@ -325,8 +336,20 @@ class _PreviewRow extends StatelessWidget {
           Icon(icon, size: 18, color: color),
           SizedBox(width: m.spaceSm),
           Expanded(
-            child: Text(entry.field.label, style: context.texts.bodyMedium),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(entry.field.label, style: context.texts.bodyMedium),
+                if (subtitle != null)
+                  Text(
+                    subtitle,
+                    style: context.texts.labelSmall
+                        ?.copyWith(color: palette.onSurfaceMuted),
+                  ),
+              ],
+            ),
           ),
+          SizedBox(width: m.spaceSm),
           Text(
             trailing,
             style: context.texts.labelMedium?.copyWith(

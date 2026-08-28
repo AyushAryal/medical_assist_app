@@ -28,6 +28,7 @@ class AgentField {
     required this.label,
     required this.kind,
     this.unit,
+    this.example,
     this.aliases = const <String>[],
     this.min,
     this.max,
@@ -44,6 +45,10 @@ class AgentField {
 
   /// Unit shown on read-back, e.g. `mmHg`. Null when the field has none.
   final String? unit;
+
+  /// A spoken example shown as a prompt, e.g. `120 over 80` — so a clinician
+  /// knows what to say for this field.
+  final String? example;
 
   final AgentFieldKind kind;
 
