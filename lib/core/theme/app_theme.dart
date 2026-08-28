@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../design/glass_page_transition.dart';
 import 'theme_config.dart';
 
 /// The bottom [NavigationBar]'s content height, themed below instead of left
@@ -69,6 +70,16 @@ abstract final class AppTheme {
       canvasColor: p.surface,
       shadowColor: p.shadow,
       fontFamily: t.fontFamily,
+      // Glassy page transitions: the native iOS slide, but frosted while in
+      // motion so translucent pages do not both show at once. Same on every
+      // platform for one consistent feel.
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: <TargetPlatform, PageTransitionsBuilder>{
+          TargetPlatform.iOS: GlassPageTransitionsBuilder(),
+          TargetPlatform.android: GlassPageTransitionsBuilder(),
+          TargetPlatform.macOS: GlassPageTransitionsBuilder(),
+        },
+      ),
       textTheme: text,
       splashFactory: InkSparkle.splashFactory,
       visualDensity: VisualDensity.standard,
