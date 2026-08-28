@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/agentic/agent_surface.dart';
 import '../../core/app_bootstrap.dart';
 import '../../core/design/design.dart';
+import '../../core/routing/app_router.dart';
 import '../drivers/guided_dictation_controller.dart';
 import '../drivers/spoken_value.dart';
 
@@ -115,6 +117,46 @@ class _GuidedDictationSheetState extends State<GuidedDictationSheet> {
   Widget build(BuildContext context) {
     final m = context.metrics;
     final palette = context.palette;
+
+    // Guided dictation transcribes on device, so it needs a speech model. Say
+    // so plainly and point at where to get one, rather than failing on the
+    // first mic tap.
+    if (!widget.bootstrap.canTranscribe) {
+      return SafeArea(
+        child: Padding(
+          padding: EdgeInsets.all(m.spaceLg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  const Icon(Icons.mic_off_outlined),
+                  SizedBox(width: m.spaceSm),
+                  Text('Guided dictation', style: context.texts.titleMedium),
+                ],
+              ),
+              SizedBox(height: m.spaceMd),
+              Text(
+                'Dictating vitals needs a speech model on this device — it is '
+                'what turns what you say into a value, all on device.',
+                style: context.texts.bodyMedium,
+              ),
+              SizedBox(height: m.spaceLg),
+              FilledButton.icon(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  context.go(Routes.dictation);
+                },
+                icon: const Icon(Icons.download_outlined),
+                label: const Text('Set up dictation'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final state = _controller.state;
     final field = state.field;
 
