@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -125,22 +126,56 @@ class AppShell extends StatelessWidget {
       // the bar reads as a material rather than an opaque strip.
       extendBody: true,
       body: navigationShell,
-      bottomNavigationBar: GlassChrome(
-        topBorder: true,
-        child: NavigationBar(
-          backgroundColor: Colors.transparent,
-          selectedIndex: navigationShell.currentIndex,
-          onDestinationSelected: _onSelect,
-          destinations: _destinations
-              .map(
-                (d) => NavigationDestination(
-                  icon: Icon(d.icon),
-                  selectedIcon: Icon(d.selectedIcon),
-                  label: d.label,
-                ),
-              )
-              .toList(),
+      bottomNavigationBar: _bottomBar(context),
+    );
+  }
+
+  /// The bottom tab bar, native to the platform. Theming a Material
+  /// NavigationBar to look less like Android only goes so far — its layout,
+  /// proportions and ripple stay Android. On iOS this is a real
+  /// CupertinoTabBar (compact, its own translucent blur, SF-style icon over a
+  /// small label); on Android it stays the Material bar inside the app's glass
+  /// chrome.
+  Widget _bottomBar(BuildContext context) {
+    final palette = context.palette;
+
+    if (Theme.of(context).platform == TargetPlatform.iOS) {
+      return CupertinoTabBar(
+        currentIndex: navigationShell.currentIndex,
+        onTap: _onSelect,
+        activeColor: palette.primary,
+        inactiveColor: palette.onSurfaceMuted,
+        // A translucent fill makes CupertinoTabBar draw its own native blur,
+        // so the app's content still shows through the bar.
+        backgroundColor: palette.surface.withValues(alpha: 0.72),
+        border: Border(
+          top: BorderSide(color: palette.outline, width: context.metrics.hairline),
         ),
+        items: <BottomNavigationBarItem>[
+          for (final d in _destinations)
+            BottomNavigationBarItem(
+              icon: Icon(d.icon),
+              activeIcon: Icon(d.selectedIcon),
+              label: d.label,
+            ),
+        ],
+      );
+    }
+
+    return GlassChrome(
+      topBorder: true,
+      child: NavigationBar(
+        backgroundColor: Colors.transparent,
+        selectedIndex: navigationShell.currentIndex,
+        onDestinationSelected: _onSelect,
+        destinations: <Widget>[
+          for (final d in _destinations)
+            NavigationDestination(
+              icon: Icon(d.icon),
+              selectedIcon: Icon(d.selectedIcon),
+              label: d.label,
+            ),
+        ],
       ),
     );
   }
