@@ -1,5 +1,6 @@
 import '../../clinical/patient_age.dart';
 import '../../core/db/db_types.dart';
+import 'sync_entity.dart';
 
 /// Sex recorded at birth. Kept distinct from gender identity because reference
 /// ranges, drug dosing and screening pathways key off the former while how a
@@ -43,9 +44,9 @@ extension AllergyStatusX on AllergyStatus {
       AllergyStatus.unknown;
 }
 
-class Patient {
+class Patient extends SyncEntity {
   const Patient({
-    required this.id,
+    required super.id,
     required this.mrn,
     required this.familyName,
     required this.givenName,
@@ -74,14 +75,12 @@ class Patient {
     this.notes,
     this.deceasedDate,
     this.lastSeenAt,
-    required this.createdAt,
-    required this.updatedAt,
-    this.deletedAt,
-    this.revision = 1,
-    this.syncStatus = SyncStatus.pending,
+    required super.createdAt,
+    required super.updatedAt,
+    super.deletedAt,
+    super.revision,
+    super.syncStatus,
   });
-
-  final String id;
 
   /// Medical record number. Human-quotable, unique on the device, and the
   /// identifier staff will actually read out over the phone.
@@ -116,11 +115,6 @@ class Patient {
   final String? notes;
   final DateTime? deceasedDate;
   final DateTime? lastSeenAt;
-  final DateTime createdAt;
-  final DateTime updatedAt;
-  final DateTime? deletedAt;
-  final int revision;
-  final String syncStatus;
 
   String get fullName => '$givenName $familyName';
 
@@ -218,7 +212,7 @@ class Patient {
       );
 
   Map<String, Object?> toMap() => <String, Object?>{
-        'id': id,
+        ...envelopeMap(),
         'mrn': mrn,
         'family_name': familyName,
         'given_name': givenName,
@@ -248,11 +242,6 @@ class Patient {
         'deceased_date': toIsoDateOrNull(deceasedDate),
         'search_index': searchIndex,
         'last_seen_at': toEpochOrNull(lastSeenAt),
-        'created_at': toEpoch(createdAt),
-        'updated_at': toEpoch(updatedAt),
-        'deleted_at': toEpochOrNull(deletedAt),
-        'revision': revision,
-        'sync_status': syncStatus,
       };
 
   Patient copyWith({

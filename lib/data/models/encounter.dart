@@ -1,4 +1,5 @@
 import '../../core/db/db_types.dart';
+import 'sync_entity.dart';
 
 enum EncounterType {
   newPatient,
@@ -79,9 +80,9 @@ extension DispositionX on Disposition {
 }
 
 /// One episode of care: a visit, a call, a home review.
-class Encounter {
+class Encounter extends SyncEntity {
   const Encounter({
-    required this.id,
+    required super.id,
     required this.patientId,
     required this.clinicId,
     this.type = EncounterType.followUp,
@@ -94,14 +95,13 @@ class Encounter {
     this.referredTo,
     this.providerName,
     this.providerId,
-    required this.createdAt,
-    required this.updatedAt,
-    this.deletedAt,
-    this.revision = 1,
-    this.syncStatus = SyncStatus.pending,
+    required super.createdAt,
+    required super.updatedAt,
+    super.deletedAt,
+    super.revision,
+    super.syncStatus,
   });
 
-  final String id;
   final String patientId;
   final String clinicId;
   final EncounterType type;
@@ -116,11 +116,6 @@ class Encounter {
   final String? referredTo;
   final String? providerName;
   final String? providerId;
-  final DateTime createdAt;
-  final DateTime updatedAt;
-  final DateTime? deletedAt;
-  final int revision;
-  final String syncStatus;
 
   Duration? get duration => endedAt?.difference(startedAt);
 
@@ -149,7 +144,7 @@ class Encounter {
       );
 
   Map<String, Object?> toMap() => <String, Object?>{
-        'id': id,
+        ...envelopeMap(),
         'patient_id': patientId,
         'clinic_id': clinicId,
         'type': type.name,
@@ -162,11 +157,6 @@ class Encounter {
         'referred_to': referredTo,
         'provider_name': providerName,
         'provider_id': providerId,
-        'created_at': toEpoch(createdAt),
-        'updated_at': toEpoch(updatedAt),
-        'deleted_at': toEpochOrNull(deletedAt),
-        'revision': revision,
-        'sync_status': syncStatus,
       };
 
   Encounter copyWith({

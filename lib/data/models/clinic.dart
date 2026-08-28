@@ -1,4 +1,5 @@
 import '../../core/db/db_types.dart';
+import 'sync_entity.dart';
 
 enum ClinicType { clinic, hospital, healthPost, pharmacy, homeVisit, telehealth }
 
@@ -20,9 +21,9 @@ extension ClinicTypeX on ClinicType {
 /// A site of care. Every encounter is stamped with one, because the same
 /// clinician's notes at a hospital and at a rural health post carry different
 /// context, formularies and follow-up expectations.
-class Clinic {
+class Clinic extends SyncEntity {
   const Clinic({
-    required this.id,
+    required super.id,
     required this.name,
     this.code,
     this.type = ClinicType.clinic,
@@ -33,14 +34,13 @@ class Clinic {
     this.phone,
     this.timezone,
     this.isActive = true,
-    required this.createdAt,
-    required this.updatedAt,
-    this.deletedAt,
-    this.revision = 1,
-    this.syncStatus = SyncStatus.pending,
+    required super.createdAt,
+    required super.updatedAt,
+    super.deletedAt,
+    super.revision,
+    super.syncStatus,
   });
 
-  final String id;
   final String name;
   final String? code;
   final ClinicType type;
@@ -51,11 +51,6 @@ class Clinic {
   final String? phone;
   final String? timezone;
   final bool isActive;
-  final DateTime createdAt;
-  final DateTime updatedAt;
-  final DateTime? deletedAt;
-  final int revision;
-  final String syncStatus;
 
   String get locationLabel =>
       [city, district].where((s) => s != null && s.isNotEmpty).join(', ');
@@ -80,7 +75,7 @@ class Clinic {
       );
 
   Map<String, Object?> toMap() => <String, Object?>{
-        'id': id,
+        ...envelopeMap(),
         'name': name,
         'code': code,
         'type': type.name,
@@ -91,11 +86,6 @@ class Clinic {
         'phone': phone,
         'timezone': timezone,
         'is_active': boolToInt(isActive),
-        'created_at': toEpoch(createdAt),
-        'updated_at': toEpoch(updatedAt),
-        'deleted_at': toEpochOrNull(deletedAt),
-        'revision': revision,
-        'sync_status': syncStatus,
       };
 
   Clinic copyWith({

@@ -3,6 +3,7 @@ import '../../clinical/news2.dart';
 import '../../clinical/patient_age.dart';
 import '../../clinical/vital_reference.dart';
 import '../../core/db/db_types.dart';
+import 'sync_entity.dart';
 
 /// Posture at the time of the reading. Orthostatic changes are real and a
 /// standing BP is not comparable with a supine one.
@@ -39,9 +40,9 @@ extension TemperatureSiteX on TemperatureSite {
 /// [encounterId] is nullable because vitals are routinely taken at triage,
 /// before anyone has opened an encounter — forcing an encounter first is the
 /// fastest way to make staff record vitals on paper instead.
-class VitalsRecord {
+class VitalsRecord extends SyncEntity {
   const VitalsRecord({
-    required this.id,
+    required super.id,
     required this.patientId,
     this.encounterId,
     required this.recordedAt,
@@ -72,14 +73,13 @@ class VitalsRecord {
     this.news2Algorithm,
     this.notes,
     this.recordedBy,
-    required this.createdAt,
-    required this.updatedAt,
-    this.deletedAt,
-    this.revision = 1,
-    this.syncStatus = SyncStatus.pending,
+    required super.createdAt,
+    required super.updatedAt,
+    super.deletedAt,
+    super.revision,
+    super.syncStatus,
   });
 
-  final String id;
   final String patientId;
   final String? encounterId;
   final DateTime recordedAt;
@@ -116,11 +116,6 @@ class VitalsRecord {
   final String? news2Algorithm;
   final String? notes;
   final String? recordedBy;
-  final DateTime createdAt;
-  final DateTime updatedAt;
-  final DateTime? deletedAt;
-  final int revision;
-  final String syncStatus;
 
   bool get isEmpty =>
       systolicBp == null &&
@@ -215,7 +210,7 @@ class VitalsRecord {
       );
 
   Map<String, Object?> toMap() => <String, Object?>{
-        'id': id,
+        ...envelopeMap(),
         'patient_id': patientId,
         'encounter_id': encounterId,
         'recorded_at': toEpoch(recordedAt),
@@ -246,10 +241,5 @@ class VitalsRecord {
         'news2_algorithm': news2Algorithm,
         'notes': notes,
         'recorded_by': recordedBy,
-        'created_at': toEpoch(createdAt),
-        'updated_at': toEpoch(updatedAt),
-        'deleted_at': toEpochOrNull(deletedAt),
-        'revision': revision,
-        'sync_status': syncStatus,
       };
 }

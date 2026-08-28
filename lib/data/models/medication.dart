@@ -1,4 +1,5 @@
 import '../../core/db/db_types.dart';
+import 'sync_entity.dart';
 
 enum MedicationStatus { active, onHold, completed, stopped }
 
@@ -31,9 +32,9 @@ abstract final class MedicationFrequencies {
   ];
 }
 
-class Medication {
+class Medication extends SyncEntity {
   const Medication({
-    required this.id,
+    required super.id,
     required this.patientId,
     this.encounterId,
     required this.name,
@@ -49,14 +50,13 @@ class Medication {
     this.stopReason,
     this.prescriber,
     this.notes,
-    required this.createdAt,
-    required this.updatedAt,
-    this.deletedAt,
-    this.revision = 1,
-    this.syncStatus = SyncStatus.pending,
+    required super.createdAt,
+    required super.updatedAt,
+    super.deletedAt,
+    super.revision,
+    super.syncStatus,
   });
 
-  final String id;
   final String patientId;
   final String? encounterId;
   final String name;
@@ -72,11 +72,6 @@ class Medication {
   final String? stopReason;
   final String? prescriber;
   final String? notes;
-  final DateTime createdAt;
-  final DateTime updatedAt;
-  final DateTime? deletedAt;
-  final int revision;
-  final String syncStatus;
 
   bool get isActive => status == MedicationStatus.active;
 
@@ -114,7 +109,7 @@ class Medication {
       );
 
   Map<String, Object?> toMap() => <String, Object?>{
-        'id': id,
+        ...envelopeMap(),
         'patient_id': patientId,
         'encounter_id': encounterId,
         'name': name,
@@ -130,10 +125,5 @@ class Medication {
         'stop_reason': stopReason,
         'prescriber': prescriber,
         'notes': notes,
-        'created_at': toEpoch(createdAt),
-        'updated_at': toEpoch(updatedAt),
-        'deleted_at': toEpochOrNull(deletedAt),
-        'revision': revision,
-        'sync_status': syncStatus,
       };
 }

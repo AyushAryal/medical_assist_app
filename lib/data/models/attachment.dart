@@ -1,4 +1,5 @@
 import '../../core/db/db_types.dart';
+import 'sync_entity.dart';
 
 enum AttachmentKind { photo, document, audio, video }
 
@@ -30,9 +31,9 @@ extension AttachmentOwnerX on AttachmentOwner {
 /// [relativePath] is relative to the app documents directory — absolute paths
 /// break on iOS, where the container UUID changes between installs and OS
 /// upgrades.
-class Attachment {
+class Attachment extends SyncEntity {
   const Attachment({
-    required this.id,
+    required super.id,
     required this.patientId,
     required this.ownerType,
     this.ownerId,
@@ -47,14 +48,13 @@ class Attachment {
     this.caption,
     this.capturedAt,
     this.createdBy,
-    required this.createdAt,
-    required this.updatedAt,
-    this.deletedAt,
-    this.revision = 1,
-    this.syncStatus = SyncStatus.pending,
+    required super.createdAt,
+    required super.updatedAt,
+    super.deletedAt,
+    super.revision,
+    super.syncStatus,
   });
 
-  final String id;
   final String patientId;
   final AttachmentOwner ownerType;
   final String? ownerId;
@@ -74,11 +74,6 @@ class Attachment {
   final String? caption;
   final DateTime? capturedAt;
   final String? createdBy;
-  final DateTime createdAt;
-  final DateTime updatedAt;
-  final DateTime? deletedAt;
-  final int revision;
-  final String syncStatus;
 
   String get sizeLabel {
     final bytes = sizeBytes;
@@ -121,7 +116,7 @@ class Attachment {
       );
 
   Map<String, Object?> toMap() => <String, Object?>{
-        'id': id,
+        ...envelopeMap(),
         'patient_id': patientId,
         'owner_type': ownerType.name,
         'owner_id': ownerId,
@@ -136,10 +131,5 @@ class Attachment {
         'caption': caption,
         'captured_at': toEpochOrNull(capturedAt),
         'created_by': createdBy,
-        'created_at': toEpoch(createdAt),
-        'updated_at': toEpoch(updatedAt),
-        'deleted_at': toEpochOrNull(deletedAt),
-        'revision': revision,
-        'sync_status': syncStatus,
       };
 }
