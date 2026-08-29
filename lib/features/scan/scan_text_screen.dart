@@ -13,9 +13,9 @@ import '../../data/services/ocr/text_scanner.dart';
 /// anything itself; it returns the text to whoever opened it.
 ///
 /// Real pages are rarely clean: letterheads, footers, stamps. So the clinician
-/// can drag a box over just the part that matters, and recognition is confined
-/// to it (native Vision reads only that region) — the letterhead is simply not
-/// read rather than read and discarded.
+/// can *circle* the part that matters — a freeform loop, the way Circle to
+/// Search works — and recognition is confined to what they drew around (native
+/// Vision reads only that region), leaving the letterhead unread.
 class ScanTextScreen extends StatefulWidget {
   const ScanTextScreen({super.key, required this.imagePath});
 
@@ -38,11 +38,12 @@ class _ScanTextScreenState extends State<ScanTextScreen>
   bool _busy = true;
   Object? _error;
 
-  /// The committed region (normalised, top-left), or null for the whole page.
+  /// The circled region (normalised, top-left) OCR is confined to, or null for
+  /// the whole page — the bounding box of what the user drew around.
   Rect? _region;
 
-  /// The rectangle being dragged right now (normalised), before release.
-  Rect? _dragging;
+  /// The freeform loop the user drew, kept to draw the "ink" over the page.
+  List<Offset>? _ink;
 
   @override
   void initState() {
@@ -60,7 +61,7 @@ class _ScanTextScreenState extends State<ScanTextScreen>
         setState(() => _aspect = frame.image.width / frame.image.height);
       }
     } on Object {
-      // Fall back to a square box; selection still works proportionally.
+      // Fall back to a square box; the loop still maps proportionally.
     }
   }
 
@@ -83,6 +84,36 @@ class _ScanTextScreenState extends State<ScanTextScreen>
     }
   }
 
+  static Rect? _boundsOf(List<Offset> points) {
+    if (points.length < 3) return null;
+    var minX = 1.0, minY = 1.0, maxX = 0.0, maxY = 0.0;
+    for (final p in points) {
+      minX = p.dx < minX ? p.dx : minX;
+      minY = p.dy < minY ? p.dy : minY;
+      maxX = p.dx > maxX ? p.dx : maxX;
+      maxY = p.dy > maxY ? p.dy : maxY;
+    }
+    if (maxX - minX < 0.04 || maxY - minY < 0.04) return null; // just a tap
+    const pad = 0.012;
+    return Rect.fromLTRB(
+      (minX - pad).clamp(0.0, 1.0),
+      (minY - pad).clamp(0.0, 1.0),
+      (maxX + pad).clamp(0.0, 1.0),
+      (maxY + pad).clamp(0.0, 1.0),
+    );
+  }
+
+  void _onDraw(List<Offset> points) => setState(() => _ink = points);
+
+  void _onDrawEnd(List<Offset> points) {
+    final bounds = _boundsOf(points);
+    setState(() {
+      _region = bounds;
+      _ink = bounds == null ? null : points;
+    });
+    _run();
+  }
+
   @override
   void dispose() {
     _sweep.dispose();
@@ -103,26 +134,24 @@ class _ScanTextScreenState extends State<ScanTextScreen>
           padding: EdgeInsets.fromLTRB(
               m.spaceLg, m.spaceLg, m.spaceLg, m.spaceLg * 3),
           children: <Widget>[
-            _ImageWithRegion(
+            _ImageCanvas(
               imagePath: widget.imagePath,
               aspect: _aspect,
               sweep: _sweep,
               scanning: _busy,
-              region: _dragging ?? _region,
-              onRegionChanged: (r) => setState(() => _dragging = r),
-              onRegionCommitted: (r) {
-                setState(() {
-                  _dragging = null;
-                  _region = r;
-                });
-                _run();
-              },
+              ink: _ink,
+              region: _region,
+              onDraw: _onDraw,
+              onDrawEnd: _onDrawEnd,
             ),
             SizedBox(height: m.spaceSm),
             _RegionControls(
               hasRegion: _region != null,
               onClear: () {
-                setState(() => _region = null);
+                setState(() {
+                  _region = null;
+                  _ink = null;
+                });
                 _run();
               },
             ),
@@ -143,8 +172,8 @@ class _ScanTextScreenState extends State<ScanTextScreen>
                 icon: Icons.document_scanner_outlined,
                 title: 'No text found',
                 message: _region != null
-                    ? 'Nothing readable in that box. Try a larger area or a '
-                        'straighter, brighter photo.'
+                    ? 'Nothing readable inside your circle. Try circling a '
+                        'larger area, or a straighter, brighter photo.'
                     : 'Try a straighter, brighter photo of the page.',
               )
             else
@@ -200,19 +229,18 @@ class _RegionControls extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!hasRegion) {
       return Text(
-        'Tip: drag a box on the image to read just that part — skip '
-        'letterheads and footers.',
+        'Tip: circle part of the page to read just that — skip letterheads '
+        'and footers.',
         style: context.texts.bodySmall
             ?.copyWith(color: context.palette.onSurfaceMuted),
       );
     }
     return Row(
       children: <Widget>[
-        Icon(Icons.crop_free,
-            size: 16, color: context.palette.onSurfaceMuted),
+        Icon(Icons.gesture, size: 16, color: context.palette.onSurfaceMuted),
         SizedBox(width: context.metrics.spaceXs),
         Expanded(
-          child: Text('Reading the selected region only.',
+          child: Text('Reading what you circled.',
               style: context.texts.bodySmall),
         ),
         TextButton.icon(
@@ -225,35 +253,29 @@ class _RegionControls extends StatelessWidget {
   }
 }
 
-/// The captured image with a scan line while reading, and a drag-to-select
-/// region overlay. Coordinates are normalised (0–1) so they map straight onto
-/// the recogniser's region of interest regardless of display size.
-class _ImageWithRegion extends StatelessWidget {
-  const _ImageWithRegion({
+/// The captured image with a scan line while reading, and a freeform
+/// circle-to-select gesture. Points are normalised (0–1) so the loop maps onto
+/// the recogniser's region regardless of display size.
+class _ImageCanvas extends StatelessWidget {
+  const _ImageCanvas({
     required this.imagePath,
     required this.aspect,
     required this.sweep,
     required this.scanning,
+    required this.ink,
     required this.region,
-    required this.onRegionChanged,
-    required this.onRegionCommitted,
+    required this.onDraw,
+    required this.onDrawEnd,
   });
 
   final String imagePath;
   final double aspect;
   final Animation<double> sweep;
   final bool scanning;
+  final List<Offset>? ink;
   final Rect? region;
-  final ValueChanged<Rect> onRegionChanged;
-  final ValueChanged<Rect?> onRegionCommitted;
-
-  Rect _rectFrom(Offset a, Offset b, Size box) {
-    Offset n(Offset p) => Offset(
-          (p.dx / box.width).clamp(0.0, 1.0),
-          (p.dy / box.height).clamp(0.0, 1.0),
-        );
-    return Rect.fromPoints(n(a), n(b));
-  }
+  final ValueChanged<List<Offset>> onDraw;
+  final ValueChanged<List<Offset>> onDrawEnd;
 
   @override
   Widget build(BuildContext context) {
@@ -264,26 +286,27 @@ class _ImageWithRegion extends StatelessWidget {
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         final box = Size(width, width / (aspect == 0 ? 1 : aspect));
-        Offset? start;
+        final points = <Offset>[];
+
+        Offset norm(Offset p) => Offset(
+              (p.dx / box.width).clamp(0.0, 1.0),
+              (p.dy / box.height).clamp(0.0, 1.0),
+            );
 
         return ClipRRect(
           borderRadius: BorderRadius.circular(m.radiusLg),
           child: GestureDetector(
-            onPanStart: (d) => start = d.localPosition,
+            onPanStart: (d) {
+              points
+                ..clear()
+                ..add(norm(d.localPosition));
+              onDraw(List<Offset>.of(points));
+            },
             onPanUpdate: (d) {
-              if (start == null) return;
-              onRegionChanged(_rectFrom(start!, d.localPosition, box));
+              points.add(norm(d.localPosition));
+              onDraw(List<Offset>.of(points));
             },
-            onPanEnd: (_) {
-              final r = region;
-              start = null;
-              // Ignore an accidental tap; keep only a real box.
-              if (r == null || r.width < 0.03 || r.height < 0.03) {
-                onRegionCommitted(null);
-              } else {
-                onRegionCommitted(r);
-              }
-            },
+            onPanEnd: (_) => onDrawEnd(List<Offset>.of(points)),
             child: SizedBox(
               width: box.width,
               height: box.height,
@@ -292,16 +315,16 @@ class _ImageWithRegion extends StatelessWidget {
                   Positioned.fill(
                     child: Image.file(File(imagePath), fit: BoxFit.fill),
                   ),
-                  if (region != null)
-                    Positioned.fill(
-                      child: CustomPaint(
-                        painter: _RegionPainter(
-                          region: region!,
-                          scrim: palette.scrim.withValues(alpha: 0.45),
-                          stroke: palette.accent,
-                        ),
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: _LassoPainter(
+                        ink: ink,
+                        region: region,
+                        scrim: palette.scrim.withValues(alpha: 0.45),
+                        stroke: palette.accent,
                       ),
                     ),
+                  ),
                   if (scanning)
                     Positioned.fill(
                       child: AnimatedBuilder(
@@ -337,41 +360,71 @@ class _ImageWithRegion extends StatelessWidget {
   }
 }
 
-class _RegionPainter extends CustomPainter {
-  _RegionPainter({
+class _LassoPainter extends CustomPainter {
+  _LassoPainter({
+    required this.ink,
     required this.region,
     required this.scrim,
     required this.stroke,
   });
 
-  final Rect region;
+  final List<Offset>? ink;
+  final Rect? region;
   final Color scrim;
   final Color stroke;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final r = Rect.fromLTWH(
-      region.left * size.width,
-      region.top * size.height,
-      region.width * size.width,
-      region.height * size.height,
-    );
-    // Dim everything except the selection.
-    final outside = Path()
-      ..addRect(Offset.zero & size)
-      ..addRect(r)
-      ..fillType = PathFillType.evenOdd;
-    canvas.drawPath(outside, Paint()..color = scrim);
-    canvas.drawRect(
-      r,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
-        ..color = stroke,
-    );
+    // Dim everything outside the circled region.
+    if (region != null) {
+      final r = Rect.fromLTRB(
+        region!.left * size.width,
+        region!.top * size.height,
+        region!.right * size.width,
+        region!.bottom * size.height,
+      );
+      final outside = Path()
+        ..addRect(Offset.zero & size)
+        ..addRRect(RRect.fromRectXY(r, 8, 8))
+        ..fillType = PathFillType.evenOdd;
+      canvas.drawPath(outside, Paint()..color = scrim);
+    }
+
+    // The freeform "ink" the user drew.
+    final pts = ink;
+    if (pts != null && pts.length > 1) {
+      final path = Path()
+        ..moveTo(pts.first.dx * size.width, pts.first.dy * size.height);
+      for (final p in pts.skip(1)) {
+        path.lineTo(p.dx * size.width, p.dy * size.height);
+      }
+      // Glow, then a crisp line on top.
+      canvas.drawPath(
+        path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round
+          ..strokeWidth = 12
+          ..color = stroke.withValues(alpha: 0.30)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+      );
+      canvas.drawPath(
+        path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round
+          ..strokeWidth = 4
+          ..color = stroke,
+      );
+    }
   }
 
   @override
-  bool shouldRepaint(_RegionPainter old) =>
-      old.region != region || old.scrim != scrim || old.stroke != stroke;
+  bool shouldRepaint(_LassoPainter old) =>
+      old.ink != ink ||
+      old.region != region ||
+      old.scrim != scrim ||
+      old.stroke != stroke;
 }
