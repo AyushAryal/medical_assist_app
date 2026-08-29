@@ -11,7 +11,7 @@ import '../../../core/design/design.dart';
 ///
 /// Every line names its source behind an [InfoDot]; anything the record does
 /// not hold reads "Not recorded" in a muted tone, and the count of gaps sits
-/// in the header so an absent allergy status cannot pass for a reassuring one.
+/// at the top so an absent allergy status cannot pass for a reassuring one.
 class RecordSummaryCard extends StatelessWidget {
   const RecordSummaryCard({
     super.key,
@@ -31,30 +31,50 @@ class RecordSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final m = context.metrics;
+    final palette = context.palette;
     final gaps = summary.notRecorded.length;
+    final items = summary.allItems.toList();
+
     return SectionCard(
       title: 'Pre-read',
-      subtitle: gaps == 0
-          ? 'Everything here is on the record.'
-          : '$gaps ${gaps == 1 ? 'thing' : 'things'} not recorded.',
-      trailing: onHandoff == null
-          ? null
-          : TextButton.icon(
-              onPressed: onHandoff,
-              icon: const Icon(Icons.assignment_outlined, size: 18),
-              label: const Text('Handoff'),
-            ),
+      leading: const Icon(Icons.assignment_ind_outlined, size: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          for (final section in summary.sections)
-            for (final item in section.items) _SummaryRow(item: item),
-          if (onBrief != null) ...<Widget>[
-            SizedBox(height: context.metrics.spaceSm),
-            OutlinedButton.icon(
-              onPressed: onBrief,
-              icon: const Icon(Icons.auto_awesome, size: 18),
-              label: const Text('Brief me'),
+          StatusPill(
+            label: gaps == 0
+                ? 'All recorded'
+                : '$gaps not recorded',
+            tone: gaps == 0 ? PillTone.normal : PillTone.caution,
+            icon: gaps == 0 ? Icons.check_circle_outline : Icons.error_outline,
+            dense: true,
+          ),
+          SizedBox(height: m.spaceSm),
+          for (var i = 0; i < items.length; i++) ...<Widget>[
+            if (i > 0)
+              Divider(height: 1, color: palette.outline.withValues(alpha: 0.4)),
+            _SummaryRow(item: items[i]),
+          ],
+          if (onBrief != null || onHandoff != null) ...<Widget>[
+            SizedBox(height: m.spaceMd),
+            Wrap(
+              spacing: m.spaceSm,
+              runSpacing: m.spaceSm,
+              children: <Widget>[
+                if (onBrief != null)
+                  OutlinedButton.icon(
+                    onPressed: onBrief,
+                    icon: const Icon(Icons.auto_awesome, size: 18),
+                    label: const Text('Brief me'),
+                  ),
+                if (onHandoff != null)
+                  OutlinedButton.icon(
+                    onPressed: onHandoff,
+                    icon: const Icon(Icons.assignment_outlined, size: 18),
+                    label: const Text('Handoff'),
+                  ),
+              ],
             ),
           ],
         ],
@@ -72,32 +92,43 @@ class _SummaryRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final m = context.metrics;
     final palette = context.palette;
-    final dot = _dotColor(palette);
 
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: m.spaceXs),
+      padding: EdgeInsets.symmetric(vertical: m.spaceSm),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Padding(
-            padding: EdgeInsets.only(top: m.spaceXs, right: m.spaceSm),
+            padding: EdgeInsets.only(top: 5, right: m.spaceSm),
             child: Container(
               width: 8,
               height: 8,
-              decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+              decoration:
+                  BoxDecoration(color: _dotColor(palette), shape: BoxShape.circle),
             ),
           ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(item.label, style: context.texts.labelMedium),
+                Text(
+                  item.label.toUpperCase(),
+                  style: context.texts.labelSmall?.copyWith(
+                    color: palette.onSurfaceMuted,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                SizedBox(height: m.spaceXs / 2),
                 Text(
                   item.value,
-                  style: context.texts.bodySmall?.copyWith(
+                  style: context.texts.bodyMedium?.copyWith(
                     color: _valueColor(palette),
                     fontStyle:
                         item.isRecorded ? FontStyle.normal : FontStyle.italic,
+                    fontWeight:
+                        item.severity == FlagSeverity.critical
+                            ? FontWeight.w600
+                            : FontWeight.w400,
                   ),
                 ),
               ],

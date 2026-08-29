@@ -151,7 +151,7 @@ class _SpokenSection extends StatelessWidget {
           ],
         ),
         SizedBox(height: m.spaceXs),
-        Text(d.text, style: context.texts.bodyMedium),
+        GeneratedText(text: d.text, typeIn: true),
         SizedBox(height: m.spaceSm),
         Text(
           LanguageModelDraft.provenanceNotice,

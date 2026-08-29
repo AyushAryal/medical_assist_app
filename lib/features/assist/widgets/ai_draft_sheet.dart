@@ -126,24 +126,25 @@ class _AiDraftSheetState extends State<AiDraftSheet> {
               label: const Text('Copy'),
             ),
       children: <Widget>[
-        if (_busy)
-          Padding(
-            padding: EdgeInsets.symmetric(vertical: m.spaceLg),
-            child: Row(
-              children: <Widget>[
-                const AiSparkleIcon(size: 20),
-                SizedBox(width: m.spaceSm),
-                Expanded(
-                  child: Text(
-                    'Preparing the assistant… the first run loads the model, '
-                    'which can take a few seconds.',
-                    style: context.texts.bodySmall,
-                  ),
-                ),
-              ],
-            ),
-          )
-        else if (_message != null)
+        if (_busy) ...<Widget>[
+          Row(
+            children: <Widget>[
+              const AiBadge(),
+              SizedBox(width: m.spaceSm),
+              Text('Generating…',
+                  style: context.texts.bodySmall
+                      ?.copyWith(color: context.palette.onSurfaceMuted)),
+            ],
+          ),
+          SizedBox(height: m.spaceMd),
+          const AiTextPlaceholder(lines: 4),
+          SizedBox(height: m.spaceSm),
+          Text(
+            'The first run loads the model and can take a few seconds.',
+            style: context.texts.bodySmall
+                ?.copyWith(color: context.palette.onSurfaceMuted),
+          ),
+        ] else if (_message != null)
           Padding(
             padding: EdgeInsets.symmetric(vertical: m.spaceMd),
             child: Text(_message!, style: context.texts.bodyMedium),
@@ -151,7 +152,7 @@ class _AiDraftSheetState extends State<AiDraftSheet> {
         else if (draft != null) ...<Widget>[
           Row(children: const <Widget>[AiBadge()]),
           SizedBox(height: m.spaceSm),
-          Text(draft.text, style: context.texts.bodyMedium),
+          GeneratedText(text: draft.text, typeIn: true),
           if (widget.caveat != null) ...<Widget>[
             SizedBox(height: m.spaceSm),
             Text(widget.caveat!,
