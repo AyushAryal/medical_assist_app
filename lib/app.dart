@@ -9,6 +9,7 @@ import 'core/agentic/agent_scope.dart';
 import 'core/app_bootstrap.dart';
 import 'core/routing/app_router.dart';
 import 'core/security/app_lock_service.dart';
+import 'core/modules/workflow_preferences.dart';
 import 'core/session/session_controller.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
@@ -120,6 +121,9 @@ class _DataScope extends StatelessWidget {
         Provider<ClinicalRepository>.value(value: bootstrap.repository),
         ChangeNotifierProvider<SessionController>.value(
           value: bootstrap.session,
+        ),
+        ChangeNotifierProvider<WorkflowPreferences>.value(
+          value: bootstrap.workflows,
         ),
       ],
       // Wrapped here rather than in the shell so the assistant is genuinely

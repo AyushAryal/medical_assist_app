@@ -18,6 +18,7 @@ import 'audit/audit_service.dart';
 import 'db/app_database.dart';
 import 'db/app_meta_store.dart';
 import 'modules/entitlements.dart';
+import 'modules/workflow_preferences.dart';
 import 'security/app_lock_service.dart';
 import 'security/db_key_manager.dart';
 import 'security/secure_store.dart';
@@ -50,6 +51,7 @@ class AppBootstrap extends ChangeNotifier {
   ClinicalRepository? _repository;
   AppMetaStore? _meta;
   SessionController? _session;
+  WorkflowPreferences? _workflows;
   VoiceNoteService? _voiceNotes;
   DictationRecorder? _dictation;
   AssistService? _assist;
@@ -160,6 +162,7 @@ class AppBootstrap extends ChangeNotifier {
   ClinicalRepository get repository => _require(_repository, 'repository');
   AppMetaStore get meta => _require(_meta, 'meta');
   SessionController get session => _require(_session, 'session');
+  WorkflowPreferences get workflows => _require(_workflows, 'workflows');
   VoiceNoteService get voiceNotes => _require(_voiceNotes, 'voiceNotes');
   DictationRecorder get dictation => _require(_dictation, 'dictation');
   AssistService get assist => _require(_assist, 'assist');
@@ -239,6 +242,9 @@ class AppBootstrap extends ChangeNotifier {
       final session = SessionController(repository, meta);
       await session.load();
 
+      final workflows = WorkflowPreferences(meta);
+      await workflows.load();
+
       audit.configure(
         actor: session.signatureName,
         deviceId: session.deviceId,
@@ -256,6 +262,7 @@ class AppBootstrap extends ChangeNotifier {
       _repository = repository;
       _meta = meta;
       _session = session;
+      _workflows = workflows;
       _voiceNotes = VoiceNoteService();
       _dictation = DictationRecorder(
         quality:
@@ -309,6 +316,7 @@ class AppBootstrap extends ChangeNotifier {
     _repository = null;
     _meta = null;
     _session = null;
+    _workflows = null;
     _voiceNotes = null;
     _phase = BootstrapPhase.idle;
     notifyListeners();

@@ -7,6 +7,7 @@ import '../../core/session/session_controller.dart';
 import '../../data/repositories/clinical_repository.dart';
 import '../appointments/appointments.dart';
 import '../clinics/clinics.dart';
+import '../triage/triage.dart';
 import 'dashboard_controller.dart';
 import 'widgets/at_a_glance.dart';
 import 'widgets/header.dart';
@@ -167,6 +168,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         // prominence.
                         NextUpCard(dashboard: dashboard, onChanged: _reload),
                         SizedBox(height: m.spaceLg),
+                        // Optional per clinic: only present when the triage
+                        // module is licensed and switched on. When it is not,
+                        // this line renders nothing and the dashboard is
+                        // unchanged.
+                        if (TriageModule.isVisible(context)) ...<Widget>[
+                          const TriageCard(),
+                          SizedBox(height: m.spaceLg),
+                        ],
                         NeedsAttention(dashboard: dashboard),
                         QuickActions(
                           dashboard: dashboard,

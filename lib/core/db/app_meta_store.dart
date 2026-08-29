@@ -3,13 +3,20 @@ import 'package:sqflite_sqlcipher/sqflite.dart';
 import 'app_database.dart';
 import 'db_types.dart';
 
+/// A string key/value store. The seam lets preference holders be unit-tested
+/// against an in-memory fake instead of opening an encrypted database.
+abstract interface class MetaKeyValue {
+  Future<String?> read(String key);
+  Future<void> write(String key, String? value);
+}
+
 /// Key/value preferences that live *inside* the encrypted database rather than
 /// in `SharedPreferences`.
 ///
 /// The active clinic and the signing clinician's name are operational context
 /// for a medical record. Neither belongs in a world-readable plist or XML file
 /// alongside the app's other unencrypted settings.
-class AppMetaStore {
+class AppMetaStore implements MetaKeyValue {
   const AppMetaStore(this._database);
 
   final AppDatabase _database;
@@ -21,6 +28,7 @@ class AppMetaStore {
   static const String keyThemeMode = 'theme_mode';
   static const String keyOnboarded = 'onboarded';
 
+  @override
   Future<String?> read(String key) async {
     if (!_database.isOpen) return null;
     final rows = await _database.db.query(
@@ -33,6 +41,7 @@ class AppMetaStore {
     return rows.isEmpty ? null : rows.first['value'] as String?;
   }
 
+  @override
   Future<void> write(String key, String? value) async {
     if (!_database.isOpen) return;
     await _database.db.insert(
