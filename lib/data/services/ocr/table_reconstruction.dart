@@ -30,23 +30,65 @@ String reconstructMarkdown(List<OcrLine> lines) {
   if (lines.isEmpty) return '';
   final rows = _rows(lines);
 
-  final blocks = <String>[];
+  final heights = lines.map((l) => l.h).toList()..sort();
+  final medianH = heights[heights.length ~/ 2];
+
+  // The document's normal line pitch — the baseline a break is measured
+  // against, so ordinary single-spaced text is not chopped into paragraphs.
+  final rowCys = rows.map((r) => r.first.cy).toList();
+  final pitches = <double>[
+    for (var k = 1; k < rowCys.length; k++) rowCys[k] - rowCys[k - 1],
+  ]..sort();
+  final normalGap = pitches.isEmpty ? double.infinity : pitches[pitches.length ~/ 2];
+
+  final out = <String>[];
+  double? prevCy;
   var i = 0;
   while (i < rows.length) {
     final run = _tableRun(rows, i);
     if (run.length >= 2) {
-      blocks.add(_tableMarkdown(run));
+      if (out.isNotEmpty) out.add('');
+      out.add(_tableMarkdown(run));
+      out.add('');
+      prevCy = run.last.first.cy;
       i += run.length;
-    } else {
-      final prose = <String>[];
-      while (i < rows.length && _tableRun(rows, i).length < 2) {
-        prose.add(rows[i].map((l) => l.text).join(' '));
-        i++;
-      }
-      blocks.add(prose.join('\n'));
+      continue;
     }
+
+    final row = rows[i];
+    final cy = row.first.cy;
+    // A large vertical gap is a section break; a moderate one is a paragraph
+    // break. (medianH is a line height, so gaps are measured in lines.)
+    if (prevCy != null) {
+      final gap = cy - prevCy;
+      if (gap > normalGap * 2.3) {
+        out..add('')..add('---')..add('');
+      } else if (gap > normalGap * 1.5) {
+        out.add('');
+      }
+    }
+
+    // Relative text size marks a heading — the only formatting the geometry can
+    // tell us honestly (Vision gives no font weight, so bold/italic are never
+    // guessed).
+    final rowH = row.map((l) => l.h).reduce(math.max);
+    final prefix = rowH >= medianH * 1.6
+        ? '# '
+        : rowH >= medianH * 1.28
+            ? '## '
+            : '';
+    out.add('$prefix${row.map((l) => l.text).join(' ')}');
+    prevCy = cy;
+    i++;
   }
-  return blocks.join('\n\n').trim();
+
+  // Collapse runs of blank lines and trim.
+  final cleaned = <String>[];
+  for (final line in out) {
+    if (line.isEmpty && (cleaned.isEmpty || cleaned.last.isEmpty)) continue;
+    cleaned.add(line);
+  }
+  return cleaned.join('\n').trim();
 }
 
 /// Groups lines into rows by vertical proximity; each row is sorted left→right.

@@ -65,6 +65,36 @@ void main() {
     expect(md, isNot(contains('---')));
   });
 
+  test('a larger line becomes a heading', () {
+    final md = reconstructMarkdown(<OcrLine>[
+      const OcrLine(text: 'DISCHARGE SUMMARY', x: 0.1, y: 0.05, w: 0.6, h: 0.06),
+      line('Patient did well', 0.1, 0.14),
+      line('Follow up in a week', 0.1, 0.20),
+    ]);
+    expect(md, startsWith('# DISCHARGE SUMMARY'));
+    expect(md, contains('Patient did well'));
+  });
+
+  test('a large vertical gap inserts a section break', () {
+    final md = reconstructMarkdown(<OcrLine>[
+      line('Line one', 0.1, 0.10),
+      line('Line two', 0.1, 0.16),
+      line('Line three', 0.1, 0.22),
+      line('Line four', 0.1, 0.28),
+      line('New section far below', 0.1, 0.60),
+    ]);
+    expect(md, contains('---'));
+  });
+
+  test('normal single-spaced lines are not chopped into paragraphs', () {
+    final md = reconstructMarkdown(<OcrLine>[
+      line('One', 0.1, 0.10),
+      line('Two', 0.1, 0.16),
+      line('Three', 0.1, 0.22),
+    ]);
+    expect(md, 'One\nTwo\nThree');
+  });
+
   test('empty input yields empty string', () {
     expect(reconstructMarkdown(const <OcrLine>[]), '');
   });

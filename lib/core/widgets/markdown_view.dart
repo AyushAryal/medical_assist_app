@@ -30,8 +30,29 @@ class MarkdownView extends StatelessWidget {
         blocks.add(_table(context, table, base));
         continue;
       }
-      if (line.trim().isEmpty) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) {
         blocks.add(SizedBox(height: context.metrics.spaceSm));
+        i++;
+        continue;
+      }
+      if (trimmed == '---' || trimmed == '***' || trimmed == '___') {
+        blocks.add(Padding(
+          padding: EdgeInsets.symmetric(vertical: context.metrics.spaceXs),
+          child: Divider(color: context.palette.outline, height: 1),
+        ));
+        i++;
+        continue;
+      }
+      if (trimmed.startsWith('# ')) {
+        blocks.add(SelectableText(trimmed.substring(2),
+            style: context.texts.titleLarge));
+        i++;
+        continue;
+      }
+      if (trimmed.startsWith('## ')) {
+        blocks.add(SelectableText(trimmed.substring(3),
+            style: context.texts.titleMedium));
         i++;
         continue;
       }
