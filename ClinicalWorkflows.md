@@ -188,7 +188,26 @@ board screen a new feature module consuming the engine through
 
 ---
 
-## 7. Open questions to settle before Phase 0
+## 7. Module gating — optional per clinic (implemented)
+
+Not every clinic triages, so a workflow feature's *presence* is a clinic
+decision, not an assumption baked into the build. Two independent gates decide
+whether triage exists in an install, both checked in one place
+(`TriageModule.isVisible`):
+
+* **Licensed** — `Entitlements.has(ModuleId.triage)`. What the plan allows.
+* **Switched on** — `WorkflowPreferences.isEnabled(ModuleId.triage)`. What the
+  clinic chose, persisted in the encrypted meta store, **default off**.
+
+A descriptor marks itself `clinicConfigurable` to opt into this; the settings
+Modules screen renders a switch for each such module. When the gate is closed,
+every entry point (dashboard card, route) renders nothing, so a clinic that
+does not triage never sees it — and the `lib/features/triage/` folder can be
+lifted out without touching another feature. This is the containerization the
+four engines were built to allow: a workflow is a thin feature module over pure
+engines, present only when wanted.
+
+## 8. Open questions to settle before the next feature
 
 * Recall "overdue" definitions — which review cadences, from where (per-problem
   policy vs a flat rule)? Needs a clinician's input; it must be data, not a
