@@ -272,14 +272,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('Assistant language model'),
+                    title: const Text('AI assistant'),
                     subtitle: Text(
-                      context.watch<AppBootstrap>().activeAssistModel?.name ??
-                          'Optional — translates wording the built-in '
-                              'matching misses',
+                      'Engine: ${context.watch<AppBootstrap>().activeAiEngineLabel}',
                     ),
                     trailing: const Icon(Icons.chevron_right),
-                    onTap: () => context.push(Routes.dictation),
+                    onTap: () => context.push(Routes.ai),
                   ),
                   ListTile(
                     contentPadding: EdgeInsets.zero,

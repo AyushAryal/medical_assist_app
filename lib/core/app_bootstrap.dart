@@ -8,6 +8,7 @@ import '../data/repositories/clinical_repository.dart';
 import '../ai/pipeline.dart';
 import '../data/services/assist/assist_service.dart';
 import '../data/fixtures/demo_data.dart';
+import '../data/services/assist/ai_engine_preference.dart';
 import '../data/services/assist/apple_foundation_model.dart';
 import '../data/services/assist/assist_model_catalog.dart';
 import '../data/services/speech_out.dart';
@@ -82,6 +83,7 @@ class AppBootstrap extends ChangeNotifier {
 
   /// Which installed assistant model interprets unmatched questions.
   static const String assistModelKey = 'assist_model_id';
+  static const String aiEnginePrefKey = 'ai_engine_pref';
   static const String ttsVoiceKey = 'tts_voice_id';
 
   /// Whether the floating assistant appears over every screen.
@@ -112,6 +114,14 @@ class AppBootstrap extends ChangeNotifier {
   AssistModel? _activeAssistModel;
   LanguageModelEngine? _assistEngine;
 
+  /// Which engine the user chose. Honoured by [refreshAssistEngine].
+  AiEnginePreference get aiEnginePreference => _aiEnginePreference;
+  AiEnginePreference _aiEnginePreference = AiEnginePreference.auto;
+
+  /// A human label for whatever is actually live now — for Settings.
+  String get activeAiEngineLabel =>
+      _assistEngine?.name ?? 'None — deterministic features only';
+
   /// Whether an assistant model is installed and live.
   bool get assistModelActive => _assistEngine != null;
 
@@ -130,39 +140,65 @@ class AppBootstrap extends ChangeNotifier {
   /// first installed model serves, so removing one falls back rather than
   /// silently switching the feature off.
   Future<void> refreshAssistEngine() async {
-    // Prefer the system model (Apple Intelligence) when the OS offers it: no
-    // download, no bundled weights, and it is already on the device. A
-    // downloaded model only serves where the native one is unavailable.
+    final pref = _aiEnginePreference;
+
+    // Resolve each candidate independently, then apply the user's choice.
     final apple = AppleFoundationLanguageModel();
-    if (await apple.isReady()) {
-      await _assistEngine?.dispose();
-      _assistEngine = apple;
-      _activeAssistModel = null; // no downloaded file backs this one
-      notifyListeners();
-      return;
+    final appleReady =
+        pref == AiEnginePreference.off ? false : await apple.isReady();
+
+    LanguageModelEngine? next;
+    AssistModel? activeModel;
+
+    Future<void> useDownloaded() async {
+      final installed = await _resolveDownloadedAssistModel();
+      if (installed != null) {
+        next = LlamaEngine(
+          modelPath: installed.path,
+          modelName: installed.model.name,
+        );
+        activeModel = installed.model;
+      }
     }
 
-    final preferredId =
-        _meta == null ? null : await meta.read(assistModelKey);
-    final preferred = AssistModelCatalog.byId(preferredId);
+    switch (pref) {
+      case AiEnginePreference.off:
+        next = null;
+      case AiEnginePreference.appleIntelligence:
+        next = appleReady ? apple : null;
+      case AiEnginePreference.downloaded:
+        await useDownloaded();
+      case AiEnginePreference.auto:
+        if (appleReady) {
+          next = apple;
+        } else {
+          await useDownloaded();
+        }
+    }
 
+    await _assistEngine?.dispose();
+    _assistEngine = next;
+    _activeAssistModel = activeModel; // null for the system model
+    notifyListeners();
+  }
+
+  /// The installed downloaded model to use — the user's pick if present, else
+  /// the first one installed. Null when none is installed.
+  Future<InstalledAssistModel?> _resolveDownloadedAssistModel() async {
+    final preferredId = _meta == null ? null : await meta.read(assistModelKey);
+    final preferred = AssistModelCatalog.byId(preferredId);
     final model = preferred != null &&
             await assistModels.installed(preferred) != null
         ? preferred
         : await assistModels.firstInstalled();
+    return model == null ? null : await assistModels.installed(model);
+  }
 
-    final installed =
-        model == null ? null : await assistModels.installed(model);
-
-    await _assistEngine?.dispose();
-    _activeAssistModel = installed?.model;
-    _assistEngine = installed == null
-        ? null
-        : LlamaEngine(
-            modelPath: installed.path,
-            modelName: installed.model.name,
-          );
-    notifyListeners();
+  /// Sets which engine backs the assistant and re-resolves it now.
+  Future<void> setAiEnginePreference(AiEnginePreference preference) async {
+    _aiEnginePreference = preference;
+    await meta.write(aiEnginePrefKey, preference.name);
+    await refreshAssistEngine();
   }
 
   /// Chooses which installed assistant model answers from now on.
@@ -205,6 +241,11 @@ class AppBootstrap extends ChangeNotifier {
   /// is installed, so the AI features are visible without a manual install.
   Future<void> _installLightestAssistModelIfNone() async {
     try {
+      // Respect the user's choice: a downloaded model only helps auto/downloaded.
+      if (_aiEnginePreference == AiEnginePreference.off ||
+          _aiEnginePreference == AiEnginePreference.appleIntelligence) {
+        return;
+      }
       // Nothing to download if the OS already provides a system model.
       if (await AppleFoundationLanguageModel().isReady()) return;
       if (await assistModels.firstInstalled() != null) return;
@@ -311,6 +352,8 @@ class AppBootstrap extends ChangeNotifier {
 
       // Restore the chosen read-aloud voice, if any.
       SpeechOut.preferredVoiceId = await meta.read(ttsVoiceKey);
+      _aiEnginePreference =
+          AiEnginePreferenceX.parse(await meta.read(aiEnginePrefKey));
 
       audit.configure(
         actor: session.signatureName,
