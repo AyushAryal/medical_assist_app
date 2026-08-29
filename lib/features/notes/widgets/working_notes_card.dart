@@ -24,6 +24,7 @@ class WorkingNotesCard extends StatelessWidget {
     required this.isDrafting,
     required this.onSort,
     required this.onDictate,
+    required this.onScan,
     this.focusNode,
     this.smartPhrases,
     this.scope = const SmartPhraseScope(),
@@ -37,6 +38,9 @@ class WorkingNotesCard extends StatelessWidget {
   final bool isDrafting;
   final VoidCallback onSort;
   final VoidCallback onDictate;
+
+  /// Scan text off a photo of a page into the working notes.
+  final VoidCallback onScan;
 
   @override
   Widget build(BuildContext context) {
@@ -65,10 +69,20 @@ class WorkingNotesCard extends StatelessWidget {
               color: palette.onSurfaceMuted,
             ),
           ),
-          trailing: IconButton(
-            tooltip: 'Dictate into the working notes',
-            icon: const Icon(Icons.mic_none_outlined),
-            onPressed: onDictate,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              IconButton(
+                tooltip: 'Scan text from a photo',
+                icon: const Icon(Icons.document_scanner_outlined),
+                onPressed: onScan,
+              ),
+              IconButton(
+                tooltip: 'Dictate into the working notes',
+                icon: const Icon(Icons.mic_none_outlined),
+                onPressed: onDictate,
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,

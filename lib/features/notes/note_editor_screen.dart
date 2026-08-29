@@ -21,6 +21,7 @@ import '../../data/repositories/clinical_repository.dart';
 import '../../core/app_bootstrap.dart';
 import '../../clinical/insights/note_intelligence.dart';
 import '../attachments/attachments.dart';
+import '../scan/scan.dart';
 import 'amend_note_sheet.dart';
 import 'dictation_sheet.dart';
 import 'draft_review_screen.dart';
@@ -869,6 +870,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                             isDrafting: _drafting,
                             onSort: _sortWorkingNotes,
                             onDictate: () => _dictateWorking(),
+                            onScan: _scanIntoWorking,
                           ),
                         ),
                       for (final key in _fields.keys) _soapField(key, isLocked),
@@ -965,6 +967,19 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   /// Sorts the working notes into the four sections, via the on-device model.
   ///
+  /// Scans text off a photo of a page into the working notes. The text is
+  /// appended, never a section — it lands in the scratch box like dictation
+  /// does, to be read, edited and sorted before any of it reaches the note.
+  Future<void> _scanIntoWorking() async {
+    final text = await scanTextFrom(context);
+    if (text == null || text.trim().isEmpty || !mounted) return;
+    _markUndoPoint();
+    final existing = _working.text.trimRight();
+    _working.text = existing.isEmpty ? text : '$existing\n$text';
+    _onChanged();
+    _offerUndo('Added scanned text to the working notes.');
+  }
+
   /// Reads only the working notes, and empties them of whatever was accepted.
   /// That is the whole shape of the feature: dictate a consultation into one
   /// box, have it distributed, and be left with the remainder — so what did
