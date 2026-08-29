@@ -1,5 +1,5 @@
 import 'dart:io' show Platform;
-import 'dart:ui' show Offset, Rect;
+import 'dart:ui' show Offset;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart' show MethodChannel;
@@ -69,22 +69,17 @@ class AppleVisionTextScanner implements TextScanner {
 
   @override
   Future<ScannedText> scan(String imagePath, {List<Offset>? lasso}) async {
-    final bounds = lasso == null ? null : _boundsOf(lasso);
+    // Recognise the whole (correctly-oriented) image, then keep only the lines
+    // inside the loop. Deliberately no regionOfInterest: a ROI plus an image
+    // orientation do not share a coordinate frame cleanly, which shifted the
+    // read area off from where the loop was drawn. Per-line boxes come back in
+    // the same normalised, oriented, top-left space as the loop, so filtering
+    // by polygon is exact.
     final result = await _channel.invokeMapMethod<String, Object?>(
       'recognize',
-      <String, Object?>{
-        'path': imagePath,
-        if (bounds != null)
-          'region': <String, double>{
-            'x': bounds.left,
-            'y': bounds.top,
-            'width': bounds.width,
-            'height': bounds.height,
-          },
-      },
+      <String, Object?>{'path': imagePath},
     );
 
-    // No loop → use the whole-image text as-is.
     if (lasso == null) {
       return ScannedText(
         text: (result?['text'] as String?) ?? '',
@@ -92,8 +87,6 @@ class AppleVisionTextScanner implements TextScanner {
       );
     }
 
-    // Keep only lines whose centre is inside the drawn loop, not just its
-    // bounding rectangle.
     final lines = (result?['lines'] as List<Object?>?) ?? const <Object?>[];
     final kept = <String>[];
     for (final entry in lines) {
@@ -106,23 +99,6 @@ class AppleVisionTextScanner implements TextScanner {
       if (_inside(centre, lasso)) kept.add(entry['text'] as String);
     }
     return ScannedText(text: kept.join('\n'), blockCount: kept.length);
-  }
-
-  static Rect _boundsOf(List<Offset> points) {
-    var minX = 1.0, minY = 1.0, maxX = 0.0, maxY = 0.0;
-    for (final p in points) {
-      if (p.dx < minX) minX = p.dx;
-      if (p.dy < minY) minY = p.dy;
-      if (p.dx > maxX) maxX = p.dx;
-      if (p.dy > maxY) maxY = p.dy;
-    }
-    const pad = 0.01;
-    return Rect.fromLTRB(
-      (minX - pad).clamp(0.0, 1.0),
-      (minY - pad).clamp(0.0, 1.0),
-      (maxX + pad).clamp(0.0, 1.0),
-      (maxY + pad).clamp(0.0, 1.0),
-    );
   }
 
   /// Ray-casting point-in-polygon over the loop's points.
