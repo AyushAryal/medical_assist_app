@@ -38,17 +38,18 @@ class _HandoffSheetState extends State<HandoffSheet> {
   bool _busy = false;
 
   Future<void> _generate() async {
-    final engine = context.read<AppBootstrap>().assistEngine;
-    final messenger = ScaffoldMessenger.of(context);
+    final bootstrap = context.read<AppBootstrap>();
+    var engine = bootstrap.assistEngine;
     if (engine == null || _busy) return;
 
     setState(() => _busy = true);
     try {
+      // Rebuild a not-yet-ready engine (fresh download / stuck load) instead
+      // of dead-ending — see AiDraftSheet for the same handling.
       if (!await engine.isReady()) {
-        messenger.showSnackBar(
-          const SnackBar(content: Text('The assistant model is still loading.')),
-        );
-        return;
+        await bootstrap.refreshAssistEngine();
+        engine = bootstrap.assistEngine;
+        if (engine == null) return;
       }
       final draft = await engine.spokenHandoff(widget.handoff.plainText);
       if (mounted) setState(() => _spoken = draft);

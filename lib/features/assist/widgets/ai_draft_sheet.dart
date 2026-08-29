@@ -70,7 +70,8 @@ class _AiDraftSheetState extends State<AiDraftSheet> {
   }
 
   Future<void> _run() async {
-    final engine = context.read<AppBootstrap>().assistEngine;
+    final bootstrap = context.read<AppBootstrap>();
+    var engine = bootstrap.assistEngine;
     setState(() {
       _busy = true;
       _message = null;
@@ -78,14 +79,21 @@ class _AiDraftSheetState extends State<AiDraftSheet> {
     try {
       if (engine == null) {
         setState(() => _message = 'No assistant model is installed on this '
-            'device, so there is nothing to generate. The record works without '
-            'it.');
+            'device yet, so there is nothing to generate. The record works '
+            'without it.');
         return;
       }
+      // A model that just finished downloading, or an engine that tried to
+      // load before the file was complete, reads as "not ready" until it is
+      // rebuilt — so rebuild and re-resolve rather than dead-ending the user.
       if (!await engine.isReady()) {
-        setState(() => _message = 'The assistant model is still loading. Try '
-            'again in a moment.');
-        return;
+        await bootstrap.refreshAssistEngine();
+        engine = bootstrap.assistEngine;
+        if (engine == null) {
+          setState(() => _message = 'No assistant model is ready yet. It may '
+              'still be downloading — try again shortly.');
+          return;
+        }
       }
       final draft = await widget.generate(engine);
       if (mounted) setState(() => _draft = draft);
@@ -123,12 +131,15 @@ class _AiDraftSheetState extends State<AiDraftSheet> {
             padding: EdgeInsets.symmetric(vertical: m.spaceLg),
             child: Row(
               children: <Widget>[
-                const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2)),
+                const AiSparkleIcon(size: 20),
                 SizedBox(width: m.spaceSm),
-                Text('Generating…', style: context.texts.bodySmall),
+                Expanded(
+                  child: Text(
+                    'Preparing the assistant… the first run loads the model, '
+                    'which can take a few seconds.',
+                    style: context.texts.bodySmall,
+                  ),
+                ),
               ],
             ),
           )

@@ -8,6 +8,7 @@ import '../data/repositories/clinical_repository.dart';
 import '../ai/pipeline.dart';
 import '../data/services/assist/assist_service.dart';
 import '../data/fixtures/demo_data.dart';
+import '../data/services/assist/apple_foundation_model.dart';
 import '../data/services/assist/assist_model_catalog.dart';
 import '../data/services/assist/assist_model_manager.dart';
 import '../data/services/assist/language_model.dart';
@@ -127,6 +128,18 @@ class AppBootstrap extends ChangeNotifier {
   /// first installed model serves, so removing one falls back rather than
   /// silently switching the feature off.
   Future<void> refreshAssistEngine() async {
+    // Prefer the system model (Apple Intelligence) when the OS offers it: no
+    // download, no bundled weights, and it is already on the device. A
+    // downloaded model only serves where the native one is unavailable.
+    final apple = AppleFoundationLanguageModel();
+    if (await apple.isReady()) {
+      await _assistEngine?.dispose();
+      _assistEngine = apple;
+      _activeAssistModel = null; // no downloaded file backs this one
+      notifyListeners();
+      return;
+    }
+
     final preferredId =
         _meta == null ? null : await meta.read(assistModelKey);
     final preferred = AssistModelCatalog.byId(preferredId);
@@ -181,6 +194,8 @@ class AppBootstrap extends ChangeNotifier {
   /// is installed, so the AI features are visible without a manual install.
   Future<void> _installLightestAssistModelIfNone() async {
     try {
+      // Nothing to download if the OS already provides a system model.
+      if (await AppleFoundationLanguageModel().isReady()) return;
       if (await assistModels.firstInstalled() != null) return;
       final lightest = AssistModelCatalog.models
           .reduce((a, b) => a.bytes <= b.bytes ? a : b);

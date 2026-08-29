@@ -2,6 +2,10 @@ import Flutter
 import UIKit
 import Vision
 
+#if canImport(FoundationModels)
+import FoundationModels
+#endif
+
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   override func application(
@@ -14,6 +18,7 @@ import Vision
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     AppleVisionOcr.register(with: engineBridge.pluginRegistry)
+    AppleFoundationModel.register(with: engineBridge.pluginRegistry)
   }
 }
 
@@ -95,5 +100,81 @@ enum AppleVisionOcr {
         fail("ocr_failed", error.localizedDescription)
       }
     }
+  }
+}
+
+/// The system on-device language model (Apple Intelligence, iOS 26+), exposed
+/// over a method channel to the Foundation Models framework.
+///
+/// Guarded so it compiles on any SDK: `availability` reports "unavailable"
+/// wherever the framework or the OS version is not there, and the Dart side
+/// falls back to a downloaded model. Nothing here authors clinical data — it
+/// only reshapes the text the app already built.
+enum AppleFoundationModel {
+  static let channelName = "app.medical/foundation_model"
+
+  static func register(with registry: FlutterPluginRegistry) {
+    guard let registrar = registry.registrar(forPlugin: "AppleFoundationModel")
+    else { return }
+    let channel = FlutterMethodChannel(
+      name: channelName,
+      binaryMessenger: registrar.messenger()
+    )
+    channel.setMethodCallHandler { call, result in
+      switch call.method {
+      case "availability":
+        result(availabilityString())
+      case "generate":
+        guard
+          let args = call.arguments as? [String: Any],
+          let prompt = args["prompt"] as? String
+        else {
+          result(FlutterError(code: "bad_args", message: "prompt is required", details: nil))
+          return
+        }
+        generate(prompt: prompt, result: result)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+  }
+
+  static func availabilityString() -> String {
+    #if canImport(FoundationModels)
+    if #available(iOS 26.0, *) {
+      switch SystemLanguageModel.default.availability {
+      case .available:
+        return "available"
+      default:
+        return "unavailable"
+      }
+    }
+    #endif
+    return "unavailable"
+  }
+
+  static func generate(prompt: String, result: @escaping FlutterResult) {
+    func reply(_ value: Any?) { DispatchQueue.main.async { result(value) } }
+    func fail(_ code: String, _ message: String) {
+      DispatchQueue.main.async {
+        result(FlutterError(code: code, message: message, details: nil))
+      }
+    }
+
+    #if canImport(FoundationModels)
+    if #available(iOS 26.0, *) {
+      Task {
+        do {
+          let session = LanguageModelSession()
+          let response = try await session.respond(to: prompt)
+          reply(response.content)
+        } catch {
+          fail("generate_failed", error.localizedDescription)
+        }
+      }
+      return
+    }
+    #endif
+    fail("unavailable", "Foundation Models is not available on this device.")
   }
 }
