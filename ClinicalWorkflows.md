@@ -137,8 +137,10 @@ a given worklist.
 
 ## 5. Roadmap (dependency- and risk-ordered)
 
-* **Phase 0 — Foundations.** The four engines as pure, tested contracts, plus
-  the read models. No UI. This document's guarantees become tests here.
+* **Phase 0 — Foundations. _(built)_** The four engines as pure, tested
+  contracts. `Worklist`, `ClinicalFlag`, `RecordSummary` live in
+  `lib/clinical/{worklist,flags,summary}/`; `AgentSurface` pre-existed. Purity
+  enforced by `test/clinical/clinical_purity_test.dart`.
 * **Phase 1 — Deterministic, read-only.** Triage board (first), then Recall
   list and Prime-the-chart, then louder safety flags. Zero model risk, fully
   offline, glanceable, one-tap. The biggest rush-relief, shipped first.
