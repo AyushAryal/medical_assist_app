@@ -1,3 +1,4 @@
+import AVFoundation
 import Flutter
 import UIKit
 import Vision
@@ -19,6 +20,51 @@ import FoundationModels
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     AppleVisionOcr.register(with: engineBridge.pluginRegistry)
     AppleFoundationModel.register(with: engineBridge.pluginRegistry)
+    AppleSpeech.register(with: engineBridge.pluginRegistry)
+  }
+}
+
+/// Reads text aloud with the system speech synthesiser.
+///
+/// Native, offline, no dependency — "read aloud" that actually speaks. The
+/// synthesiser is held statically so it is not deallocated mid-utterance.
+enum AppleSpeech {
+  static let channelName = "app.medical/tts"
+  static let synthesizer = AVSpeechSynthesizer()
+
+  static func register(with registry: FlutterPluginRegistry) {
+    guard let registrar = registry.registrar(forPlugin: "AppleSpeech") else {
+      return
+    }
+    let channel = FlutterMethodChannel(
+      name: channelName,
+      binaryMessenger: registrar.messenger()
+    )
+    channel.setMethodCallHandler { call, result in
+      switch call.method {
+      case "speak":
+        guard
+          let args = call.arguments as? [String: Any],
+          let text = args["text"] as? String
+        else {
+          result(FlutterError(code: "bad_args", message: "text is required", details: nil))
+          return
+        }
+        try? AVAudioSession.sharedInstance().setCategory(
+          .playback, options: [.duckOthers])
+        try? AVAudioSession.sharedInstance().setActive(true)
+        synthesizer.stopSpeaking(at: .immediate)
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.rate = AVSpeechUtteranceDefaultSpeechRate
+        synthesizer.speak(utterance)
+        result(true)
+      case "stop":
+        synthesizer.stopSpeaking(at: .immediate)
+        result(true)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
   }
 }
 

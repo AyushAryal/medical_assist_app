@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../core/app_bootstrap.dart';
 import '../../../core/design/design.dart';
 import '../../../data/services/assist/language_model.dart';
+import '../../../data/services/speech_out.dart';
 
 /// A reusable sheet for a single generated draft.
 ///
@@ -67,6 +68,13 @@ class _AiDraftSheetState extends State<AiDraftSheet> {
     if (_started) return;
     _started = true;
     _run();
+  }
+
+  @override
+  void dispose() {
+    // Don't keep talking after the sheet is gone.
+    SpeechOut.stop();
+    super.dispose();
   }
 
   Future<void> _run() async {
@@ -150,7 +158,18 @@ class _AiDraftSheetState extends State<AiDraftSheet> {
             child: Text(_message!, style: context.texts.bodyMedium),
           )
         else if (draft != null) ...<Widget>[
-          Row(children: const <Widget>[AiBadge()]),
+          Row(
+            children: <Widget>[
+              const AiBadge(),
+              const Spacer(),
+              IconButton(
+                tooltip: 'Read aloud',
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.volume_up_outlined, size: 20),
+                onPressed: () => SpeechOut.speak(draft.text),
+              ),
+            ],
+          ),
           SizedBox(height: m.spaceSm),
           GeneratedText(text: draft.text, typeIn: true),
           if (widget.caveat != null) ...<Widget>[

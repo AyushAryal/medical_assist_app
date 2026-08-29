@@ -7,6 +7,7 @@ import '../../../clinical/summary/handoff.dart';
 import '../../../core/app_bootstrap.dart';
 import '../../../core/design/design.dart';
 import '../../../data/services/assist/language_model.dart';
+import '../../../data/services/speech_out.dart';
 
 /// Shows a deterministic SBAR handoff, ready to read aloud or copy.
 ///
@@ -36,6 +37,12 @@ class HandoffSheet extends StatefulWidget {
 class _HandoffSheetState extends State<HandoffSheet> {
   LanguageModelDraft? _spoken;
   bool _busy = false;
+
+  @override
+  void dispose() {
+    SpeechOut.stop();
+    super.dispose();
+  }
 
   Future<void> _generate() async {
     final bootstrap = context.read<AppBootstrap>();
@@ -135,6 +142,12 @@ class _SpokenSection extends StatelessWidget {
           children: <Widget>[
             const AiBadge(),
             const Spacer(),
+            IconButton(
+              tooltip: 'Read aloud',
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(Icons.volume_up_outlined, size: 20),
+              onPressed: () => SpeechOut.speak(d.text),
+            ),
             IconButton(
               tooltip: 'Copy spoken version',
               visualDensity: VisualDensity.compact,

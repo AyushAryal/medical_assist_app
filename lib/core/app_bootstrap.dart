@@ -169,11 +169,13 @@ class AppBootstrap extends ChangeNotifier {
     await refreshAssistEngine();
   }
 
-  /// Debug convenience provisioning runs on debug builds but never under
-  /// `flutter test`, so a bootstrap test cannot trigger a slow seed or a
-  /// network model download.
+  /// Auto-provisioning (seed demo data + pull the smallest model) runs wherever
+  /// demo data is allowed — debug builds, and release builds explicitly made
+  /// for review with `--dart-define=ALLOW_DEMO_DATA=true`. Never under
+  /// `flutter test`, and never in a shipped build (which passes neither), so it
+  /// cannot seed a real deployment or trigger a surprise download.
   bool get _debugProvisioningEnabled =>
-      kDebugMode && !Platform.environment.containsKey('FLUTTER_TEST');
+      demoDataAllowed && !Platform.environment.containsKey('FLUTTER_TEST');
 
   /// Debug only: fills an empty database with the realistic demo dataset, so a
   /// fresh debug install lands on populated triage/recall/charts. Idempotent —
