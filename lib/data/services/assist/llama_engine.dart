@@ -256,6 +256,21 @@ class LlamaEngine implements LanguageModelEngine {
     return _draft(answer ?? plan);
   }
 
+  @override
+  Future<LanguageModelDraft> spokenHandoff(String structuredHandoff) async {
+    final answer = await _complete(
+      'Rewrite this SBAR handoff as one short, natural paragraph a clinician '
+      'could read aloud at a shift change. Keep every fact and add none; '
+      'invent nothing. Where a line says something is "not recorded", say so '
+      'rather than omitting it.',
+      structuredHandoff,
+      maxTokens: 384,
+    );
+    // Falls back to the structured text when the model cannot answer — the
+    // deterministic handoff is always a valid handoff.
+    return _draft(answer ?? structuredHandoff);
+  }
+
   LanguageModelDraft _draft(String text) =>
       LanguageModelDraft(text: text, engineName: name);
 

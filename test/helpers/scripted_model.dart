@@ -9,9 +9,13 @@ class ScriptedModel implements LanguageModelEngine {
     this.assignment,
     this.instructions,
     this.extraction,
+    this.handoff,
   });
 
   final String? rewrite;
+
+  /// The reworded spoken-handoff reply.
+  final String? handoff;
 
   /// The raw JSON reply to an extraction request.
   final String? extraction;
@@ -56,6 +60,15 @@ class ScriptedModel implements LanguageModelEngine {
   Future<LanguageModelDraft> plainLanguageInstructions(String plan) async {
     sawText = plan;
     return LanguageModelDraft(text: instructions ?? '', engineName: name);
+  }
+
+  @override
+  Future<LanguageModelDraft> spokenHandoff(String structuredHandoff) async {
+    sawText = structuredHandoff;
+    return LanguageModelDraft(
+      text: handoff ?? structuredHandoff,
+      engineName: name,
+    );
   }
 
   @override

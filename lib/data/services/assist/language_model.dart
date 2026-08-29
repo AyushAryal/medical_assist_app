@@ -33,6 +33,14 @@ abstract interface class LanguageModelEngine {
   /// Rewrites a plan as instructions a patient can follow at home.
   Future<LanguageModelDraft> plainLanguageInstructions(String plan);
 
+  /// Rewrites a structured SBAR handoff as a short paragraph a clinician could
+  /// read aloud at a shift change. Rewriting, not authorship: it is handed the
+  /// deterministic handoff the app already built and asked only to reshape it,
+  /// keeping every fact and adding none — a "not recorded" stays "not
+  /// recorded". The deterministic handoff remains the source of truth; this is
+  /// a convenience draft, marked as generated.
+  Future<LanguageModelDraft> spokenHandoff(String structuredHandoff);
+
   /// Says which SOAP section each numbered sentence belongs to.
   ///
   /// Classification, not generation — the reply is expected to be section
