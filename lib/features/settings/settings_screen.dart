@@ -281,6 +281,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => context.push(Routes.dictation),
                   ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Read-aloud voice'),
+                    subtitle: const Text(
+                      'The voice used to speak generated text',
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => context.push(Routes.voice),
+                  ),
                 ],
               ),
             ),

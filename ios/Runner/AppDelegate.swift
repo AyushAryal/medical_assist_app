@@ -51,15 +51,41 @@ enum AppleSpeech {
           return
         }
         let language = (args["language"] as? String) ?? "en-US"
+        let voiceId = args["voiceId"] as? String
         try? AVAudioSession.sharedInstance().setCategory(
           .playback, options: [.duckOthers])
         try? AVAudioSession.sharedInstance().setActive(true)
         synthesizer.stopSpeaking(at: .immediate)
         let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = bestVoice(for: language)
+        // An explicitly chosen voice wins; otherwise the best installed one.
+        utterance.voice =
+          (voiceId.flatMap { AVSpeechSynthesisVoice(identifier: $0) })
+          ?? bestVoice(for: language)
         utterance.rate = AVSpeechUtteranceDefaultSpeechRate
         synthesizer.speak(utterance)
         result(true)
+      case "voices":
+        // Every installed voice for the language, quality-first, so the app can
+        // show what is actually on the device and let the user pick/preview.
+        let language = (call.arguments as? [String: Any])?["language"] as? String
+          ?? "en"
+        let base = String(language.prefix(2))
+        let voices = AVSpeechSynthesisVoice.speechVoices()
+          .filter { $0.language.hasPrefix(base) }
+          .sorted {
+            $0.quality.rawValue != $1.quality.rawValue
+              ? $0.quality.rawValue > $1.quality.rawValue
+              : $0.name < $1.name
+          }
+          .map {
+            [
+              "id": $0.identifier,
+              "name": $0.name,
+              "language": $0.language,
+              "quality": $0.quality.rawValue,
+            ] as [String: Any]
+          }
+        result(voices)
       case "bestVoiceQuality":
         // 1 default, 2 enhanced, 3 premium — lets the app nudge the user to
         // download a better voice when only the robotic default is installed.

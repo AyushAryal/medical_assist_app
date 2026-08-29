@@ -6,3 +6,4 @@ export 'audit_log_screen.dart' show AuditLogScreen;
 export 'dictation_settings_screen.dart' show DictationSettingsScreen;
 export 'modules_screen.dart' show ModulesScreen;
 export 'settings_screen.dart' show SettingsScreen;
+export 'voice_settings_screen.dart' show VoiceSettingsScreen;

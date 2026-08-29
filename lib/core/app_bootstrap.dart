@@ -10,6 +10,7 @@ import '../data/services/assist/assist_service.dart';
 import '../data/fixtures/demo_data.dart';
 import '../data/services/assist/apple_foundation_model.dart';
 import '../data/services/assist/assist_model_catalog.dart';
+import '../data/services/speech_out.dart';
 import '../data/services/assist/assist_model_manager.dart';
 import '../data/services/assist/language_model.dart';
 import '../data/services/assist/llama_engine.dart';
@@ -81,6 +82,7 @@ class AppBootstrap extends ChangeNotifier {
 
   /// Which installed assistant model interprets unmatched questions.
   static const String assistModelKey = 'assist_model_id';
+  static const String ttsVoiceKey = 'tts_voice_id';
 
   /// Whether the floating assistant appears over every screen.
   static const String assistantEnabledKey = 'assistant_enabled';
@@ -167,6 +169,13 @@ class AppBootstrap extends ChangeNotifier {
   Future<void> setAssistModel(AssistModel model) async {
     await meta.write(assistModelKey, model.id);
     await refreshAssistEngine();
+  }
+
+  /// Pins the voice used for read-aloud (null = let the platform pick the best).
+  Future<void> setTtsVoice(String? voiceId) async {
+    SpeechOut.preferredVoiceId = voiceId;
+    await meta.write(ttsVoiceKey, voiceId);
+    notifyListeners();
   }
 
   /// Auto-provisioning (seed demo data + pull the smallest model) runs wherever
@@ -299,6 +308,9 @@ class AppBootstrap extends ChangeNotifier {
 
       final workflows = WorkflowPreferences(meta);
       await workflows.load();
+
+      // Restore the chosen read-aloud voice, if any.
+      SpeechOut.preferredVoiceId = await meta.read(ttsVoiceKey);
 
       audit.configure(
         actor: session.signatureName,

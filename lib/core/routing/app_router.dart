@@ -41,6 +41,7 @@ abstract final class Routes {
   static const String modules = '/settings/modules';
   static const String auditLog = '/settings/audit';
   static const String dictation = '/settings/dictation';
+  static const String voice = '/settings/voice';
 
   static String chartFor(String patientId) => '/patients/$patientId';
   static String editFor(String patientId) => '/patients/$patientId/edit';
@@ -202,6 +203,11 @@ abstract final class AppRouter {
           path: Routes.dictation,
           parentNavigatorKey: rootNavigatorKey,
           builder: (context, state) => const DictationSettingsScreen(),
+        ),
+        GoRoute(
+          path: Routes.voice,
+          parentNavigatorKey: rootNavigatorKey,
+          builder: (context, state) => const VoiceSettingsScreen(),
         ),
       ],
       errorBuilder: (context, state) => Scaffold(

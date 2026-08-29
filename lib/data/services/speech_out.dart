@@ -1,18 +1,56 @@
 import 'package:flutter/services.dart';
 
+/// One installed system voice.
+class TtsVoice {
+  const TtsVoice({
+    required this.id,
+    required this.name,
+    required this.language,
+    required this.quality,
+  });
+
+  final String id;
+  final String name;
+  final String language;
+
+  /// 1 default (compact, robotic), 2 enhanced, 3 premium.
+  final int quality;
+
+  String get qualityLabel => switch (quality) {
+        3 => 'Premium',
+        2 => 'Enhanced',
+        _ => 'Default',
+      };
+
+  bool get isNatural => quality >= 2;
+}
+
 /// Reads text aloud through the platform speech synthesiser.
 ///
 /// A thin channel to the system voice (iOS `AVSpeechSynthesizer`). Best-effort:
-/// where no synthesiser is wired (non-Apple, for now) the calls are no-ops, so
-/// a caller can always offer "speak" and simply get silence rather than an
-/// error. Nothing here is on the critical path.
+/// where no synthesiser is wired the calls are no-ops. [preferredVoiceId] lets
+/// the user pin a specific installed voice; without it the platform picks the
+/// best available. Note the literal Siri voice is not exposed to apps — only
+/// the downloadable Enhanced/Premium voices are.
 abstract final class SpeechOut {
   static const MethodChannel _channel = MethodChannel('app.medical/tts');
 
-  static Future<void> speak(String text) async {
+  /// The user's chosen voice, applied to every [speak]. Loaded at startup and
+  /// updated by the voice picker.
+  static String? preferredVoiceId;
+
+  static Future<void> speak(String text) => _speak(text, preferredVoiceId);
+
+  /// Speaks with an explicit voice — used to preview a voice before choosing it.
+  static Future<void> preview(String text, String voiceId) =>
+      _speak(text, voiceId);
+
+  static Future<void> _speak(String text, String? voiceId) async {
     if (text.trim().isEmpty) return;
+    final args = <String, Object?>{'text': text};
+    if (voiceId != null) args['voiceId'] = voiceId;
     try {
-      await _channel.invokeMethod<bool>('speak', <String, Object?>{'text': text});
+      await _channel.invokeMethod<bool>('speak', args);
     } on Object {
       // No synthesiser on this platform — silence is an acceptable outcome.
     }
@@ -26,9 +64,30 @@ abstract final class SpeechOut {
     }
   }
 
-  /// Quality of the best installed voice: 0 none, 1 default (the robotic
-  /// compact voice), 2 enhanced, 3 premium. Lets the UI nudge the user to
-  /// download a natural voice when only the default is present.
+  /// Every installed voice for [language], quality-first.
+  static Future<List<TtsVoice>> voices({String language = 'en'}) async {
+    try {
+      final raw = await _channel.invokeMethod<List<Object?>>(
+        'voices',
+        <String, Object?>{'language': language},
+      );
+      return <TtsVoice>[
+        for (final entry in raw ?? const <Object?>[])
+          if (entry is Map)
+            TtsVoice(
+              id: entry['id'] as String,
+              name: entry['name'] as String,
+              language: entry['language'] as String,
+              quality: (entry['quality'] as num).toInt(),
+            ),
+      ];
+    } on Object {
+      return const <TtsVoice>[];
+    }
+  }
+
+  /// Quality of the best installed voice: 0 none, 1 default, 2 enhanced,
+  /// 3 premium.
   static Future<int> bestVoiceQuality() async {
     try {
       return await _channel.invokeMethod<int>('bestVoiceQuality') ?? 0;
