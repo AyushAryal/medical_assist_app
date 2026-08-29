@@ -7,6 +7,7 @@ import '../../core/session/session_controller.dart';
 import '../../data/repositories/clinical_repository.dart';
 import '../appointments/appointments.dart';
 import '../clinics/clinics.dart';
+import '../recall/recall.dart';
 import '../triage/triage.dart';
 import 'dashboard_controller.dart';
 import 'widgets/at_a_glance.dart';
@@ -174,6 +175,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         // unchanged.
                         if (TriageModule.isVisible(context)) ...<Widget>[
                           const TriageCard(),
+                          SizedBox(height: m.spaceLg),
+                        ],
+                        if (RecallModule.isVisible(context)) ...<Widget>[
+                          const RecallCard(),
                           SizedBox(height: m.spaceLg),
                         ],
                         NeedsAttention(dashboard: dashboard),

@@ -18,6 +18,7 @@ enum ModuleId {
   medications,
   appointments,
   triage,
+  recall,
   analytics,
   cloudSync,
   multiUser,
@@ -136,6 +137,16 @@ abstract final class ModuleRegistry {
       tier: ModuleTier.professional,
       icon: Icons.emergency_outlined,
       dependsOn: <ModuleId>[ModuleId.appointments, ModuleId.earlyWarningScore],
+      clinicConfigurable: true,
+    ),
+    ModuleId.recall: ModuleDescriptor(
+      id: ModuleId.recall,
+      name: 'Recall list',
+      description: 'Patients overdue for a review they were promised, ranked '
+          'by how overdue. Optional per clinic.',
+      tier: ModuleTier.professional,
+      icon: Icons.event_repeat_outlined,
+      dependsOn: <ModuleId>[ModuleId.encounters],
       clinicConfigurable: true,
     ),
     ModuleId.attachments: ModuleDescriptor(

@@ -9,6 +9,7 @@ import '../../features/encounters/encounters.dart';
 import '../../features/notes/notes.dart';
 import '../../features/patients/patients.dart';
 import '../../features/settings/settings.dart';
+import '../../features/recall/recall.dart';
 import '../../features/shell/shell.dart';
 import '../../features/triage/triage.dart';
 import '../../features/vitals/vitals.dart';
@@ -35,6 +36,7 @@ abstract final class Routes {
   static const String noteEditor = '/encounters/:encounterId/note';
   static const String clinics = '/clinics';
   static const String triage = '/triage';
+  static const String recall = '/recall';
   static const String settings = '/settings';
   static const String modules = '/settings/modules';
   static const String auditLog = '/settings/audit';
@@ -180,6 +182,11 @@ abstract final class AppRouter {
           path: Routes.triage,
           parentNavigatorKey: rootNavigatorKey,
           builder: (context, state) => const TriageBoardScreen(),
+        ),
+        GoRoute(
+          path: Routes.recall,
+          parentNavigatorKey: rootNavigatorKey,
+          builder: (context, state) => const RecallBoardScreen(),
         ),
         GoRoute(
           path: Routes.modules,
