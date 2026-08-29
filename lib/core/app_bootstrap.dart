@@ -1,10 +1,13 @@
 import 'dart:async';
 
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 
 import '../data/repositories/clinical_repository.dart';
 import '../ai/pipeline.dart';
 import '../data/services/assist/assist_service.dart';
+import '../data/fixtures/demo_data.dart';
 import '../data/services/assist/assist_model_catalog.dart';
 import '../data/services/assist/assist_model_manager.dart';
 import '../data/services/assist/language_model.dart';
@@ -153,6 +156,41 @@ class AppBootstrap extends ChangeNotifier {
     await refreshAssistEngine();
   }
 
+  /// Debug convenience provisioning runs on debug builds but never under
+  /// `flutter test`, so a bootstrap test cannot trigger a slow seed or a
+  /// network model download.
+  bool get _debugProvisioningEnabled =>
+      kDebugMode && !Platform.environment.containsKey('FLUTTER_TEST');
+
+  /// Debug only: fills an empty database with the realistic demo dataset, so a
+  /// fresh debug install lands on populated triage/recall/charts. Idempotent —
+  /// it seeds only when nothing is there — and swallows its own failures rather
+  /// than ever blocking startup.
+  Future<void> _seedDemoDataIfEmpty(ClinicalRepository repository) async {
+    try {
+      final seeder = DemoDataSeeder(repository);
+      if (await seeder.count() == 0) {
+        await seeder.seed();
+      }
+    } on Object catch (error) {
+      debugPrint('Debug demo seed skipped: $error');
+    }
+  }
+
+  /// Debug only: downloads and activates the smallest assistant model when none
+  /// is installed, so the AI features are visible without a manual install.
+  Future<void> _installLightestAssistModelIfNone() async {
+    try {
+      if (await assistModels.firstInstalled() != null) return;
+      final lightest = AssistModelCatalog.models
+          .reduce((a, b) => a.bytes <= b.bytes ? a : b);
+      await assistModels.download(lightest);
+      await setAssistModel(lightest);
+    } on Object catch (error) {
+      debugPrint('Debug assist-model auto-install skipped: $error');
+    }
+  }
+
   BootstrapPhase get phase => _phase;
   Object? get error => _error;
   bool get isReady => _phase == BootstrapPhase.ready;
@@ -282,11 +320,26 @@ class AppBootstrap extends ChangeNotifier {
       _assistantEnabled =
           (await meta.read(assistantEnabledKey) ?? 'true') != 'false';
 
+      // Debug builds arrive populated: a realistic dataset so triage, recall
+      // and the charts have something to show, seeded before the dashboard
+      // first loads. Never runs in a shipped build (guarded by demoDataAllowed).
+      if (_debugProvisioningEnabled) {
+        await _seedDemoDataIfEmpty(repository);
+      }
+
       _phase = BootstrapPhase.ready;
       // Not awaited: they only read file sizes, and an unlock must not wait
       // on the filesystem to show the dashboard.
       unawaited(refreshTranscriptionEngine());
       unawaited(refreshAssistEngine());
+
+      // Debug convenience: pull the smallest assistant model in the background
+      // so the AI features are visible without a manual install. Non-blocking
+      // and best-effort — the app is fully usable while it downloads, and the
+      // deterministic features never depend on it.
+      if (_debugProvisioningEnabled) {
+        unawaited(_installLightestAssistModelIfNone());
+      }
     } on Object catch (error) {
       _error = error;
       _phase = BootstrapPhase.failed;
