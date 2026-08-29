@@ -185,6 +185,30 @@ class _PatientChartScreenState extends State<PatientChartScreen> {
                         'rely on it.',
                     generate: (engine) => engine.spokenBrief(summary.plainText),
                   ),
+          onExplain: !aiActive
+              ? null
+              : () => AiDraftSheet.show(
+                    context,
+                    title: 'Explain',
+                    subtitle: patient.displayName,
+                    caveat: 'Describes the numbers only — not a diagnosis or '
+                        'advice.',
+                    notice: 'Generated from the record shown above.',
+                    generate: (engine) => engine.explainPlainly(summary.plainText),
+                  ),
+          onReferral: !aiActive
+              ? null
+              : () => AiDraftSheet.show(
+                    context,
+                    title: 'Referral letter',
+                    subtitle: patient.displayName,
+                    notice: 'Draft from the record — check every line before '
+                        'sending. The record is the source of truth.',
+                    generate: (engine) => engine.referralLetter(
+                      '${patient.displayName}\n${patient.identityLine}\n\n'
+                      '${summary.plainText}',
+                    ),
+                  ),
         ),
         SizedBox(height: context.metrics.spaceLg),
       ],

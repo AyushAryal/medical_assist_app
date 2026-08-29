@@ -307,6 +307,31 @@ class LlamaEngine implements LanguageModelEngine {
     return _draft(answer ?? '');
   }
 
+  @override
+  Future<LanguageModelDraft> referralLetter(String record) async {
+    final answer = await _complete(
+      'Write a concise referral letter from these patient details: a brief '
+      'opening, the reason for referral, relevant history, current medications '
+      'and allergies, and the latest observations. Use only the facts given; '
+      'add none; do not diagnose.',
+      record,
+      maxTokens: 512,
+    );
+    return _draft(answer ?? record);
+  }
+
+  @override
+  Future<LanguageModelDraft> explainPlainly(String data) async {
+    final answer = await _complete(
+      'Explain what these clinical values show, in plain language a patient '
+      'could follow. Describe the numbers and their direction only. Do not '
+      'diagnose, do not advise, and add no facts.',
+      data,
+      maxTokens: 320,
+    );
+    return _draft(answer ?? data);
+  }
+
   LanguageModelDraft _draft(String text) =>
       LanguageModelDraft(text: text, engineName: name);
 

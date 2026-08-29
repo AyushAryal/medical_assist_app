@@ -57,6 +57,14 @@ abstract interface class LanguageModelEngine {
   /// its output is framed as suggestions only and always marked generated.
   Future<LanguageModelDraft> triageTalkingPoints(String presentation);
 
+  /// Writes a referral/summary letter from a structured record. Rewriting the
+  /// facts into prose — no new facts, no diagnosis.
+  Future<LanguageModelDraft> referralLetter(String record);
+
+  /// Describes what clinical values show, in plain language — the numbers and
+  /// their direction only, never a diagnosis or advice, and adding no facts.
+  Future<LanguageModelDraft> explainPlainly(String data);
+
   /// Says which SOAP section each numbered sentence belongs to.
   ///
   /// Classification, not generation — the reply is expected to be section

@@ -103,6 +103,29 @@ class AppleFoundationLanguageModel implements LanguageModelEngine {
   }
 
   @override
+  Future<LanguageModelDraft> referralLetter(String record) async {
+    final answer = await _complete(
+      'Write a concise referral letter from these patient details: a brief '
+      'opening, the reason for referral, relevant history, current medications '
+      'and allergies, and the latest observations. Use only the facts given; '
+      'add none; do not diagnose.',
+      record,
+    );
+    return _draft(answer ?? record);
+  }
+
+  @override
+  Future<LanguageModelDraft> explainPlainly(String data) async {
+    final answer = await _complete(
+      'Explain what these clinical values show, in plain language a patient '
+      'could follow. Describe the numbers and their direction only. Do not '
+      'diagnose, do not advise, and add no facts.',
+      data,
+    );
+    return _draft(answer ?? data);
+  }
+
+  @override
   Future<String?> assignSentencesToSections(List<String> numberedSentences) {
     return _complete(
       'For each numbered sentence, say which SOAP section it belongs to '

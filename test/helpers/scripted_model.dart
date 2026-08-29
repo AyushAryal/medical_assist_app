@@ -90,6 +90,18 @@ class ScriptedModel implements LanguageModelEngine {
   }
 
   @override
+  Future<LanguageModelDraft> referralLetter(String record) async {
+    sawText = record;
+    return LanguageModelDraft(text: rewrite ?? record, engineName: name);
+  }
+
+  @override
+  Future<LanguageModelDraft> explainPlainly(String data) async {
+    sawText = data;
+    return LanguageModelDraft(text: rewrite ?? data, engineName: name);
+  }
+
+  @override
   Future<String?> extractValues(
     String description, {
     required List<String> fields,

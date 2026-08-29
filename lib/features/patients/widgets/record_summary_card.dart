@@ -19,6 +19,8 @@ class RecordSummaryCard extends StatelessWidget {
     required this.summary,
     this.onHandoff,
     this.onBrief,
+    this.onReferral,
+    this.onExplain,
   });
 
   final RecordSummary summary;
@@ -26,9 +28,10 @@ class RecordSummaryCard extends StatelessWidget {
   /// Opens the SBAR handoff built from the same record. Null hides the action.
   final VoidCallback? onHandoff;
 
-  /// Generates an AI spoken brief of this summary. Null hides the action (no
-  /// model installed).
+  /// AI actions over this record. Null hides each (no model installed).
   final VoidCallback? onBrief;
+  final VoidCallback? onReferral;
+  final VoidCallback? onExplain;
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +61,10 @@ class RecordSummaryCard extends StatelessWidget {
               Divider(height: 1, color: palette.outline.withValues(alpha: 0.4)),
             _SummaryRow(item: items[i]),
           ],
-          if (onBrief != null || onHandoff != null) ...<Widget>[
+          if (onBrief != null ||
+              onHandoff != null ||
+              onReferral != null ||
+              onExplain != null) ...<Widget>[
             SizedBox(height: m.spaceMd),
             Wrap(
               spacing: m.spaceSm,
@@ -70,11 +76,23 @@ class RecordSummaryCard extends StatelessWidget {
                     icon: const Icon(Icons.auto_awesome, size: 18),
                     label: const Text('Brief me'),
                   ),
+                if (onExplain != null)
+                  OutlinedButton.icon(
+                    onPressed: onExplain,
+                    icon: const Icon(Icons.help_outline, size: 18),
+                    label: const Text('Explain'),
+                  ),
                 if (onHandoff != null)
                   OutlinedButton.icon(
                     onPressed: onHandoff,
                     icon: const Icon(Icons.assignment_outlined, size: 18),
                     label: const Text('Handoff'),
+                  ),
+                if (onReferral != null)
+                  OutlinedButton.icon(
+                    onPressed: onReferral,
+                    icon: const Icon(Icons.outgoing_mail, size: 18),
+                    label: const Text('Referral'),
                   ),
               ],
             ),
