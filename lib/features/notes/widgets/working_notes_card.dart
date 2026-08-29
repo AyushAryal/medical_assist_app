@@ -16,7 +16,7 @@ import 'smart_text_wrap.dart';
 /// is still useful on its own: somewhere to put words while a patient is
 /// still talking. It is deliberately not part of the signed record, and the
 /// editor refuses to sign quietly while anything is still sitting in it.
-class WorkingNotesCard extends StatelessWidget {
+class WorkingNotesCard extends StatefulWidget {
   const WorkingNotesCard({
     super.key,
     required this.controller,
@@ -43,14 +43,26 @@ class WorkingNotesCard extends StatelessWidget {
   final VoidCallback onScan;
 
   @override
+  State<WorkingNotesCard> createState() => _WorkingNotesCardState();
+}
+
+class _WorkingNotesCardState extends State<WorkingNotesCard> {
+  /// Render Markdown (tables, bullets) read-only, versus the editable text.
+  bool _preview = false;
+
+  @override
   Widget build(BuildContext context) {
     final m = context.metrics;
     final palette = context.palette;
+    final controller = widget.controller;
+    final hasModel = widget.hasModel;
+    final isDrafting = widget.isDrafting;
 
     return ListenableBuilder(
       listenable: controller,
       builder: (context, _) {
         final hasText = controller.text.trim().isNotEmpty;
+        final showPreview = _preview && hasText;
 
         return SectionCard(
           title: 'Working notes',
@@ -72,54 +84,74 @@ class WorkingNotesCard extends StatelessWidget {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
+              if (hasText)
+                IconButton(
+                  tooltip: showPreview ? 'Edit' : 'Preview (tables & format)',
+                  icon: Icon(showPreview
+                      ? Icons.edit_outlined
+                      : Icons.table_chart_outlined),
+                  onPressed: () => setState(() => _preview = !_preview),
+                ),
               IconButton(
                 tooltip: 'Scan text from a photo',
                 icon: const Icon(Icons.document_scanner_outlined),
-                onPressed: onScan,
+                onPressed: widget.onScan,
               ),
               IconButton(
                 tooltip: 'Dictate into the working notes',
                 icon: const Icon(Icons.mic_none_outlined),
-                onPressed: onDictate,
+                onPressed: widget.onDictate,
               ),
             ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              smartTextWrap(
-                controller: controller,
-                focusNode: focusNode,
-                registry: smartPhrases,
-                scope: scope,
-                field: TextField(
+              if (showPreview)
+                // Read-only rendered view — tap to go back to editing.
+                GestureDetector(
+                  onTap: () => setState(() => _preview = false),
+                  child: Container(
+                    width: double.infinity,
+                    constraints: const BoxConstraints(minHeight: 72),
+                    padding: EdgeInsets.symmetric(vertical: m.spaceXs),
+                    child: MarkdownView(data: controller.text),
+                  ),
+                )
+              else
+                smartTextWrap(
                   controller: controller,
-                  focusNode: focusNode,
-                  maxLines: null,
-                  minLines: 3,
-                  keyboardType: TextInputType.multiline,
-                  textCapitalization: TextCapitalization.sentences,
-                  style: context.texts.bodyMedium,
-                  decoration: InputDecoration(
-                    hintText: 'Whatever the consultation produced, in any '
-                        'order. Nothing here is part of the signed note.',
-                    hintStyle: context.texts.bodySmall
-                        ?.copyWith(color: palette.onSurfaceMuted),
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    filled: false,
-                    contentPadding: EdgeInsets.zero,
+                  focusNode: widget.focusNode,
+                  registry: widget.smartPhrases,
+                  scope: widget.scope,
+                  field: TextField(
+                    controller: controller,
+                    focusNode: widget.focusNode,
+                    maxLines: null,
+                    minLines: 3,
+                    keyboardType: TextInputType.multiline,
+                    textCapitalization: TextCapitalization.sentences,
+                    style: context.texts.bodyMedium,
+                    decoration: InputDecoration(
+                      hintText: 'Whatever the consultation produced, in any '
+                          'order. Nothing here is part of the signed note.',
+                      hintStyle: context.texts.bodySmall
+                          ?.copyWith(color: palette.onSurfaceMuted),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      filled: false,
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ),
                 ),
-              ),
               if (hasText) ...<Widget>[
                 SizedBox(height: m.spaceSm),
                 AiGlowBorder(
                   active: isDrafting,
                   borderRadius: BorderRadius.circular(m.radiusSm),
                   child: FilledButton.tonalIcon(
-                    onPressed: isDrafting ? null : onSort,
+                    onPressed: isDrafting ? null : widget.onSort,
                     icon: isDrafting
                         ? const AiSparkleIcon(size: 18)
                         : const Icon(Icons.auto_awesome_outlined, size: 18),
