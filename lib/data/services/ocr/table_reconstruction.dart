@@ -17,27 +17,49 @@ class OcrLine {
   double get cy => y + h / 2;
 }
 
-/// Rebuilds layout from recognised line boxes: a Markdown table when the text
-/// is laid out in columns, plain lines otherwise.
+/// Rebuilds page layout from recognised line boxes as a *mix* of prose and
+/// tables — only the parts that are genuinely laid out in columns become
+/// Markdown tables; everything else stays plain text.
 ///
-/// Deterministic geometry, not a model — it groups boxes into rows by vertical
-/// position and into columns by horizontal position, so a table on the page
-/// stays a table rather than collapsing into one run-on stream. Conservative:
-/// it only emits a table when the layout clearly is one, and always leaves
-/// readable text behind when it is not.
+/// Deterministic geometry, not a model. Most of a page (a letterhead, a
+/// paragraph, a signed section) is not a table, and forcing it into one is
+/// worse than leaving it alone — so a run only becomes a table when several
+/// *consecutive* rows share aligned multi-column structure. Everything outside
+/// such a run is emitted as prose.
 String reconstructMarkdown(List<OcrLine> lines) {
   if (lines.isEmpty) return '';
-  final sorted = <OcrLine>[...lines]..sort((a, b) => a.cy.compareTo(b.cy));
+  final rows = _rows(lines);
 
+  final blocks = <String>[];
+  var i = 0;
+  while (i < rows.length) {
+    final run = _tableRun(rows, i);
+    if (run.length >= 2) {
+      blocks.add(_tableMarkdown(run));
+      i += run.length;
+    } else {
+      final prose = <String>[];
+      while (i < rows.length && _tableRun(rows, i).length < 2) {
+        prose.add(rows[i].map((l) => l.text).join(' '));
+        i++;
+      }
+      blocks.add(prose.join('\n'));
+    }
+  }
+  return blocks.join('\n\n').trim();
+}
+
+/// Groups lines into rows by vertical proximity; each row is sorted left→right.
+List<List<OcrLine>> _rows(List<OcrLine> lines) {
+  final sorted = <OcrLine>[...lines]..sort((a, b) => a.cy.compareTo(b.cy));
   final heights = sorted.map((l) => l.h).toList()..sort();
   final medianH = heights[heights.length ~/ 2];
-  final rowGap = math.max(medianH * 0.7, 0.008);
+  final gap = math.max(medianH * 0.6, 0.006);
 
-  // Group into rows by vertical proximity.
   final rows = <List<OcrLine>>[];
   var current = <OcrLine>[sorted.first];
   for (final line in sorted.skip(1)) {
-    if ((line.cy - current.last.cy).abs() <= rowGap) {
+    if ((line.cy - current.last.cy).abs() <= gap) {
       current.add(line);
     } else {
       rows.add(current);
@@ -48,18 +70,45 @@ String reconstructMarkdown(List<OcrLine> lines) {
   for (final row in rows) {
     row.sort((a, b) => a.cx.compareTo(b.cx));
   }
+  return rows;
+}
 
-  final cols = rows.fold<int>(0, (mx, r) => math.max(mx, r.length));
-  final multiCellRows = rows.where((r) => r.length >= 2).length;
-  final looksTabular = rows.length >= 2 && cols >= 2 && multiCellRows >= 2;
+/// How far (normalised) a cell centre may sit from a column centre and still
+/// count as that column.
+const double _columnTolerance = 0.08;
 
-  if (!looksTabular) {
-    return rows.map((r) => r.map((l) => l.text).join(' ')).join('\n');
+/// The consecutive rows starting at [start] that form one aligned table. Length
+/// 1 (or 0) means "not a table here".
+List<List<OcrLine>> _tableRun(List<List<OcrLine>> rows, int start) {
+  final first = rows[start];
+  if (first.length < 2) return <List<OcrLine>>[first];
+
+  final centres = first.map((l) => l.cx).toList();
+  final run = <List<OcrLine>>[first];
+  for (var j = start + 1; j < rows.length; j++) {
+    final row = rows[j];
+    if (row.length < 2 || row.length > centres.length) break;
+    if (!_alignsTo(row, centres)) break;
+    run.add(row);
   }
+  return run;
+}
 
-  // Column centres come from the widest row; each cell joins the nearest column.
-  final anchor = rows.firstWhere((r) => r.length == cols);
-  final centres = anchor.map((l) => l.cx).toList();
+/// Every cell in [row] sits within tolerance of one of the [centres].
+bool _alignsTo(List<OcrLine> row, List<double> centres) {
+  for (final cell in row) {
+    var nearest = double.infinity;
+    for (final c in centres) {
+      nearest = math.min(nearest, (cell.cx - c).abs());
+    }
+    if (nearest > _columnTolerance) return false;
+  }
+  return true;
+}
+
+String _tableMarkdown(List<List<OcrLine>> run) {
+  final centres = run.first.map((l) => l.cx).toList();
+  final cols = centres.length;
 
   List<String> toCells(List<OcrLine> row) {
     final cells = List<String>.filled(cols, '');
@@ -79,7 +128,7 @@ String reconstructMarkdown(List<OcrLine> lines) {
     return cells;
   }
 
-  final grid = rows.map(toCells).toList();
+  final grid = run.map(toCells).toList();
   final buffer = StringBuffer()
     ..writeln('| ${grid.first.join(' | ')} |')
     ..writeln('| ${List<String>.filled(cols, '---').join(' | ')} |');

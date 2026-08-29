@@ -41,6 +41,30 @@ void main() {
     expect(md, contains('| 1 | 2 |'));
   });
 
+  test('mixed page: prose stays prose, only the aligned run is a table', () {
+    final md = reconstructMarkdown(<OcrLine>[
+      line('Referred by Dr Smith', 0.10, 0.05),
+      line('Test', 0.10, 0.15), line('Value', 0.60, 0.15),
+      line('Sodium', 0.10, 0.22), line('140', 0.60, 0.22),
+      line('Signed, Dr Jones', 0.10, 0.32),
+    ]);
+    expect(md, contains('Referred by Dr Smith'));
+    expect(md, contains('| Test | Value |'));
+    expect(md, contains('| Sodium | 140 |'));
+    expect(md, contains('Signed, Dr Jones'));
+    // The prose lines are not pulled into the table.
+    expect(md, isNot(contains('| Referred')));
+    expect(md, isNot(contains('| Signed')));
+  });
+
+  test('two aligned columns over only one row is not forced into a table', () {
+    // A single line that happens to have two runs is prose, not a 1-row table.
+    final md = reconstructMarkdown(<OcrLine>[
+      line('Name: John', 0.10, 0.10), line('DOB: 1990', 0.60, 0.10),
+    ]);
+    expect(md, isNot(contains('---')));
+  });
+
   test('empty input yields empty string', () {
     expect(reconstructMarkdown(const <OcrLine>[]), '');
   });
