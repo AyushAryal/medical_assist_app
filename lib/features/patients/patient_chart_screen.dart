@@ -18,6 +18,7 @@ import 'widgets/chart_quick_actions.dart';
 import 'widgets/chart_section.dart';
 import 'widgets/chart_section_switcher.dart';
 import 'widgets/chart_trends.dart';
+import 'widgets/record_summary_card.dart';
 
 /// The patient chart: everything known about one person, in the order a
 /// clinician reads it.
@@ -160,9 +161,14 @@ class _PatientChartScreenState extends State<PatientChartScreen> {
     PatientChartController chart,
     Patient patient,
   ) {
+    final summary = chart.recordSummary;
     return <Widget>[
       ChartQuickActions(chart: chart),
       SizedBox(height: context.metrics.spaceLg),
+      if (summary != null) ...<Widget>[
+        RecordSummaryCard(summary: summary),
+        SizedBox(height: context.metrics.spaceLg),
+      ],
       SplitColumns(
         primary: <Widget>[
           if (chart.concerningTrends.isNotEmpty)

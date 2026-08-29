@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../clinical/insights/trend_analysis.dart';
 import '../../clinical/patient_age.dart';
+import '../../clinical/summary/record_summary.dart';
 import '../../data/models/allergy.dart';
 import '../../data/models/clinical_note.dart';
 import '../../data/models/attachment.dart';
@@ -12,6 +13,7 @@ import '../../data/models/problem.dart';
 import '../../data/models/vitals_record.dart';
 import '../../data/repositories/clinical_repository.dart';
 import '../../data/services/assist/assist_service.dart';
+import '../../data/summary/chart_summary.dart';
 
 /// Loads everything the chart shows in one pass.
 ///
@@ -84,6 +86,22 @@ class PatientChartController extends ChangeNotifier {
 
   List<Medication> get activeMedications =>
       _medications.where((m) => m.isActive).toList(growable: false);
+
+  /// A deterministic, sourced prime-the-chart pre-read of the loaded record —
+  /// honest about what is not recorded. Null until the patient has loaded.
+  /// Computed from data already on screen, so it costs no extra query.
+  RecordSummary? get recordSummary {
+    final p = _patient;
+    if (p == null) return null;
+    return ChartSummary.build(
+      patient: p,
+      allergies: _allergies,
+      activeProblems: activeProblems,
+      activeMedications: activeMedications,
+      latestVitals: latestVitals,
+      asOf: DateTime.now(),
+    );
+  }
 
   Encounter? get openEncounter =>
       _encounters.where((e) => e.isOpen).firstOrNull;
