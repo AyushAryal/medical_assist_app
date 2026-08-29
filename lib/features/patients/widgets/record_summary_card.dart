@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../clinical/flags/clinical_flag.dart';
 import '../../../clinical/summary/record_summary.dart';
 import '../../../core/design/design.dart';
+import '../../assist/assist.dart';
 
 /// The prime-the-chart pre-read: allergies, problems, medications, the latest
 /// observations and when the patient was last seen, at a glance — with the
@@ -39,6 +40,7 @@ class RecordSummaryCard extends StatelessWidget {
     return SectionCard(
       title: 'Pre-read',
       leading: const Icon(Icons.assignment_ind_outlined, size: 20),
+      trailing: SpeakButton(text: summary.plainText),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[

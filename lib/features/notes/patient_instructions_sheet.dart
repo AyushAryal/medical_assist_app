@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/design/design.dart';
 import '../../data/services/assist/note_drafting.dart';
+import '../assist/assist.dart';
 
 /// What to do with a generated patient-instructions draft.
 enum InstructionsAction { dismissed, appended, copied }
@@ -67,6 +68,7 @@ class PatientInstructionsSheet extends StatelessWidget {
                     style: context.texts.titleMedium,
                   ),
                 ),
+                SpeakButton(text: draft.text),
                 const AiBadge(dense: true),
               ],
             ),

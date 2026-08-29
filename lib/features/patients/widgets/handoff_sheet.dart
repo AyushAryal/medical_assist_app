@@ -143,12 +143,7 @@ class _SpokenSection extends StatelessWidget {
           children: <Widget>[
             const AiBadge(),
             const Spacer(),
-            IconButton(
-              tooltip: 'Read aloud',
-              visualDensity: VisualDensity.compact,
-              icon: const Icon(Icons.volume_up_outlined, size: 20),
-              onPressed: () => speakAloud(context, d.text),
-            ),
+            SpeakButton(text: d.text),
             IconButton(
               tooltip: 'Copy spoken version',
               visualDensity: VisualDensity.compact,

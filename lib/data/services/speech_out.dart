@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 /// One installed system voice.
@@ -39,7 +40,33 @@ abstract final class SpeechOut {
   /// updated by the voice picker.
   static String? preferredVoiceId;
 
+  /// Whether speech is currently playing — driven by the platform so every
+  /// read-aloud control reflects the same state (one utterance plays at a time).
+  static final ValueNotifier<bool> speaking = ValueNotifier<bool>(false);
+
+  static bool _handlerInstalled = false;
+
+  static void _ensureHandler() {
+    if (_handlerInstalled) return;
+    _handlerInstalled = true;
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'state' && call.arguments is Map) {
+        speaking.value = (call.arguments as Map)['speaking'] == true;
+      }
+      return null;
+    });
+  }
+
   static Future<void> speak(String text) => _speak(text, preferredVoiceId);
+
+  /// Speaks [text], or stops if something is already playing.
+  static Future<void> toggle(String text) async {
+    if (speaking.value) {
+      await stop();
+    } else {
+      await speak(text);
+    }
+  }
 
   /// Speaks with an explicit voice — used to preview a voice before choosing it.
   static Future<void> preview(String text, String voiceId) =>
@@ -47,16 +74,19 @@ abstract final class SpeechOut {
 
   static Future<void> _speak(String text, String? voiceId) async {
     if (text.trim().isEmpty) return;
+    _ensureHandler();
     final args = <String, Object?>{'text': text};
     if (voiceId != null) args['voiceId'] = voiceId;
     try {
       await _channel.invokeMethod<bool>('speak', args);
+      speaking.value = true; // platform confirms via the state callback
     } on Object {
       // No synthesiser on this platform — silence is an acceptable outcome.
     }
   }
 
   static Future<void> stop() async {
+    speaking.value = false;
     try {
       await _channel.invokeMethod<bool>('stop');
     } on Object {

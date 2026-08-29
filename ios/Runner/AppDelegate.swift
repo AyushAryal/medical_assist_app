@@ -28,9 +28,31 @@ import FoundationModels
 ///
 /// Native, offline, no dependency — "read aloud" that actually speaks. The
 /// synthesiser is held statically so it is not deallocated mid-utterance.
+/// Forwards synthesiser start/stop to Dart so every "read aloud" control can
+/// show whether speech is playing.
+final class TtsStateRelay: NSObject, AVSpeechSynthesizerDelegate {
+  private let channel: FlutterMethodChannel
+  init(channel: FlutterMethodChannel) { self.channel = channel }
+
+  private func send(_ speaking: Bool) {
+    channel.invokeMethod("state", arguments: ["speaking": speaking])
+  }
+
+  func speechSynthesizer(_ s: AVSpeechSynthesizer, didStart u: AVSpeechUtterance) {
+    send(true)
+  }
+  func speechSynthesizer(_ s: AVSpeechSynthesizer, didFinish u: AVSpeechUtterance) {
+    send(false)
+  }
+  func speechSynthesizer(_ s: AVSpeechSynthesizer, didCancel u: AVSpeechUtterance) {
+    send(false)
+  }
+}
+
 enum AppleSpeech {
   static let channelName = "app.medical/tts"
   static let synthesizer = AVSpeechSynthesizer()
+  static var relay: TtsStateRelay?
 
   static func register(with registry: FlutterPluginRegistry) {
     guard let registrar = registry.registrar(forPlugin: "AppleSpeech") else {
@@ -40,6 +62,9 @@ enum AppleSpeech {
       name: channelName,
       binaryMessenger: registrar.messenger()
     )
+    // Held statically so the delegate is not deallocated.
+    relay = TtsStateRelay(channel: channel)
+    synthesizer.delegate = relay
     channel.setMethodCallHandler { call, result in
       switch call.method {
       case "speak":

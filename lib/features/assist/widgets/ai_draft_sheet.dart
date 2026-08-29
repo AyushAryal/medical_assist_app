@@ -6,7 +6,7 @@ import '../../../core/app_bootstrap.dart';
 import '../../../core/design/design.dart';
 import '../../../data/services/assist/language_model.dart';
 import '../../../data/services/speech_out.dart';
-import '../speak_aloud.dart';
+import 'speak_button.dart';
 
 /// A reusable sheet for a single generated draft.
 ///
@@ -171,12 +171,7 @@ class _AiDraftSheetState extends State<AiDraftSheet> {
             children: <Widget>[
               const AiBadge(),
               const Spacer(),
-              IconButton(
-                tooltip: 'Read aloud',
-                visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.volume_up_outlined, size: 20),
-                onPressed: () => speakAloud(context, draft.text),
-              ),
+              SpeakButton(text: draft.text),
             ],
           ),
           SizedBox(height: m.spaceSm),
