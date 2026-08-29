@@ -384,46 +384,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ],
                     ),
-                    SizedBox(height: m.spaceMd),
-                    Row(
-                      children: <Widget>[
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _demoBusy
-                                ? null
-                                : () => _runDemoAction(
-                                    (s) => s.seed(),
-                                    (n) => 'Added $n demo patients.',
-                                  ),
-                            icon: const Icon(Icons.add_chart),
-                            label: const Text('Load'),
-                          ),
-                        ),
-                        SizedBox(width: m.spaceSm),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _demoBusy || _demoPatients == 0
-                                ? null
-                                : () async {
-                                    final ok = await _confirm(
-                                      'Remove demo data?',
-                                      'This removes only the fictional '
-                                          '"(DEMO)" records. Real patient '
-                                          'records are not affected.',
-                                      'Remove',
-                                    );
-                                    if (ok) {
-                                      await _runDemoAction(
-                                        (s) => s.clear(),
-                                        (n) => 'Removed $n demo patients.',
-                                      );
-                                    }
-                                  },
-                            icon: const Icon(Icons.delete_outline),
-                            label: const Text('Remove'),
-                          ),
-                        ),
-                      ],
+                    SizedBox(height: m.spaceSm),
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Load demo data'),
+                      subtitle: Text(
+                        _demoBusy
+                            ? 'Working…'
+                            : _demoPatients > 0
+                                ? 'Fictional "(DEMO)" records are loaded'
+                                : 'Off — no demo records',
+                        style: context.texts.bodySmall,
+                      ),
+                      value: _demoPatients > 0,
+                      onChanged: _demoBusy
+                          ? null
+                          : (on) async {
+                              if (on) {
+                                await _runDemoAction(
+                                  (s) => s.seed(),
+                                  (n) => 'Added $n demo patients.',
+                                );
+                              } else {
+                                final ok = await _confirm(
+                                  'Remove demo data?',
+                                  'This removes only the fictional "(DEMO)" '
+                                      'records. Real patient records are not '
+                                      'affected.',
+                                  'Remove',
+                                );
+                                if (ok) {
+                                  await _runDemoAction(
+                                    (s) => s.clear(),
+                                    (n) => 'Removed $n demo patients.',
+                                  );
+                                }
+                              }
+                            },
                     ),
                   ],
                 ),
