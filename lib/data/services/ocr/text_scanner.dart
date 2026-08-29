@@ -1,3 +1,7 @@
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/services.dart' show MethodChannel;
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
 /// Text lifted off an image.
@@ -24,6 +28,14 @@ class ScannedText {
 abstract interface class TextScanner {
   Future<ScannedText> scan(String imagePath);
   Future<void> dispose();
+
+  /// The best recogniser for this platform: Apple's native Vision engine on
+  /// iOS (no bundled model, uses the OS), the bundled ML Kit model everywhere
+  /// else. Same seam, so callers never branch on platform.
+  factory TextScanner.platformDefault() {
+    if (!kIsWeb && Platform.isIOS) return AppleVisionTextScanner();
+    return MlKitTextScanner();
+  }
 }
 
 /// ML Kit's Latin-script recogniser, bundled in the app and run offline.
@@ -40,4 +52,25 @@ class MlKitTextScanner implements TextScanner {
 
   @override
   Future<void> dispose() => _recognizer.close();
+}
+
+/// Apple's Vision framework over a method channel — native, on-device, no
+/// bundled model. The Swift side lives in `ios/Runner/AppleVisionOcr.swift`.
+class AppleVisionTextScanner implements TextScanner {
+  static const MethodChannel _channel = MethodChannel('app.medical/ocr');
+
+  @override
+  Future<ScannedText> scan(String imagePath) async {
+    final result = await _channel.invokeMapMethod<String, Object?>(
+      'recognize',
+      <String, Object?>{'path': imagePath},
+    );
+    return ScannedText(
+      text: (result?['text'] as String?) ?? '',
+      blockCount: (result?['blocks'] as int?) ?? 0,
+    );
+  }
+
+  @override
+  Future<void> dispose() async {}
 }

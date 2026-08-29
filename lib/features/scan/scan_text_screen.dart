@@ -22,7 +22,7 @@ class ScanTextScreen extends StatefulWidget {
 
 class _ScanTextScreenState extends State<ScanTextScreen>
     with SingleTickerProviderStateMixin {
-  final TextScanner _scanner = MlKitTextScanner();
+  final TextScanner _scanner = TextScanner.platformDefault();
   late final AnimationController _sweep = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1400),
