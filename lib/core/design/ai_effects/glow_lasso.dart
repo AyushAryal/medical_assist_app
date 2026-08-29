@@ -96,35 +96,35 @@ class _GlowLassoPainter extends CustomPainter {
     for (final p in points.skip(1)) {
       path.lineTo(p.dx * size.width, p.dy * size.height);
     }
-    final bounds = path.getBounds().inflate(24);
-
-    // A soft pulsing halo.
-    canvas.drawPath(
-      path,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round
-        ..strokeWidth = 16
-        ..color = glow.withValues(alpha: 0.16 + 0.18 * pulse)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
-    );
-
-    // The gradient stroke, sliding along the loop.
+    final bounds = path.getBounds().inflate(36);
     final shader = LinearGradient(
       colors: colors,
       tileMode: TileMode.repeated,
       transform: _SlidingGradient(t),
     ).createShader(bounds);
-    canvas.drawPath(
-      path,
-      Paint()
+
+    Paint stroke(double width, double blur, double alpha, {bool grad = false}) {
+      final p = Paint()
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round
-        ..strokeWidth = 4.5
-        ..shader = shader,
-    );
+        ..strokeWidth = width;
+      if (blur > 0) p.maskFilter = MaskFilter.blur(BlurStyle.normal, blur);
+      if (grad) {
+        p.shader = shader;
+      } else {
+        p.color = glow.withValues(alpha: alpha);
+      }
+      return p;
+    }
+
+    // Wide soft outer halo, a tighter inner halo, then a blurred gradient bloom
+    // and finally the crisp gradient stroke on top — layered so it reads as
+    // genuinely glowing, not just a coloured line.
+    canvas.drawPath(path, stroke(34, 22, 0.10 + 0.14 * pulse));
+    canvas.drawPath(path, stroke(18, 10, 0.20 + 0.22 * pulse));
+    canvas.drawPath(path, stroke(9, 6, 0, grad: true));
+    canvas.drawPath(path, stroke(4.5, 0, 0, grad: true));
   }
 
   @override

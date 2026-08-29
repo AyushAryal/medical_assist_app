@@ -251,13 +251,36 @@ enum AppleVisionOcr {
       request.regionOfInterest = region
     }
 
-    let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+    // Pass the photo's orientation, or Vision reads the raw (often sideways)
+    // pixels while Flutter shows it upright — the region and the recognised
+    // text would then come from the wrong part of the page.
+    let handler = VNImageRequestHandler(
+      cgImage: cgImage,
+      orientation: cgOrientation(image.imageOrientation),
+      options: [:]
+    )
     DispatchQueue.global(qos: .userInitiated).async {
       do {
         try handler.perform([request])
       } catch {
         fail("ocr_failed", error.localizedDescription)
       }
+    }
+  }
+
+  private static func cgOrientation(
+    _ orientation: UIImage.Orientation
+  ) -> CGImagePropertyOrientation {
+    switch orientation {
+    case .up: return .up
+    case .down: return .down
+    case .left: return .left
+    case .right: return .right
+    case .upMirrored: return .upMirrored
+    case .downMirrored: return .downMirrored
+    case .leftMirrored: return .leftMirrored
+    case .rightMirrored: return .rightMirrored
+    @unknown default: return .up
     }
   }
 }
