@@ -1,4 +1,5 @@
 import '../../clinical/flags/clinical_flag.dart';
+import '../../clinical/flags/red_flag_rule.dart';
 import '../../clinical/patient_age.dart';
 import '../../clinical/worklist/triage_worklist.dart';
 import '../models/appointment.dart';
@@ -52,14 +53,18 @@ abstract final class TriageAssembly {
       observations: vitals?.news2Input,
       vitalsRecordedAt: vitals?.recordedAt,
       vitalsRecordId: vitals?.id,
-      flags: _flagsOf(patient, vitals),
+      flags: _flagsOf(patient, r.appointment),
     );
   }
 
-  /// Only *critical* flags change triage precedence, so this starts empty:
-  /// the deterministic NEWS2 path carries the first board. Note-derived red
-  /// flags (chest pain and the like) plug in here next, via NoteIntelligence,
-  /// without touching the ranking rule.
-  static List<ClinicalFlag> _flagsOf(Patient patient, VitalsRecord? vitals) =>
-      const <ClinicalFlag>[];
+  /// Red flags from the presenting complaint. A waiting patient may have no
+  /// note yet, but their reason for coming is already on the appointment —
+  /// "chest pain" there should pull them into the attention tier before any
+  /// vitals are taken. Uses the shared red-flag dictionary, negation and all.
+  static List<ClinicalFlag> _flagsOf(Patient patient, Appointment appointment) {
+    final text = <String?>[appointment.reason, appointment.notes]
+        .where((s) => s != null && s.trim().isNotEmpty)
+        .join('. ');
+    return RedFlagRule.fromText(patient.id, text, source: 'Presenting complaint');
+  }
 }

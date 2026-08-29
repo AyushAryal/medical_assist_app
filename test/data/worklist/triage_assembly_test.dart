@@ -30,6 +30,7 @@ void main() {
   Appointment arrived({
     required String patientId,
     DateTime? arrivedAt,
+    String? reason,
   }) =>
       Appointment(
         id: 'appt-$patientId',
@@ -38,6 +39,7 @@ void main() {
         scheduledAt: asOf.subtract(const Duration(hours: 1)),
         status: AppointmentStatus.arrived,
         arrivedAt: arrivedAt,
+        reason: reason,
         createdAt: epoch,
         updatedAt: epoch,
       );
@@ -126,6 +128,32 @@ void main() {
     final s = model.subjects.single;
     expect(s.isScored, isFalse);
     expect(s.unavailableReason, News2Unavailable.ageOutOfScope);
+  });
+
+  test('a red-flag presenting complaint becomes a critical flag', () {
+    final model = TriageAssembly.build(asOf: asOf, records: [
+      (
+        appointment: arrived(patientId: 'p', reason: 'chest pain'),
+        patient: patient(id: 'p', mrn: '001', dob: DateTime(1980)),
+        latestVitals: null,
+      ),
+    ]);
+    final s = model.subjects.single;
+    // No vitals, but the complaint pulls them into attention, not needs-obs.
+    expect(s.isScored, isFalse);
+    expect(s.hasCriticalFlag, isTrue);
+    expect(s.flags.single.title, contains('Chest pain'));
+  });
+
+  test('an ordinary reason raises no flag', () {
+    final model = TriageAssembly.build(asOf: asOf, records: [
+      (
+        appointment: arrived(patientId: 'p', reason: 'medication review'),
+        patient: patient(id: 'p', mrn: '001', dob: DateTime(1980)),
+        latestVitals: null,
+      ),
+    ]);
+    expect(model.subjects.single.hasCriticalFlag, isFalse);
   });
 
   test('a complete adult observation set scores, carrying the vitals row id', () {
