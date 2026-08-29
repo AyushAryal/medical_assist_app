@@ -12,6 +12,7 @@ import '../assist/assist.dart';
 import '../vitals/vitals.dart';
 import 'chart_entry_sheets.dart';
 import 'patient_chart_controller.dart';
+import 'smart_intake_screen.dart';
 import 'visit_record_view.dart';
 import 'widgets/chart_details.dart';
 import 'widgets/chart_lists.dart';
@@ -96,6 +97,19 @@ class _PatientChartScreenState extends State<PatientChartScreen> {
                   phone: patient.phone,
                   patientName: patient.displayName,
                   compact: true,
+                ),
+                IconButton(
+                  tooltip: 'Smart intake',
+                  icon: const Icon(Icons.playlist_add),
+                  onPressed: () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) =>
+                            SmartIntakeScreen(patientId: patient.id),
+                      ),
+                    );
+                    await chart.refresh();
+                  },
                 ),
                 IconButton(
                   tooltip: 'Edit demographics',

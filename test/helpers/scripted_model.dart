@@ -102,6 +102,12 @@ class ScriptedModel implements LanguageModelEngine {
   }
 
   @override
+  Future<LanguageModelDraft> caseloadReport(String figures) async {
+    sawText = figures;
+    return LanguageModelDraft(text: rewrite ?? figures, engineName: name);
+  }
+
+  @override
   Future<String?> extractValues(
     String description, {
     required List<String> fields,

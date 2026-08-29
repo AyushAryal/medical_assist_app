@@ -332,6 +332,18 @@ class LlamaEngine implements LanguageModelEngine {
     return _draft(answer ?? data);
   }
 
+  @override
+  Future<LanguageModelDraft> caseloadReport(String figures) async {
+    final answer = await _complete(
+      'Write a short, plain-language brief of the clinic\'s day from these '
+      'figures. State the numbers and what stands out. Add no facts, no '
+      'advice, no diagnosis.',
+      figures,
+      maxTokens: 320,
+    );
+    return _draft(answer ?? figures);
+  }
+
   LanguageModelDraft _draft(String text) =>
       LanguageModelDraft(text: text, engineName: name);
 

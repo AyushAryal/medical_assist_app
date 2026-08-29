@@ -65,6 +65,10 @@ abstract interface class LanguageModelEngine {
   /// their direction only, never a diagnosis or advice, and adding no facts.
   Future<LanguageModelDraft> explainPlainly(String data);
 
+  /// Turns the clinic's figures for the day into a short plain-language brief —
+  /// the numbers and what stands out, no advice, no new facts.
+  Future<LanguageModelDraft> caseloadReport(String figures);
+
   /// Says which SOAP section each numbered sentence belongs to.
   ///
   /// Classification, not generation — the reply is expected to be section

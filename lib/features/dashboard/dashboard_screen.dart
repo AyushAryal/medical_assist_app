@@ -3,9 +3,11 @@ import 'package:provider/provider.dart';
 
 import '../../core/design/design.dart';
 
+import '../../core/app_bootstrap.dart';
 import '../../core/session/session_controller.dart';
 import '../../data/repositories/clinical_repository.dart';
 import '../appointments/appointments.dart';
+import '../assist/assist.dart';
 import '../clinics/clinics.dart';
 import '../recall/recall.dart';
 import '../triage/triage.dart';
@@ -52,6 +54,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _controller?.dispose();
     super.dispose();
   }
+
+  static String _caseloadFigures(DashboardController d) => <String>[
+        'Patients waiting now: ${d.waitingCount}',
+        'Appointments remaining today: ${d.remainingToday}',
+        'Encounters today: ${d.todayEncounterCount}',
+        'Observation sets today: ${d.todayVitalsCount}',
+        'Unsigned notes: ${d.draftNoteCount}',
+        'Follow-ups due: ${d.followUpsDue.length}',
+        'Observations flagged today: ${d.flagged.length}',
+        'Registered patients: ${d.patientCount}',
+      ].join('\n');
 
   static String _greeting(DateTime now) {
     if (now.hour < 12) return 'Good morning';
@@ -162,6 +175,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           },
                         ),
                         SizedBox(height: m.spaceLg),
+                        if (context.watch<AppBootstrap>().assistModelActive) ...<Widget>[
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: OutlinedButton.icon(
+                              onPressed: () => AiDraftSheet.show(
+                                context,
+                                title: 'Daily brief',
+                                subtitle: session.activeClinic?.name,
+                                notice: 'Generated from today\'s figures.',
+                                generate: (engine) => engine
+                                    .caseloadReport(_caseloadFigures(dashboard)),
+                              ),
+                              icon: const Icon(Icons.auto_awesome, size: 18),
+                              label: const Text('Daily brief'),
+                            ),
+                          ),
+                          SizedBox(height: m.spaceLg),
+                        ],
                         // Who is next, and anything abnormal, always come
                         // first and always full width — they are the two
                         // things that must not be missed, and putting them in

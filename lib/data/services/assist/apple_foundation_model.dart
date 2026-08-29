@@ -126,6 +126,17 @@ class AppleFoundationLanguageModel implements LanguageModelEngine {
   }
 
   @override
+  Future<LanguageModelDraft> caseloadReport(String figures) async {
+    final answer = await _complete(
+      'Write a short, plain-language brief of the clinic\'s day from these '
+      'figures. State the numbers and what stands out. Add no facts, no '
+      'advice, no diagnosis.',
+      figures,
+    );
+    return _draft(answer ?? figures);
+  }
+
+  @override
   Future<String?> assignSentencesToSections(List<String> numberedSentences) {
     return _complete(
       'For each numbered sentence, say which SOAP section it belongs to '
