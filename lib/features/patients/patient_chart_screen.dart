@@ -8,6 +8,7 @@ import '../../core/routing/app_router.dart';
 import '../../data/models/patient.dart';
 import '../../data/repositories/clinical_repository.dart';
 import '../../core/app_bootstrap.dart';
+import '../assist/assist.dart';
 import '../vitals/vitals.dart';
 import 'chart_entry_sheets.dart';
 import 'patient_chart_controller.dart';
@@ -163,6 +164,7 @@ class _PatientChartScreenState extends State<PatientChartScreen> {
     Patient patient,
   ) {
     final summary = chart.recordSummary;
+    final aiActive = context.watch<AppBootstrap>().assistModelActive;
     return <Widget>[
       ChartQuickActions(chart: chart),
       SizedBox(height: context.metrics.spaceLg),
@@ -173,6 +175,14 @@ class _PatientChartScreenState extends State<PatientChartScreen> {
             final handoff = chart.handoff;
             if (handoff != null) HandoffSheet.show(context, handoff);
           },
+          onBrief: !aiActive
+              ? null
+              : () => AiDraftSheet.show(
+                    context,
+                    title: 'Spoken brief',
+                    subtitle: patient.displayName,
+                    generate: (engine) => engine.spokenBrief(summary.plainText),
+                  ),
         ),
         SizedBox(height: context.metrics.spaceLg),
       ],

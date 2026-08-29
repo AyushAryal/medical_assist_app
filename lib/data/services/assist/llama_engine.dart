@@ -271,6 +271,42 @@ class LlamaEngine implements LanguageModelEngine {
     return _draft(answer ?? structuredHandoff);
   }
 
+  @override
+  Future<LanguageModelDraft> spokenBrief(String structuredSummary) async {
+    final answer = await _complete(
+      'Rewrite this patient summary as one short, natural paragraph to hear '
+      'before a consultation. Keep every fact and add none; where a line says '
+      'something is "not recorded", say so.',
+      structuredSummary,
+      maxTokens: 320,
+    );
+    return _draft(answer ?? structuredSummary);
+  }
+
+  @override
+  Future<LanguageModelDraft> patientReminder(String reviewContext) async {
+    final answer = await _complete(
+      'Write a short, warm, plain-language appointment reminder for a patient '
+      'whose review is due, using only the facts given. No medical advice, no '
+      'new facts, no diagnosis — just a friendly reminder to book.',
+      reviewContext,
+      maxTokens: 200,
+    );
+    return _draft(answer ?? reviewContext);
+  }
+
+  @override
+  Future<LanguageModelDraft> triageTalkingPoints(String presentation) async {
+    final answer = await _complete(
+      'List 3 to 5 focused questions or examination points a clinician might '
+      'consider for this presentation. These are prompts to consider, not a '
+      'diagnosis and not instructions. Add no new facts. One per line.',
+      presentation,
+      maxTokens: 256,
+    );
+    return _draft(answer ?? '');
+  }
+
   LanguageModelDraft _draft(String text) =>
       LanguageModelDraft(text: text, engineName: name);
 

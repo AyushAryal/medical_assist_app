@@ -5,10 +5,12 @@ import 'package:provider/provider.dart';
 import '../../clinical/news2.dart';
 import '../../clinical/worklist/triage_worklist.dart';
 import '../../clinical/worklist/worklist.dart';
+import '../../core/app_bootstrap.dart';
 import '../../core/design/design.dart';
 import '../../core/routing/app_router.dart';
 import '../../core/session/session_controller.dart';
 import '../../data/repositories/clinical_repository.dart';
+import '../assist/assist.dart';
 import 'triage_board_controller.dart';
 
 /// "Who do I see first." Ranks the waiting room by acuity and holds the
@@ -78,6 +80,9 @@ class _TriageBoardScreenState extends State<TriageBoardScreen> {
                               title: 'Attention',
                               entries: c.attention,
                               controller: c,
+                              aiActive: context
+                                  .watch<AppBootstrap>()
+                                  .assistModelActive,
                             ),
                           if (c.needsObs.isNotEmpty) ...<Widget>[
                             SizedBox(height: m.spaceLg),
@@ -86,6 +91,9 @@ class _TriageBoardScreenState extends State<TriageBoardScreen> {
                               subtitle: 'Risk unknown until vitals are taken.',
                               entries: c.needsObs,
                               controller: c,
+                              aiActive: context
+                                  .watch<AppBootstrap>()
+                                  .assistModelActive,
                             ),
                           ],
                         ],
@@ -104,6 +112,7 @@ class _Section extends StatelessWidget {
     required this.title,
     required this.entries,
     required this.controller,
+    required this.aiActive,
     this.subtitle,
   });
 
@@ -111,6 +120,7 @@ class _Section extends StatelessWidget {
   final String? subtitle;
   final List<WorklistEntry> entries;
   final TriageBoardController controller;
+  final bool aiActive;
 
   @override
   Widget build(BuildContext context) {
@@ -131,6 +141,7 @@ class _Section extends StatelessWidget {
             _TriageRow(
               entry: entry,
               subject: controller.subjectFor(entry.patientId),
+              aiActive: aiActive,
             ),
         ],
       ),
@@ -139,10 +150,28 @@ class _Section extends StatelessWidget {
 }
 
 class _TriageRow extends StatelessWidget {
-  const _TriageRow({required this.entry, required this.subject});
+  const _TriageRow({
+    required this.entry,
+    required this.subject,
+    required this.aiActive,
+  });
 
   final WorklistEntry entry;
   final TriageSubject? subject;
+  final bool aiActive;
+
+  void _talkingPoints(BuildContext context) {
+    final name = subject?.displayName ?? 'the patient';
+    final facts = <String>['Patient: $name', ...entry.reasons].join('. ');
+    AiDraftSheet.show(
+      context,
+      title: 'Talking points',
+      subtitle: name,
+      caveat: 'Prompts to consider — not a diagnosis, not advice. You decide '
+          'what to ask and examine.',
+      generate: (engine) => engine.triageTalkingPoints(facts),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -171,10 +200,21 @@ class _TriageRow extends StatelessWidget {
         child: Text(entry.reasons.join(' · '),
             style: context.texts.bodySmall),
       ),
-      trailing: InfoDot.text(
-        title: 'Why this ranking',
-        summary: entry.reasons.join(' · '),
-        source: _provenanceText(entry),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          if (aiActive)
+            IconButton(
+              tooltip: 'Talking points',
+              icon: const Icon(Icons.auto_awesome_outlined),
+              onPressed: () => _talkingPoints(context),
+            ),
+          InfoDot.text(
+            title: 'Why this ranking',
+            summary: entry.reasons.join(' · '),
+            source: _provenanceText(entry),
+          ),
+        ],
       ),
       onTap: () => context.push(Routes.chartFor(entry.patientId)),
     );

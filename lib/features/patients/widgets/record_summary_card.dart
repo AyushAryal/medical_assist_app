@@ -13,12 +13,21 @@ import '../../../core/design/design.dart';
 /// not hold reads "Not recorded" in a muted tone, and the count of gaps sits
 /// in the header so an absent allergy status cannot pass for a reassuring one.
 class RecordSummaryCard extends StatelessWidget {
-  const RecordSummaryCard({super.key, required this.summary, this.onHandoff});
+  const RecordSummaryCard({
+    super.key,
+    required this.summary,
+    this.onHandoff,
+    this.onBrief,
+  });
 
   final RecordSummary summary;
 
   /// Opens the SBAR handoff built from the same record. Null hides the action.
   final VoidCallback? onHandoff;
+
+  /// Generates an AI spoken brief of this summary. Null hides the action (no
+  /// model installed).
+  final VoidCallback? onBrief;
 
   @override
   Widget build(BuildContext context) {
@@ -36,9 +45,18 @@ class RecordSummaryCard extends StatelessWidget {
               label: const Text('Handoff'),
             ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           for (final section in summary.sections)
             for (final item in section.items) _SummaryRow(item: item),
+          if (onBrief != null) ...<Widget>[
+            SizedBox(height: context.metrics.spaceSm),
+            OutlinedButton.icon(
+              onPressed: onBrief,
+              icon: const Icon(Icons.auto_awesome, size: 18),
+              label: const Text('Brief me'),
+            ),
+          ],
         ],
       ),
     );

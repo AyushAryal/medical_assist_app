@@ -66,6 +66,17 @@ class RecordSummary {
 
   Iterable<SummaryItem> get allItems => sections.expand((s) => s.items);
 
+  /// A flat, deterministic text rendering — one `label: value` per line. Used
+  /// as the input a model rewrites into a spoken brief, so the model only ever
+  /// sees the summary the app already built, never the raw record.
+  String get plainText {
+    final buffer = StringBuffer();
+    for (final item in allItems) {
+      buffer.writeln('${item.label}: ${item.value}');
+    }
+    return buffer.toString().trimRight();
+  }
+
   /// The gaps — every required line the record does not yet hold. Lets a
   /// screen show "3 things not recorded" instead of the reader having to
   /// notice each absence.

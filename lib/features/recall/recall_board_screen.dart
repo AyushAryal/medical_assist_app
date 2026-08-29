@@ -4,9 +4,11 @@ import 'package:provider/provider.dart';
 
 import '../../clinical/worklist/recall_worklist.dart';
 import '../../clinical/worklist/worklist.dart';
+import '../../core/app_bootstrap.dart';
 import '../../core/design/design.dart';
 import '../../core/routing/app_router.dart';
 import '../../data/repositories/clinical_repository.dart';
+import '../assist/assist.dart';
 import 'recall_board_controller.dart';
 
 /// Patients overdue for a review they were promised, most overdue first.
@@ -74,6 +76,12 @@ class _RecallBoardScreenState extends State<RecallBoardScreen> {
                                   _RecallRow(
                                     entry: entry,
                                     subject: c.subjectFor(entry.patientId),
+                                    onReminder: context
+                                            .watch<AppBootstrap>()
+                                            .assistModelActive
+                                        ? () => _reminderFor(context, entry,
+                                            c.subjectFor(entry.patientId))
+                                        : null,
                                   ),
                               ],
                             ),
@@ -89,11 +97,30 @@ class _RecallBoardScreenState extends State<RecallBoardScreen> {
   }
 }
 
+void _reminderFor(
+    BuildContext context, WorklistEntry entry, RecallSubject? subject) {
+  final name = subject?.displayName ?? 'the patient';
+  final facts = <String>['Patient: $name', ...entry.reasons].join('. ');
+  AiDraftSheet.show(
+    context,
+    title: 'Recall reminder',
+    subtitle: name,
+    generate: (engine) => engine.patientReminder(facts),
+  );
+}
+
 class _RecallRow extends StatelessWidget {
-  const _RecallRow({required this.entry, required this.subject});
+  const _RecallRow({
+    required this.entry,
+    required this.subject,
+    this.onReminder,
+  });
 
   final WorklistEntry entry;
   final RecallSubject? subject;
+
+  /// Drafts a patient-friendly reminder message (AI). Null when no model.
+  final VoidCallback? onReminder;
 
   @override
   Widget build(BuildContext context) {
@@ -125,6 +152,13 @@ class _RecallRow extends StatelessWidget {
         padding: EdgeInsets.only(top: m.spaceXs / 2),
         child: Text(entry.reasons.first, style: context.texts.bodySmall),
       ),
+      trailing: onReminder == null
+          ? null
+          : IconButton(
+              tooltip: 'Draft reminder',
+              icon: const Icon(Icons.sms_outlined),
+              onPressed: onReminder,
+            ),
       onTap: () => context.push(Routes.chartFor(entry.patientId)),
     );
   }

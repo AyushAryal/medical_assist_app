@@ -41,6 +41,22 @@ abstract interface class LanguageModelEngine {
   /// a convenience draft, marked as generated.
   Future<LanguageModelDraft> spokenHandoff(String structuredHandoff);
 
+  /// Rewrites a structured record summary as a one-paragraph spoken brief to
+  /// hear before walking into a consultation. Rewriting only: keep every fact,
+  /// add none, keep "not recorded" as not recorded.
+  Future<LanguageModelDraft> spokenBrief(String structuredSummary);
+
+  /// Writes a short, warm, plain-language reminder for a patient whose review
+  /// is due, from the facts given. No medical advice and no new facts — it
+  /// reshapes an appointment reminder, nothing more.
+  Future<LanguageModelDraft> patientReminder(String reviewContext);
+
+  /// Lists a few focused questions or examination points a clinician might
+  /// *consider* for a presentation — prompts, explicitly not a diagnosis or
+  /// instructions, and adding no facts. The weakest-guarantee task here, so
+  /// its output is framed as suggestions only and always marked generated.
+  Future<LanguageModelDraft> triageTalkingPoints(String presentation);
+
   /// Says which SOAP section each numbered sentence belongs to.
   ///
   /// Classification, not generation — the reply is expected to be section

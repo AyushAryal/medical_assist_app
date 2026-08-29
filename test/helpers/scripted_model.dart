@@ -72,6 +72,24 @@ class ScriptedModel implements LanguageModelEngine {
   }
 
   @override
+  Future<LanguageModelDraft> spokenBrief(String structuredSummary) async {
+    sawText = structuredSummary;
+    return LanguageModelDraft(text: rewrite ?? structuredSummary, engineName: name);
+  }
+
+  @override
+  Future<LanguageModelDraft> patientReminder(String reviewContext) async {
+    sawText = reviewContext;
+    return LanguageModelDraft(text: rewrite ?? reviewContext, engineName: name);
+  }
+
+  @override
+  Future<LanguageModelDraft> triageTalkingPoints(String presentation) async {
+    sawText = presentation;
+    return LanguageModelDraft(text: rewrite ?? presentation, engineName: name);
+  }
+
+  @override
   Future<String?> extractValues(
     String description, {
     required List<String> fields,
