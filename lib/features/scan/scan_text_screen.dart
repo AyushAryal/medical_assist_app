@@ -45,6 +45,10 @@ class _ScanTextScreenState extends State<ScanTextScreen>
   /// The freeform loop the user drew, kept to draw the "ink" over the page.
   List<Offset>? _ink;
 
+  /// True while a finger is down drawing — freezes the scroll view so the loop
+  /// is captured instead of scrolling the page.
+  bool _drawing = false;
+
   @override
   void initState() {
     super.initState();
@@ -103,11 +107,14 @@ class _ScanTextScreenState extends State<ScanTextScreen>
     );
   }
 
+  void _onDrawStart() => setState(() => _drawing = true);
+
   void _onDraw(List<Offset> points) => setState(() => _ink = points);
 
   void _onDrawEnd(List<Offset> points) {
     final bounds = _boundsOf(points);
     setState(() {
+      _drawing = false;
       _region = bounds;
       _ink = bounds == null ? null : points;
     });
@@ -131,6 +138,8 @@ class _ScanTextScreenState extends State<ScanTextScreen>
       appBar: AppBar(title: const Text('Scan text')),
       body: ContentWidth(
         child: ListView(
+          // Frozen while drawing so the loop is captured, not scrolled.
+          physics: _drawing ? const NeverScrollableScrollPhysics() : null,
           padding: EdgeInsets.fromLTRB(
               m.spaceLg, m.spaceLg, m.spaceLg, m.spaceLg * 3),
           children: <Widget>[
@@ -141,6 +150,7 @@ class _ScanTextScreenState extends State<ScanTextScreen>
               scanning: _busy,
               ink: _ink,
               region: _region,
+              onDrawStart: _onDrawStart,
               onDraw: _onDraw,
               onDrawEnd: _onDrawEnd,
             ),
@@ -264,6 +274,7 @@ class _ImageCanvas extends StatelessWidget {
     required this.scanning,
     required this.ink,
     required this.region,
+    required this.onDrawStart,
     required this.onDraw,
     required this.onDrawEnd,
   });
@@ -274,6 +285,7 @@ class _ImageCanvas extends StatelessWidget {
   final bool scanning;
   final List<Offset>? ink;
   final Rect? region;
+  final VoidCallback onDrawStart;
   final ValueChanged<List<Offset>> onDraw;
   final ValueChanged<List<Offset>> onDrawEnd;
 
@@ -295,18 +307,23 @@ class _ImageCanvas extends StatelessWidget {
 
         return ClipRRect(
           borderRadius: BorderRadius.circular(m.radiusLg),
-          child: GestureDetector(
-            onPanStart: (d) {
+          // Listener, not GestureDetector: raw pointer events are captured even
+          // though this sits inside a scroll view (the list is frozen while
+          // drawing), so a vertical loop is drawn rather than scrolling away.
+          child: Listener(
+            onPointerDown: (e) {
               points
                 ..clear()
-                ..add(norm(d.localPosition));
+                ..add(norm(e.localPosition));
+              onDrawStart();
               onDraw(List<Offset>.of(points));
             },
-            onPanUpdate: (d) {
-              points.add(norm(d.localPosition));
+            onPointerMove: (e) {
+              points.add(norm(e.localPosition));
               onDraw(List<Offset>.of(points));
             },
-            onPanEnd: (_) => onDrawEnd(List<Offset>.of(points)),
+            onPointerUp: (_) => onDrawEnd(List<Offset>.of(points)),
+            onPointerCancel: (_) => onDrawEnd(List<Offset>.of(points)),
             child: SizedBox(
               width: box.width,
               height: box.height,

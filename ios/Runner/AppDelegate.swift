@@ -38,14 +38,23 @@ final class TtsStateRelay: NSObject, AVSpeechSynthesizerDelegate {
     channel.invokeMethod("state", arguments: ["speaking": speaking])
   }
 
+  /// Releases the audio session so the app is not holding the audio route once
+  /// nothing is being spoken.
+  private func releaseAudio() {
+    try? AVAudioSession.sharedInstance().setActive(
+      false, options: [.notifyOthersOnDeactivation])
+  }
+
   func speechSynthesizer(_ s: AVSpeechSynthesizer, didStart u: AVSpeechUtterance) {
     send(true)
   }
   func speechSynthesizer(_ s: AVSpeechSynthesizer, didFinish u: AVSpeechUtterance) {
     send(false)
+    releaseAudio()
   }
   func speechSynthesizer(_ s: AVSpeechSynthesizer, didCancel u: AVSpeechUtterance) {
     send(false)
+    releaseAudio()
   }
 }
 
