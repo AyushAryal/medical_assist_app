@@ -5,9 +5,15 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart' show MethodChannel;
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
+import 'table_reconstruction.dart';
+
 /// Text lifted off an image.
 class ScannedText {
-  const ScannedText({required this.text, required this.blockCount});
+  ScannedText({
+    required this.text,
+    required this.blockCount,
+    String? markdown,
+  }) : markdown = markdown ?? text;
 
   /// The recognised text, in reading order, blocks separated by newlines.
   final String text;
@@ -15,6 +21,11 @@ class ScannedText {
   /// How many separate text blocks were found — a rough measure of how much
   /// structure the page had.
   final int blockCount;
+
+  /// The text with layout preserved: a Markdown table when the page was laid
+  /// out in columns, otherwise the same as [text]. Where the recogniser gives
+  /// no positions (ML Kit) this is just [text].
+  final String markdown;
 
   bool get isEmpty => text.trim().isEmpty;
 }
@@ -80,25 +91,38 @@ class AppleVisionTextScanner implements TextScanner {
       <String, Object?>{'path': imagePath},
     );
 
-    if (lasso == null) {
+    // Build the line boxes, keeping only those inside the loop when one is set.
+    final raw = (result?['lines'] as List<Object?>?) ?? const <Object?>[];
+    final lines = <OcrLine>[];
+    for (final entry in raw) {
+      if (entry is! Map) continue;
+      final line = OcrLine(
+        text: entry['text'] as String,
+        x: (entry['x'] as num).toDouble(),
+        y: (entry['y'] as num).toDouble(),
+        w: (entry['w'] as num).toDouble(),
+        h: (entry['h'] as num).toDouble(),
+      );
+      if (lasso == null || _inside(Offset(line.cx, line.cy), lasso)) {
+        lines.add(line);
+      }
+    }
+
+    if (lines.isEmpty) {
+      // Fall back to the native joined text (e.g. nothing had boxes).
       return ScannedText(
         text: (result?['text'] as String?) ?? '',
         blockCount: (result?['blocks'] as int?) ?? 0,
       );
     }
 
-    final lines = (result?['lines'] as List<Object?>?) ?? const <Object?>[];
-    final kept = <String>[];
-    for (final entry in lines) {
-      if (entry is! Map) continue;
-      final x = (entry['x'] as num).toDouble();
-      final y = (entry['y'] as num).toDouble();
-      final w = (entry['w'] as num).toDouble();
-      final h = (entry['h'] as num).toDouble();
-      final centre = Offset(x + w / 2, y + h / 2);
-      if (_inside(centre, lasso)) kept.add(entry['text'] as String);
-    }
-    return ScannedText(text: kept.join('\n'), blockCount: kept.length);
+    final ordered = <OcrLine>[...lines]
+      ..sort((a, b) => a.cy != b.cy ? a.cy.compareTo(b.cy) : a.cx.compareTo(b.cx));
+    return ScannedText(
+      text: ordered.map((l) => l.text).join('\n'),
+      blockCount: lines.length,
+      markdown: reconstructMarkdown(lines),
+    );
   }
 
   /// Ray-casting point-in-polygon over the loop's points.

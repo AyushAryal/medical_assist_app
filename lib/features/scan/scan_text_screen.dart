@@ -187,10 +187,10 @@ class _ScanTextScreenState extends State<ScanTextScreen>
               SectionCard(
                 title: 'Found ${result.blockCount} '
                     '${result.blockCount == 1 ? 'block' : 'blocks'} of text',
-                child: SelectableText(
-                  result.text,
-                  style: context.texts.bodyMedium,
-                ),
+                subtitle: result.markdown.contains('|')
+                    ? 'Table layout detected'
+                    : null,
+                child: MarkdownView(data: result.markdown),
               ),
           ],
         ),
@@ -212,7 +212,7 @@ class _ScanTextScreenState extends State<ScanTextScreen>
                     Expanded(
                       child: FilledButton.icon(
                         onPressed: () =>
-                            Navigator.of(context).pop<String>(result.text),
+                            Navigator.of(context).pop<String>(result.markdown),
                         icon: const Icon(Icons.check),
                         label: const Text('Use text'),
                       ),

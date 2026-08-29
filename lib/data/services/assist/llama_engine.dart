@@ -337,7 +337,8 @@ class LlamaEngine implements LanguageModelEngine {
     final answer = await _complete(
       'Write a short, plain-language brief of the clinic\'s day from these '
       'figures. State the numbers and what stands out. Add no facts, no '
-      'advice, no diagnosis.',
+      'advice, no diagnosis. A short Markdown table is fine if it makes the '
+      'figures clearer.',
       figures,
       maxTokens: 320,
     );

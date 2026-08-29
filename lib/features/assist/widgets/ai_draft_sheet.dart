@@ -175,7 +175,9 @@ class _AiDraftSheetState extends State<AiDraftSheet> {
             ],
           ),
           SizedBox(height: m.spaceSm),
-          GeneratedText(text: draft.text, typeIn: true),
+          // Rendered as Markdown so a generated table shows as a table; plain
+          // prose renders as plain text.
+          MarkdownView(data: draft.text),
           if (widget.caveat != null) ...<Widget>[
             SizedBox(height: m.spaceSm),
             Text(widget.caveat!,
