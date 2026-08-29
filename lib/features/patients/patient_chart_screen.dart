@@ -18,6 +18,7 @@ import 'widgets/chart_quick_actions.dart';
 import 'widgets/chart_section.dart';
 import 'widgets/chart_section_switcher.dart';
 import 'widgets/chart_trends.dart';
+import 'widgets/handoff_sheet.dart';
 import 'widgets/record_summary_card.dart';
 
 /// The patient chart: everything known about one person, in the order a
@@ -166,7 +167,13 @@ class _PatientChartScreenState extends State<PatientChartScreen> {
       ChartQuickActions(chart: chart),
       SizedBox(height: context.metrics.spaceLg),
       if (summary != null) ...<Widget>[
-        RecordSummaryCard(summary: summary),
+        RecordSummaryCard(
+          summary: summary,
+          onHandoff: () {
+            final handoff = chart.handoff;
+            if (handoff != null) HandoffSheet.show(context, handoff);
+          },
+        ),
         SizedBox(height: context.metrics.spaceLg),
       ],
       SplitColumns(

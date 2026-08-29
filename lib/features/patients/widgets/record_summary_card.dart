@@ -13,9 +13,12 @@ import '../../../core/design/design.dart';
 /// not hold reads "Not recorded" in a muted tone, and the count of gaps sits
 /// in the header so an absent allergy status cannot pass for a reassuring one.
 class RecordSummaryCard extends StatelessWidget {
-  const RecordSummaryCard({super.key, required this.summary});
+  const RecordSummaryCard({super.key, required this.summary, this.onHandoff});
 
   final RecordSummary summary;
+
+  /// Opens the SBAR handoff built from the same record. Null hides the action.
+  final VoidCallback? onHandoff;
 
   @override
   Widget build(BuildContext context) {
@@ -25,6 +28,13 @@ class RecordSummaryCard extends StatelessWidget {
       subtitle: gaps == 0
           ? 'Everything here is on the record.'
           : '$gaps ${gaps == 1 ? 'thing' : 'things'} not recorded.',
+      trailing: onHandoff == null
+          ? null
+          : TextButton.icon(
+              onPressed: onHandoff,
+              icon: const Icon(Icons.assignment_outlined, size: 18),
+              label: const Text('Handoff'),
+            ),
       child: Column(
         children: <Widget>[
           for (final section in summary.sections)

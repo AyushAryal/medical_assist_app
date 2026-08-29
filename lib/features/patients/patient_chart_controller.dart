@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../clinical/insights/trend_analysis.dart';
 import '../../clinical/patient_age.dart';
+import '../../clinical/summary/handoff.dart';
 import '../../clinical/summary/record_summary.dart';
 import '../../data/models/allergy.dart';
 import '../../data/models/clinical_note.dart';
@@ -101,6 +102,42 @@ class PatientChartController extends ChangeNotifier {
       latestVitals: latestVitals,
       asOf: DateTime.now(),
     );
+  }
+
+  /// A deterministic SBAR handoff for passing this patient to another
+  /// clinician. Reuses the pre-read for Background, adds the current concerns
+  /// (deteriorating trends) and outstanding tasks. Null until loaded.
+  Handoff? get handoff {
+    final p = _patient;
+    final summary = recordSummary;
+    if (p == null || summary == null) return null;
+
+    final concerns = <String>[
+      for (final t in _concerningTrends)
+        '${t.label}: ${t.direction.label.toLowerCase()}',
+    ];
+
+    final outstanding = <String>[];
+    final open = openEncounter;
+    if (open != null) {
+      final note = _visits
+          .where((v) => v.encounter.id == open.id)
+          .map((v) => v.note)
+          .firstOrNull;
+      if (note == null || note.status == NoteStatus.draft) {
+        outstanding.add('Complete and sign the note for the open visit');
+      }
+    }
+
+    return HandoffBuilder.build(HandoffInput(
+      patientId: p.id,
+      asOf: DateTime.now(),
+      identityLine: '${p.displayName} · ${p.identityLine}',
+      record: summary,
+      presentingComplaint: open?.chiefComplaint,
+      concerns: concerns,
+      outstanding: outstanding,
+    ));
   }
 
   Encounter? get openEncounter =>
