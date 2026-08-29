@@ -50,20 +50,45 @@ enum AppleSpeech {
           result(FlutterError(code: "bad_args", message: "text is required", details: nil))
           return
         }
+        let language = (args["language"] as? String) ?? "en-US"
         try? AVAudioSession.sharedInstance().setCategory(
           .playback, options: [.duckOthers])
         try? AVAudioSession.sharedInstance().setActive(true)
         synthesizer.stopSpeaking(at: .immediate)
         let utterance = AVSpeechUtterance(string: text)
+        utterance.voice = bestVoice(for: language)
         utterance.rate = AVSpeechUtteranceDefaultSpeechRate
         synthesizer.speak(utterance)
         result(true)
+      case "bestVoiceQuality":
+        // 1 default, 2 enhanced, 3 premium — lets the app nudge the user to
+        // download a better voice when only the robotic default is installed.
+        let language = (call.arguments as? [String: Any])?["language"] as? String
+          ?? "en-US"
+        result(bestVoice(for: language)?.quality.rawValue ?? 0)
       case "stop":
         synthesizer.stopSpeaking(at: .immediate)
         result(true)
       default:
         result(FlutterMethodNotImplemented)
       }
+    }
+  }
+
+  /// The most natural installed voice for a language: premium over enhanced
+  /// over the compact default (which is the robotic one shipped by default).
+  /// Prefers an exact language match, then any match on the base language.
+  static func bestVoice(for language: String) -> AVSpeechSynthesisVoice? {
+    let base = String(language.prefix(2))
+    let candidates = AVSpeechSynthesisVoice.speechVoices().filter {
+      $0.language == language || $0.language.hasPrefix(base)
+    }
+    return candidates.max { a, b in
+      if a.quality.rawValue != b.quality.rawValue {
+        return a.quality.rawValue < b.quality.rawValue
+      }
+      // Tie-break: prefer the exact locale.
+      return (a.language == language ? 1 : 0) < (b.language == language ? 1 : 0)
     }
   }
 }

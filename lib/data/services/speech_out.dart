@@ -25,4 +25,15 @@ abstract final class SpeechOut {
       // Nothing playing / no channel.
     }
   }
+
+  /// Quality of the best installed voice: 0 none, 1 default (the robotic
+  /// compact voice), 2 enhanced, 3 premium. Lets the UI nudge the user to
+  /// download a natural voice when only the default is present.
+  static Future<int> bestVoiceQuality() async {
+    try {
+      return await _channel.invokeMethod<int>('bestVoiceQuality') ?? 0;
+    } on Object {
+      return 0;
+    }
+  }
 }

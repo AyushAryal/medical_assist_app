@@ -181,6 +181,8 @@ class _PatientChartScreenState extends State<PatientChartScreen> {
                     context,
                     title: 'Spoken brief',
                     subtitle: patient.displayName,
+                    notice: 'Generated from the record. Read it before you '
+                        'rely on it.',
                     generate: (engine) => engine.spokenBrief(summary.plainText),
                   ),
         ),

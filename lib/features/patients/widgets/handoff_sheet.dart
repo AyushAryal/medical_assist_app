@@ -8,6 +8,7 @@ import '../../../core/app_bootstrap.dart';
 import '../../../core/design/design.dart';
 import '../../../data/services/assist/language_model.dart';
 import '../../../data/services/speech_out.dart';
+import '../../assist/assist.dart';
 
 /// Shows a deterministic SBAR handoff, ready to read aloud or copy.
 ///
@@ -146,7 +147,7 @@ class _SpokenSection extends StatelessWidget {
               tooltip: 'Read aloud',
               visualDensity: VisualDensity.compact,
               icon: const Icon(Icons.volume_up_outlined, size: 20),
-              onPressed: () => SpeechOut.speak(d.text),
+              onPressed: () => speakAloud(context, d.text),
             ),
             IconButton(
               tooltip: 'Copy spoken version',
@@ -167,7 +168,8 @@ class _SpokenSection extends StatelessWidget {
         GeneratedText(text: d.text, typeIn: true),
         SizedBox(height: m.spaceSm),
         Text(
-          LanguageModelDraft.provenanceNotice,
+          'Generated from the record. Read it before you rely on it — the '
+          'structured SBAR above is the source.',
           style: context.texts.bodySmall
               ?.copyWith(color: context.palette.onSurfaceMuted),
         ),

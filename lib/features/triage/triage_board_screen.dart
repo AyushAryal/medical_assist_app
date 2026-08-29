@@ -169,6 +169,7 @@ class _TriageRow extends StatelessWidget {
       subtitle: name,
       caveat: 'Prompts to consider — not a diagnosis, not advice. You decide '
           'what to ask and examine.',
+      notice: 'Suggestions generated from the presenting details only.',
       generate: (engine) => engine.triageTalkingPoints(facts),
     );
   }

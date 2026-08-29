@@ -6,6 +6,7 @@ import '../../../core/app_bootstrap.dart';
 import '../../../core/design/design.dart';
 import '../../../data/services/assist/language_model.dart';
 import '../../../data/services/speech_out.dart';
+import '../speak_aloud.dart';
 
 /// A reusable sheet for a single generated draft.
 ///
@@ -22,6 +23,7 @@ class AiDraftSheet extends StatefulWidget {
     required this.generate,
     this.subtitle,
     this.caveat,
+    this.notice,
   });
 
   final String title;
@@ -29,6 +31,11 @@ class AiDraftSheet extends StatefulWidget {
 
   /// An extra caution shown under the draft (e.g. "prompts, not advice").
   final String? caveat;
+
+  /// The provenance line under the draft. Task-specific — a note draft, a
+  /// message to send, a brief — so each caller says what this text is. Falls
+  /// back to a neutral generated-text notice.
+  final String? notice;
 
   /// The rewriting task, given the resolved engine.
   final Future<LanguageModelDraft> Function(LanguageModelEngine engine) generate;
@@ -39,6 +46,7 @@ class AiDraftSheet extends StatefulWidget {
     required Future<LanguageModelDraft> Function(LanguageModelEngine) generate,
     String? subtitle,
     String? caveat,
+    String? notice,
   }) {
     return showModalBottomSheet<void>(
       context: context,
@@ -47,6 +55,7 @@ class AiDraftSheet extends StatefulWidget {
         title: title,
         subtitle: subtitle,
         caveat: caveat,
+        notice: notice,
         generate: generate,
       ),
     );
@@ -166,7 +175,7 @@ class _AiDraftSheetState extends State<AiDraftSheet> {
                 tooltip: 'Read aloud',
                 visualDensity: VisualDensity.compact,
                 icon: const Icon(Icons.volume_up_outlined, size: 20),
-                onPressed: () => SpeechOut.speak(draft.text),
+                onPressed: () => speakAloud(context, draft.text),
               ),
             ],
           ),
@@ -181,7 +190,7 @@ class _AiDraftSheetState extends State<AiDraftSheet> {
           ],
           SizedBox(height: m.spaceSm),
           Text(
-            LanguageModelDraft.provenanceNotice,
+            widget.notice ?? LanguageModelDraft.generatedNotice,
             style: context.texts.bodySmall
                 ?.copyWith(color: context.palette.onSurfaceMuted),
           ),

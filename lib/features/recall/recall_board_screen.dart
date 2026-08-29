@@ -105,6 +105,7 @@ void _reminderFor(
     context,
     title: 'Recall reminder',
     subtitle: name,
+    notice: 'Draft reminder — check it before sending it to the patient.',
     generate: (engine) => engine.patientReminder(facts),
   );
 }
