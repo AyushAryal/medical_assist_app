@@ -109,8 +109,6 @@ class _ScanTextScreenState extends State<ScanTextScreen>
 
   void _onDrawStart() => setState(() => _drawing = true);
 
-  void _onDraw(List<Offset> points) => setState(() => _ink = points);
-
   void _onDrawEnd(List<Offset> points) {
     final bounds = _boundsOf(points);
     setState(() {
@@ -151,7 +149,6 @@ class _ScanTextScreenState extends State<ScanTextScreen>
               ink: _ink,
               region: _region,
               onDrawStart: _onDrawStart,
-              onDraw: _onDraw,
               onDrawEnd: _onDrawEnd,
             ),
             SizedBox(height: m.spaceSm),
@@ -266,7 +263,7 @@ class _RegionControls extends StatelessWidget {
 /// The captured image with a scan line while reading, and a freeform
 /// circle-to-select gesture. Points are normalised (0–1) so the loop maps onto
 /// the recogniser's region regardless of display size.
-class _ImageCanvas extends StatelessWidget {
+class _ImageCanvas extends StatefulWidget {
   const _ImageCanvas({
     required this.imagePath,
     required this.aspect,
@@ -275,7 +272,6 @@ class _ImageCanvas extends StatelessWidget {
     required this.ink,
     required this.region,
     required this.onDrawStart,
-    required this.onDraw,
     required this.onDrawEnd,
   });
 
@@ -286,8 +282,22 @@ class _ImageCanvas extends StatelessWidget {
   final List<Offset>? ink;
   final Rect? region;
   final VoidCallback onDrawStart;
-  final ValueChanged<List<Offset>> onDraw;
   final ValueChanged<List<Offset>> onDrawEnd;
+
+  @override
+  State<_ImageCanvas> createState() => _ImageCanvasState();
+}
+
+class _ImageCanvasState extends State<_ImageCanvas> {
+  // Persists across rebuilds — a local list would reset on every setState mid
+  // draw and the stroke would never accumulate.
+  final List<Offset> _points = <Offset>[];
+  Size _box = Size.zero;
+
+  Offset _norm(Offset p) => Offset(
+        (_box.width == 0 ? 0.0 : p.dx / _box.width).clamp(0.0, 1.0),
+        (_box.height == 0 ? 0.0 : p.dy / _box.height).clamp(0.0, 1.0),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -297,13 +307,8 @@ class _ImageCanvas extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final box = Size(width, width / (aspect == 0 ? 1 : aspect));
-        final points = <Offset>[];
-
-        Offset norm(Offset p) => Offset(
-              (p.dx / box.width).clamp(0.0, 1.0),
-              (p.dy / box.height).clamp(0.0, 1.0),
-            );
+        _box = Size(width, width / (widget.aspect == 0 ? 1 : widget.aspect));
+        final display = _points.isNotEmpty ? _points : widget.ink;
 
         return ClipRRect(
           borderRadius: BorderRadius.circular(m.radiusLg),
@@ -312,42 +317,48 @@ class _ImageCanvas extends StatelessWidget {
           // drawing), so a vertical loop is drawn rather than scrolling away.
           child: Listener(
             onPointerDown: (e) {
-              points
-                ..clear()
-                ..add(norm(e.localPosition));
-              onDrawStart();
-              onDraw(List<Offset>.of(points));
+              setState(() {
+                _points
+                  ..clear()
+                  ..add(_norm(e.localPosition));
+              });
+              widget.onDrawStart();
             },
-            onPointerMove: (e) {
-              points.add(norm(e.localPosition));
-              onDraw(List<Offset>.of(points));
+            onPointerMove: (e) =>
+                setState(() => _points.add(_norm(e.localPosition))),
+            onPointerUp: (_) {
+              widget.onDrawEnd(List<Offset>.of(_points));
+              setState(_points.clear);
             },
-            onPointerUp: (_) => onDrawEnd(List<Offset>.of(points)),
-            onPointerCancel: (_) => onDrawEnd(List<Offset>.of(points)),
+            onPointerCancel: (_) {
+              widget.onDrawEnd(List<Offset>.of(_points));
+              setState(_points.clear);
+            },
             child: SizedBox(
-              width: box.width,
-              height: box.height,
+              width: _box.width,
+              height: _box.height,
               child: Stack(
                 children: <Widget>[
                   Positioned.fill(
-                    child: Image.file(File(imagePath), fit: BoxFit.fill),
+                    child: Image.file(File(widget.imagePath), fit: BoxFit.fill),
                   ),
                   Positioned.fill(
                     child: CustomPaint(
                       painter: _LassoPainter(
-                        ink: ink,
-                        region: region,
+                        ink: display,
+                        region: widget.region,
                         scrim: palette.scrim.withValues(alpha: 0.45),
                         stroke: palette.accent,
                       ),
                     ),
                   ),
-                  if (scanning)
+                  if (widget.scanning)
                     Positioned.fill(
                       child: AnimatedBuilder(
-                        animation: sweep,
+                        animation: widget.sweep,
                         builder: (context, _) {
-                          final t = Curves.easeInOut.transform(sweep.value);
+                          final t =
+                              Curves.easeInOut.transform(widget.sweep.value);
                           return Align(
                             alignment: Alignment(0, -1 + 2 * t),
                             child: Container(
