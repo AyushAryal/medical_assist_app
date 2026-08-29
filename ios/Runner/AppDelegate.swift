@@ -227,10 +227,23 @@ enum AppleVisionOcr {
       }
       let observations =
         (request.results as? [VNRecognizedTextObservation]) ?? []
-      let lines = observations.compactMap {
-        $0.topCandidates(1).first?.string
+      // Each line with its box, normalised to the full image and flipped to a
+      // top-left origin, so the Dart side can keep only the lines that fall
+      // inside a freeform loop rather than its bounding rectangle.
+      let lines: [[String: Any]] = observations.compactMap { obs in
+        guard let text = obs.topCandidates(1).first?.string else { return nil }
+        let b = obs.boundingBox
+        return [
+          "text": text,
+          "x": b.origin.x,
+          "y": 1 - b.origin.y - b.height,
+          "w": b.width,
+          "h": b.height,
+        ]
       }
-      reply(["text": lines.joined(separator: "\n"), "blocks": lines.count])
+      let joined = lines.compactMap { $0["text"] as? String }
+        .joined(separator: "\n")
+      reply(["text": joined, "blocks": lines.count, "lines": lines])
     }
     request.recognitionLevel = .accurate
     request.usesLanguageCorrection = true

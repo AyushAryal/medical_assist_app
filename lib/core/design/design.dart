@@ -42,6 +42,7 @@ export 'ai_effects.dart'
         AiBadge,
         AiSparkleIcon,
         AiAuroraBackground,
+        GlowLasso,
         GeneratedText,
         GeneratedTextLegend,
         GeneratedSpanController,

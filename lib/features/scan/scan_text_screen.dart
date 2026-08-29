@@ -76,7 +76,7 @@ class _ScanTextScreenState extends State<ScanTextScreen>
     });
     if (!_sweep.isAnimating) _sweep.repeat();
     try {
-      final result = await _scanner.scan(widget.imagePath, region: _region);
+      final result = await _scanner.scan(widget.imagePath, lasso: _ink);
       if (mounted) setState(() => _result = result);
     } on Object catch (error) {
       if (mounted) setState(() => _error = error);
@@ -342,16 +342,19 @@ class _ImageCanvasState extends State<_ImageCanvas> {
                   Positioned.fill(
                     child: Image.file(File(widget.imagePath), fit: BoxFit.fill),
                   ),
-                  Positioned.fill(
-                    child: CustomPaint(
-                      painter: _LassoPainter(
-                        ink: display,
-                        region: widget.region,
-                        scrim: palette.scrim.withValues(alpha: 0.45),
-                        stroke: palette.accent,
+                  // Dim outside the circled region (plain scrim, no gradient).
+                  if (widget.region != null)
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: _DimPainter(
+                          region: widget.region!,
+                          scrim: palette.scrim.withValues(alpha: 0.45),
+                        ),
                       ),
                     ),
-                  ),
+                  // The glowing, gradient-animated loop (design layer).
+                  if (display != null && display.length > 1)
+                    Positioned.fill(child: GlowLasso(points: display)),
                   if (widget.scanning)
                     Positioned.fill(
                       child: AnimatedBuilder(
@@ -388,71 +391,30 @@ class _ImageCanvasState extends State<_ImageCanvas> {
   }
 }
 
-class _LassoPainter extends CustomPainter {
-  _LassoPainter({
-    required this.ink,
-    required this.region,
-    required this.scrim,
-    required this.stroke,
-  });
+/// Dims the page outside the circled region. The glowing loop itself is drawn
+/// by [GlowLasso] from the design layer (that is where gradients live).
+class _DimPainter extends CustomPainter {
+  _DimPainter({required this.region, required this.scrim});
 
-  final List<Offset>? ink;
-  final Rect? region;
+  final Rect region;
   final Color scrim;
-  final Color stroke;
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Dim everything outside the circled region.
-    if (region != null) {
-      final r = Rect.fromLTRB(
-        region!.left * size.width,
-        region!.top * size.height,
-        region!.right * size.width,
-        region!.bottom * size.height,
-      );
-      final outside = Path()
-        ..addRect(Offset.zero & size)
-        ..addRRect(RRect.fromRectXY(r, 8, 8))
-        ..fillType = PathFillType.evenOdd;
-      canvas.drawPath(outside, Paint()..color = scrim);
-    }
-
-    // The freeform "ink" the user drew.
-    final pts = ink;
-    if (pts != null && pts.length > 1) {
-      final path = Path()
-        ..moveTo(pts.first.dx * size.width, pts.first.dy * size.height);
-      for (final p in pts.skip(1)) {
-        path.lineTo(p.dx * size.width, p.dy * size.height);
-      }
-      // Glow, then a crisp line on top.
-      canvas.drawPath(
-        path,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeCap = StrokeCap.round
-          ..strokeJoin = StrokeJoin.round
-          ..strokeWidth = 12
-          ..color = stroke.withValues(alpha: 0.30)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
-      );
-      canvas.drawPath(
-        path,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeCap = StrokeCap.round
-          ..strokeJoin = StrokeJoin.round
-          ..strokeWidth = 4
-          ..color = stroke,
-      );
-    }
+    final r = Rect.fromLTRB(
+      region.left * size.width,
+      region.top * size.height,
+      region.right * size.width,
+      region.bottom * size.height,
+    );
+    final outside = Path()
+      ..addRect(Offset.zero & size)
+      ..addRRect(RRect.fromRectXY(r, 8, 8))
+      ..fillType = PathFillType.evenOdd;
+    canvas.drawPath(outside, Paint()..color = scrim);
   }
 
   @override
-  bool shouldRepaint(_LassoPainter old) =>
-      old.ink != ink ||
-      old.region != region ||
-      old.scrim != scrim ||
-      old.stroke != stroke;
+  bool shouldRepaint(_DimPainter old) =>
+      old.region != region || old.scrim != scrim;
 }
