@@ -1,4 +1,5 @@
 import 'dart:io' show Platform;
+import 'dart:ui' show Rect;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart' show MethodChannel;
@@ -26,7 +27,10 @@ class ScannedText {
 /// extraction: it reads what is printed, it does not interpret it, so nothing
 /// it produces is a clinical fact until a clinician files it.
 abstract interface class TextScanner {
-  Future<ScannedText> scan(String imagePath);
+  /// Reads text from the image. [region], when given, is a normalised rectangle
+  /// (0–1, top-left origin) to read *only* — so a letterhead or footer can be
+  /// left out by reading just the body.
+  Future<ScannedText> scan(String imagePath, {Rect? region});
   Future<void> dispose();
 
   /// The best recogniser for this platform: Apple's native Vision engine on
@@ -44,7 +48,9 @@ class MlKitTextScanner implements TextScanner {
       TextRecognizer(script: TextRecognitionScript.latin);
 
   @override
-  Future<ScannedText> scan(String imagePath) async {
+  Future<ScannedText> scan(String imagePath, {Rect? region}) async {
+    // ML Kit has no region-of-interest, so it reads the whole image; region is
+    // honoured on the Apple path. (Android could pre-crop here later.)
     final input = InputImage.fromFilePath(imagePath);
     final result = await _recognizer.processImage(input);
     return ScannedText(text: result.text, blockCount: result.blocks.length);
@@ -60,10 +66,19 @@ class AppleVisionTextScanner implements TextScanner {
   static const MethodChannel _channel = MethodChannel('app.medical/ocr');
 
   @override
-  Future<ScannedText> scan(String imagePath) async {
+  Future<ScannedText> scan(String imagePath, {Rect? region}) async {
     final result = await _channel.invokeMapMethod<String, Object?>(
       'recognize',
-      <String, Object?>{'path': imagePath},
+      <String, Object?>{
+        'path': imagePath,
+        if (region != null)
+          'region': <String, double>{
+            'x': region.left,
+            'y': region.top,
+            'width': region.width,
+            'height': region.height,
+          },
+      },
     );
     return ScannedText(
       text: (result?['text'] as String?) ?? '',

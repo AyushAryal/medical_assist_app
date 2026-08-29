@@ -174,7 +174,17 @@ enum AppleVisionOcr {
           result(FlutterError(code: "bad_args", message: "path is required", details: nil))
           return
         }
-        recognize(path: path, result: result)
+        // Optional region of interest, normalised top-left (x, y, width, height).
+        var roi: CGRect?
+        if let r = args["region"] as? [String: Any],
+          let x = (r["x"] as? NSNumber)?.doubleValue,
+          let y = (r["y"] as? NSNumber)?.doubleValue,
+          let w = (r["width"] as? NSNumber)?.doubleValue,
+          let h = (r["height"] as? NSNumber)?.doubleValue {
+          // Vision's ROI is normalised with a bottom-left origin, so flip y.
+          roi = CGRect(x: x, y: 1 - y - h, width: w, height: h)
+        }
+        recognize(path: path, region: roi, result: result)
       default:
         result(FlutterMethodNotImplemented)
       }
@@ -183,7 +193,9 @@ enum AppleVisionOcr {
 
   /// Always completes the Flutter result on the platform (main) thread — Vision
   /// calls back on a background queue, and a FlutterResult must not.
-  private static func recognize(path: String, result: @escaping FlutterResult) {
+  private static func recognize(
+    path: String, region: CGRect?, result: @escaping FlutterResult
+  ) {
     func reply(_ value: Any?) {
       DispatchQueue.main.async { result(value) }
     }
@@ -213,6 +225,9 @@ enum AppleVisionOcr {
     }
     request.recognitionLevel = .accurate
     request.usesLanguageCorrection = true
+    if let region = region {
+      request.regionOfInterest = region
+    }
 
     let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
     DispatchQueue.global(qos: .userInitiated).async {
