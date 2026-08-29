@@ -179,6 +179,14 @@ class _PatientChartScreenState extends State<PatientChartScreen> {
   ) {
     final summary = chart.recordSummary;
     final aiActive = context.watch<AppBootstrap>().assistModelActive;
+    // The exact record lines fed to the model — shown behind "Sources" so the
+    // output is grounded in real entries, never invented citations.
+    final sources = summary == null
+        ? const <AiSource>[]
+        : <AiSource>[
+            for (final item in summary.allItems)
+              AiSource(label: item.label, detail: item.source),
+          ];
     return <Widget>[
       ChartQuickActions(chart: chart),
       SizedBox(height: context.metrics.spaceLg),
@@ -197,6 +205,7 @@ class _PatientChartScreenState extends State<PatientChartScreen> {
                     subtitle: patient.displayName,
                     notice: 'Generated from the record. Read it before you '
                         'rely on it.',
+                    sources: sources,
                     generate: (engine) => engine.spokenBrief(summary.plainText),
                   ),
           onExplain: !aiActive
@@ -208,6 +217,7 @@ class _PatientChartScreenState extends State<PatientChartScreen> {
                     caveat: 'Describes the numbers only — not a diagnosis or '
                         'advice.',
                     notice: 'Generated from the record shown above.',
+                    sources: sources,
                     generate: (engine) => engine.explainPlainly(summary.plainText),
                   ),
           onReferral: !aiActive
@@ -218,6 +228,7 @@ class _PatientChartScreenState extends State<PatientChartScreen> {
                     subtitle: patient.displayName,
                     notice: 'Draft from the record — check every line before '
                         'sending. The record is the source of truth.',
+                    sources: sources,
                     generate: (engine) => engine.referralLetter(
                       '${patient.displayName}\n${patient.identityLine}\n\n'
                       '${summary.plainText}',

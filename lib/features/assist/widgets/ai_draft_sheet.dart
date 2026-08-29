@@ -8,6 +8,22 @@ import '../../../data/services/assist/language_model.dart';
 import '../../../data/services/speech_out.dart';
 import 'speak_button.dart';
 
+/// One input a generated draft was built from — a record section, an
+/// attachment, a page. Shown behind the "Sources" button so the output is
+/// grounded in what the model was actually given.
+///
+/// These are known deterministically (the app decides what text to feed the
+/// model), so they cannot be hallucinated: they are the real inputs, not
+/// citations the model invented. [onOpen] navigates to the source when there is
+/// somewhere to go — an attachment, a record.
+class AiSource {
+  const AiSource({required this.label, this.detail, this.onOpen});
+
+  final String label;
+  final String? detail;
+  final VoidCallback? onOpen;
+}
+
 /// A reusable sheet for a single generated draft.
 ///
 /// One place for the whole "the model rewrote something" pattern: it fetches
@@ -24,10 +40,14 @@ class AiDraftSheet extends StatefulWidget {
     this.subtitle,
     this.caveat,
     this.notice,
+    this.sources = const <AiSource>[],
   });
 
   final String title;
   final String? subtitle;
+
+  /// What the draft was built from — shown behind a "Sources" button.
+  final List<AiSource> sources;
 
   /// An extra caution shown under the draft (e.g. "prompts, not advice").
   final String? caveat;
@@ -47,6 +67,7 @@ class AiDraftSheet extends StatefulWidget {
     String? subtitle,
     String? caveat,
     String? notice,
+    List<AiSource> sources = const <AiSource>[],
   }) {
     return showModalBottomSheet<void>(
       context: context,
@@ -56,6 +77,7 @@ class AiDraftSheet extends StatefulWidget {
         subtitle: subtitle,
         caveat: caveat,
         notice: notice,
+        sources: sources,
         generate: generate,
       ),
     );
@@ -84,6 +106,46 @@ class _AiDraftSheetState extends State<AiDraftSheet> {
     // Don't keep talking after the sheet is gone.
     SpeechOut.stop();
     super.dispose();
+  }
+
+  static void _showSources(BuildContext context, List<AiSource> sources) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          padding: EdgeInsets.all(context.metrics.spaceLg),
+          children: <Widget>[
+            Text('Built from', style: context.texts.titleMedium),
+            SizedBox(height: context.metrics.spaceXs),
+            Text(
+              'The record this was generated from. Nothing here is invented — '
+              'these are the exact entries the assistant was given.',
+              style: context.texts.bodySmall
+                  ?.copyWith(color: context.palette.onSurfaceMuted),
+            ),
+            SizedBox(height: context.metrics.spaceSm),
+            for (final source in sources)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.description_outlined),
+                title: Text(source.label),
+                subtitle:
+                    source.detail == null ? null : Text(source.detail!),
+                trailing: source.onOpen == null
+                    ? null
+                    : const Icon(Icons.chevron_right),
+                onTap: source.onOpen == null
+                    ? null
+                    : () {
+                        Navigator.of(context).pop();
+                        source.onOpen!();
+                      },
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _run() async {
@@ -178,6 +240,17 @@ class _AiDraftSheetState extends State<AiDraftSheet> {
           // Rendered as Markdown so a generated table shows as a table; plain
           // prose renders as plain text.
           MarkdownView(data: draft.text),
+          if (widget.sources.isNotEmpty) ...<Widget>[
+            SizedBox(height: m.spaceSm),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => _showSources(context, widget.sources),
+                icon: const Icon(Icons.fact_check_outlined, size: 18),
+                label: Text('Sources (${widget.sources.length})'),
+              ),
+            ),
+          ],
           if (widget.caveat != null) ...<Widget>[
             SizedBox(height: m.spaceSm),
             Text(widget.caveat!,

@@ -184,6 +184,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 title: 'Daily brief',
                                 subtitle: session.activeClinic?.name,
                                 notice: 'Generated from today\'s figures.',
+                                sources: <AiSource>[
+                                  for (final line
+                                      in _caseloadFigures(dashboard).split('\n'))
+                                    AiSource(label: line),
+                                ],
                                 generate: (engine) => engine
                                     .caseloadReport(_caseloadFigures(dashboard)),
                               ),
