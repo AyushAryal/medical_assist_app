@@ -171,9 +171,23 @@ class _TriageRow extends StatelessWidget {
         child: Text(entry.reasons.join(' · '),
             style: context.texts.bodySmall),
       ),
+      trailing: InfoDot.text(
+        title: 'Why this ranking',
+        summary: entry.reasons.join(' · '),
+        source: _provenanceText(entry),
+      ),
       onTap: () => context.push(Routes.chartFor(entry.patientId)),
     );
   }
+
+  /// The exact rows and times the rank was read from, so a clinician can check
+  /// the board's reasoning rather than trust it.
+  static String _provenanceText(WorklistEntry entry) => entry.provenance
+      .map((p) => p.at == null ? p.label : '${p.label} · ${_time(p.at!)}')
+      .join('; ');
+
+  static String _time(DateTime t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
   /// Maps the NEWS2 band onto a reserved clinical tone. "Needs obs" is info,
   /// never a severity colour it has not earned.
