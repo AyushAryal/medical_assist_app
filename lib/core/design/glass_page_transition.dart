@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -39,7 +38,13 @@ class GlassPageTransitionsBuilder extends PageTransitionsBuilder {
   }
 }
 
-/// Refracts the backdrop through the moving page while it is in motion.
+/// Backs the moving page with an opaque glass fill *while it travels*, so the
+/// outgoing page is occluded rather than showing straight through, then clears
+/// to nothing when it settles and the ambient wash returns.
+///
+/// A live `BackdropFilter` blur is the truer "refraction", but re-rasterising a
+/// blur every frame under an interactive edge-swipe stutters the drag — so this
+/// uses a cheap colour fill, which the finger-drag can keep up with.
 class _LiquidGlass extends StatelessWidget {
   const _LiquidGlass({required this.animation, required this.child});
 
@@ -48,29 +53,18 @@ class _LiquidGlass extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) return child;
+    final fill = Theme.of(context).canvasColor;
 
     return AnimatedBuilder(
       animation: animation,
       child: child,
       builder: (context, child) {
-        final t = animation.value.clamp(0.0, 1.0);
-        // Zero at both ends (off-screen and settled), peaking mid-travel. A
-        // heavy sigma reads as high refraction; the fill stays almost fully
-        // transparent so it is glass, not fog.
-        final wave = math.sin(t * math.pi);
-        final blur = wave * 22;
-        if (blur < 0.5) return child!;
-        return ClipRect(
-          child: BackdropFilter(
-            filter: ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: wave * 0.04),
-              ),
-              child: child,
-            ),
-          ),
+        // Zero at both ends (off-screen and settled), peaking mid-travel.
+        final occlude = math.sin(animation.value.clamp(0.0, 1.0) * math.pi) * 0.9;
+        if (occlude < 0.02) return child!;
+        return ColoredBox(
+          color: fill.withValues(alpha: occlude),
+          child: child,
         );
       },
     );
