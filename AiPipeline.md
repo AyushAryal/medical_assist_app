@@ -323,6 +323,238 @@ are single, audited, and always downstream of a human confirmation.**
 
 ---
 
+## 2.6 The actual prompts and contexts
+
+Everything below is verbatim from the code (`llama_engine.dart` /
+`apple_foundation_model.dart`). There is no hidden system prompt or persona —
+what you see is the whole instruction.
+
+### 2.6.1 How a prompt is assembled
+
+Two parts only: a fixed **instruction** and the **structured context**. No chat
+history is fed to these tasks (the query pipeline keeps its own thread; the
+rewrite tasks are stateless).
+
+```
+  ┌──────────────────────────────────────────────────────────────┐
+  │ instruction   = the fixed task string (below), per method     │
+  │ context       = the app's structured text (RecordSummary.      │
+  │                 plainText, Handoff.plainText, figures, …)      │
+  └──────────────────────────────────────────────────────────────┘
+
+  LlamaEngine:   complete(system: instruction, user: context)
+                 → the model's own chat template is applied natively in the
+                   C shim; temperature 0; maxTokens 200–512 per task; 2048-token
+                   context window.
+
+  AppleFoundation: session.respond(to: "instruction\n\n context")
+```
+
+`temperature = 0` (as deterministic as the model allows); token budget is set
+per task (e.g. 512 for a referral letter, 200 for a reminder).
+
+### 2.6.2 Generation prompts — verbatim (context = structured record text)
+
+Each of these is the *system* string; the *user* string is the structured text.
+
+```text
+spokenHandoff:
+  Rewrite this SBAR handoff as one short, natural paragraph a clinician could
+  read aloud at a shift change. Keep every fact and add none; invent nothing.
+  Where a line says something is "not recorded", say so rather than omitting it.
+
+spokenBrief:
+  Rewrite this patient summary as one short, natural paragraph to hear before a
+  consultation. Keep every fact and add none; where a line says something is
+  "not recorded", say so.
+
+plainLanguageInstructions:
+  Rewrite this clinical plan as short instructions the patient can follow at
+  home, in plain words. Keep every instruction; add none.
+
+patientReminder:
+  Write a short, warm, plain-language appointment reminder for a patient whose
+  review is due, using only the facts given. No medical advice, no new facts,
+  no diagnosis — just a friendly reminder to book.
+
+triageTalkingPoints:
+  List 3 to 5 focused questions or examination points a clinician might consider
+  for this presentation. These are prompts to consider, not a diagnosis and not
+  instructions. Add no new facts. One per line.
+
+referralLetter:
+  Write a concise referral letter from these patient details: a brief opening,
+  the reason for referral, relevant history, current medications and allergies,
+  and the latest observations. Use only the facts given; add none; do not
+  diagnose.
+
+explainPlainly:
+  Explain what these clinical values show, in plain language a patient could
+  follow. Describe the numbers and their direction only. Do not diagnose, do not
+  advise, and add no facts.
+
+caseloadReport:
+  Write a short, plain-language brief of the clinic's day from these figures.
+  State the numbers and what stands out. Add no facts, no advice, no diagnosis.
+  A short Markdown table is fine if it makes the figures clearer.
+```
+
+Every one repeats the same guardrails in the model's own language — *keep every
+fact, add none, do not diagnose* — because the prompt is the last line of
+defence if the deterministic checks are ever bypassed.
+
+### 2.6.3 The context these receive — real examples
+
+**`RecordSummary.plainText`** (fed to `spokenBrief`, `explainPlainly`,
+`referralLetter`). One `label: value` per line, "not recorded" as a value:
+
+```text
+Allergies: Penicillin (severe)
+Problems: Hypertension, Type 2 diabetes
+Medications: Amlodipine 5 mg, Metformin 500 mg
+NEWS2: NEWS2 3 · Low–medium
+Last seen: 2026-08-20
+```
+
+**`Handoff.plainText`** (fed to `spokenHandoff`). The deterministic SBAR is the
+input *and* the source of truth; the model only reflows it:
+
+```text
+SBAR handoff — Jane Doe · 46y · F · MRN 000142
+As of 2026-08-31 09:12
+
+S — Situation
+  • Jane Doe · 46y · F · MRN 000142
+  • Presenting: chest pain
+  • Latest news2: NEWS2 6 (medium)
+B — Background
+  • Allergies: Penicillin (severe)
+  • Problems: Hypertension
+  • Medications: Amlodipine 5 mg
+  • Last seen: 2026-08-20
+A — Assessment
+  • Respiratory rate rising over 3 sets
+R — Recommendation
+  • Complete and sign the note for the open visit
+```
+
+**Caseload figures** (fed to `caseloadReport`, built by
+`_caseloadFigures(dashboard)`):
+
+```text
+Patients waiting now: 3
+Appointments remaining today: 8
+Encounters today: 5
+Observation sets today: 4
+Unsigned notes: 2
+Follow-ups due: 6
+Observations flagged today: 1
+Registered patients: 214
+```
+
+Note what is *absent* from every example: no MRN-linked raw row, no free-text
+note body, nothing the app did not deliberately format. That is the whole
+grounding guarantee.
+
+### 2.6.4 The interpret/translate prompt (Pipeline A)
+
+`rephraseAsKnownQuestion` — the model's only job in the query pipeline. The
+`vocabulary` is the **published question bank** (`ai/cohort/query_vocabulary.dart`
++ generated examples), so the model can only ever point at a real capability:
+
+```text
+You translate a clinician's request about their patient register into EXACTLY
+ONE question from the supported list below, copied character for character.
+Reply with that single question and nothing else — no quotes, no explanation.
+Never repeat the request itself. If no supported question means what the request
+means, reply exactly NONE.
+
+Supported questions:
+- how many patients are registered
+- patients on <medication>
+- average blood pressure by district
+- patients with the highest bmi
+- … (the whole published bank) …
+
+Remember: one supported question verbatim, or NONE.
+```
+
+Flow: `redacted request → (this prompt) → one sentence → re-parsed by the same
+grammars`. A sentence that is not in the bank (or "NONE") produces no query —
+the chain falls to the clarifier. **There is no path from this output to a query
+that did not already exist.**
+
+### 2.6.5 The classify / extract prompts (validated, not trusted)
+
+These return structure that coded logic then checks — the model never writes the
+result directly.
+
+```text
+assignSentencesToSections  (note working-box → SOAP):
+  You file a clinician's sentences into a SOAP note. For each numbered sentence,
+  decide which section it belongs to:
+  SUBJECTIVE — what the patient reports, their history and symptoms.
+  OBJECTIVE — what the clinician observed, examined or measured.
+  ASSESSMENT — the clinician's interpretation or diagnosis.
+  PLAN — treatment, prescriptions, referrals, follow-up, advice.
+  Reply with ONLY these four lines, listing sentence numbers:
+  SUBJECTIVE: 1, 4
+  OBJECTIVE: 2
+  ASSESSMENT: 3
+  PLAN:
+  Never write out a sentence. Never invent a number. Leave a section empty if
+  nothing belongs there. Use each number at most once.
+```
+
+Context in / reply out:
+
+```text
+  IN  (user):                          OUT (model, then validated):
+  1. Chest tightness for two days.     SUBJECTIVE: 1
+  2. Chest clear, BP 148/92.           OBJECTIVE: 2
+  3. Likely musculoskeletal.           ASSESSMENT: 3
+  4. Ibuprofen prn, review 1 week.     PLAN: 4
+```
+
+The caller re-assembles the note **from its own sentences by index** — so the
+model returning "3" for a sentence can misplace it, but can never *change a
+word* of it.
+
+```text
+extractValues  (guided dictation → JSON, validated against field bounds):
+  You extract clinical measurements from a spoken description into JSON. Reply
+  with ONLY a JSON object and nothing else. Use exactly these keys and no
+  others: <field ids>. A value is the number said for that measurement; blood
+  pressure is "systolic/diastolic" like "120/80". Omit any field that is not
+  clearly stated. Invent nothing.
+```
+
+Context in / reply out (then every number is checked against `AgentField.min/max`;
+out-of-range or unknown keys are discarded):
+
+```text
+  fields: systolic_bp, diastolic_bp, pulse, spo2, temperature
+  IN  (user): "BP one twenty over eighty, pulse seventy-two, sats ninety-eight"
+  OUT (model): {"systolic_bp":120,"diastolic_bp":80,"pulse":72,"spo2":98}
+```
+
+### 2.6.6 Templates (deterministic, no model)
+
+Two "template" systems exist that are pure string composition, no model:
+
+- **Smart-phrase / note templates** (`core/smart_phrases/`, note
+  `template_picker_sheet.dart`) — expand `\pat`, `\news2`, canned SOAP
+  skeletons. Deterministic text substitution the clinician triggers.
+- **Deterministic builders** (`SummaryBuilder`, `HandoffBuilder`,
+  `reconstructMarkdown`) — these *are* the templates for the structured text in
+  §2.6.3; the model only reflows their output.
+
+So the only "prompt templates" that reach a model are the fixed strings in
+§2.6.2/2.6.4/2.6.5, and the only "context templates" are the deterministic
+builders. Nothing about the record is templated *by* the model.
+
+---
+
 ## 3. Pipeline A — the assistant / query pipeline (`lib/ai/`)
 
 This is the "agent" that answers questions about the patient register
