@@ -110,6 +110,219 @@ rules, but they solve different problems and live in different code.
 
 ---
 
+## 2.5 The data pipeline underneath (and block diagrams)
+
+AI never talks to storage. It sits at the top of a deterministic data pipeline
+whose job is to turn encrypted rows into **honest, sourced, structured facts** —
+and that structured layer is the *only* thing the model ever sees.
+
+### 2.5.1 System layers — the dependency direction
+
+Dependencies point **inward**: UI depends on the kernel, never the reverse
+(enforced by `test/core/module_boundaries_test.dart` and `clinical_purity_test`).
+
+```
+        ┌──────────────────────────────────────────────────────────────┐
+        │  features/            UI. Screens, sheets, the AiDraftSheet,   │
+        │  (Flutter)            SpeakButton, scan, settings.             │
+        └───────────────┬───────────────────────────┬──────────────────┘
+                        │ imports (via barrels)      │
+        ┌───────────────▼──────────────┐   ┌─────────▼──────────────────┐
+        │  ai/                          │   │  data/services/assist/      │
+        │  Pipeline A (query grammars)  │   │  LanguageModelEngine +      │
+        │  + ModelInterpreter           │   │  Llama / AppleFoundation    │
+        └───────────────┬──────────────┘   └─────────┬──────────────────┘
+                        │                             │
+        ┌───────────────▼─────────────────────────────▼──────────────────┐
+        │  clinical/            PURE kernel. No Flutter, no model, no I/O. │
+        │  (pure Dart)          NEWS2 · Worklist · RecordSummary ·         │
+        │                       ClinicalFlag · NoteIntelligence            │
+        └───────────────┬─────────────────────────────────────────────────┘
+                        │ operates on projections built from ↓
+        ┌───────────────▼─────────────────────────────────────────────────┐
+        │  data/                Models · DAOs · ClinicalRepository ·        │
+        │                       read-model assemblers · projections        │
+        └───────────────┬─────────────────────────────────────────────────┘
+                        │
+        ┌───────────────▼─────────────────────────────────────────────────┐
+        │  core/db/             Encrypted SQLite (sqflite_sqlcipher) +      │
+        │                       AppMetaStore (KV inside the same DB)        │
+        └──────────────────────────────────────────────────────────────────┘
+```
+
+Key rule visible here: **`clinical/` is pure** — it imports no Flutter, no model,
+no DAO. It operates on plain *projections*, which is what makes both the engines
+and their AI-facing text deterministic and testable.
+
+### 2.5.2 Read path — rows to structured facts to AI
+
+Everything the model reads is produced by this chain. There is no step where the
+model reaches back toward the database.
+
+```
+  ┌─────────┐   ┌───────┐   ┌────────────────────┐   ┌────────────────────┐
+  │ Encrypted│──▶│ DAOs  │──▶│ ClinicalRepository │──▶│ Read-model assembler│
+  │  SQLite  │   │(read) │   │ (composes reads)   │   │ data/…/x_assembly   │
+  └─────────┘   └───────┘   └────────────────────┘   └─────────┬──────────┘
+                                                               │ builds a
+                                                               │ pure projection
+                                                               ▼
+                                          ┌────────────────────────────────┐
+                                          │ Projection / snapshot (clinical)│
+                                          │  TriageReadModel · ChartSnapshot│
+                                          │  RecallReadModel · News2Input   │
+                                          └───────────────┬────────────────┘
+                                                          │ pure function
+                                                          ▼
+                                          ┌────────────────────────────────┐
+                                          │ Clinical engine (pure)          │
+                                          │  News2Calculator · TriageWorklist│
+                                          │  SummaryBuilder · RedFlagRule    │
+                                          └───────────────┬────────────────┘
+                                                          │ deterministic result
+                        ┌─────────────────────────────────┼───────────────────┐
+                        ▼                                  ▼                   ▼
+             ┌────────────────────┐          ┌──────────────────────┐  ┌──────────────┐
+             │ UI (worklist board,│          │ .plainText / figures │  │ Provenance / │
+             │ pre-read card…)    │          │  = STRUCTURED TEXT   │  │ Sources list │
+             └────────────────────┘          └──────────┬───────────┘  └──────────────┘
+                                                        │ the ONLY thing the
+                                                        ▼ model is handed
+                                             ┌──────────────────────┐
+                                             │ LanguageModelEngine   │  (Pipeline B)
+                                             │  .method(prompt, text)│
+                                             └──────────────────────┘
+```
+
+Worked example — the **pre-read → Brief**:
+
+```
+  vitals/allergy/problem/med rows
+     └─ PatientChartController loads them (via repository DAOs)
+        └─ ChartSummary.build(...)                → ChartSnapshot   (data/summary)
+           └─ SummaryBuilder.build(snapshot)      → RecordSummary   (clinical, pure)
+              ├─ RecordSummaryCard                → the on-screen pre-read
+              └─ summary.plainText  ──────────────▶ engine.spokenBrief(text)  → draft
+                 summary.allItems   ──────────────▶ AiSource[] behind "Sources"
+```
+
+The model receives `summary.plainText`; it never sees a `VitalsRecord` or an
+MRN. The "Sources" list is `summary.allItems` — the very same structured lines —
+which is why it grounds the output without inventing citations.
+
+### 2.5.3 Write path — nothing writes itself
+
+Reads fan out through DAOs; **writes funnel through one audited path**. A model
+(or an OCR result, or a voice value) can only ever produce a *proposal*.
+
+```
+  Model draft / OCR text / spoken value / typed edit
+        │
+        ▼
+  ┌──────────────────────────┐   the human decides
+  │ Proposal in the UI        │   (accept a suggestion, tap "Add",
+  │ (AiDraftSheet, SmartIntake,│    confirm a dictated value, sign a note)
+  │  guided dictation, review) │
+  └────────────┬─────────────┘
+               │ explicit confirm
+               ▼
+  ┌──────────────────────────────────────────────┐
+  │ ClinicalRepository  (THE single write path)   │
+  │   ├─ invariants (MRN alloc, note locking,     │
+  │   │             derived-value freezing)        │
+  │   ├─ AuditService  → audit_event row           │
+  │   └─ sync-queue entry (offline-first)          │
+  └────────────┬─────────────────────────────────┘
+               ▼
+        DAO write → Encrypted SQLite
+```
+
+So the two directions are asymmetric on purpose: **reads compose freely; writes
+are single, audited, and always downstream of a human confirmation.**
+
+### 2.5.4 The two AI pipelines as block diagrams
+
+**Pipeline A — assistant / query** (deterministic, model as last-resort translator):
+
+```
+  question
+     │
+     ▼
+  ┌────────────┐   redacted, normalised text (identifiers stripped here)
+  │ Preprocess │───────────────┐
+  └────────────┘               │
+                               ▼
+                     ┌───────────────────────────────────────────┐
+                     │ InterpreterChain (most-specific first)      │
+                     │  Patient·Overview·Rank·Analysis·Pattern      │
+                     │  ─────────────────────────────────────────  │
+                     │  ModelInterpreter (only if a model is live): │
+                     │    request+vocabulary ─▶ model ─▶ a SENTENCE │
+                     │    └─────────────── re-parsed by the grammars┘
+                     └───────────────┬─────────────────────────────┘
+                                     │ typed AssistIntent
+                        ┌────────────▼───────────┐
+                        │ Refine (thread context) │  "only the women"
+                        └────────────┬───────────┘
+                        ┌────────────▼───────────┐
+                        │ Authorise (Entitlements)│  before any execution
+                        └────────────┬───────────┘
+                        ┌────────────▼───────────┐
+                        │ Execute (handlers →     │  deterministic queries
+                        │ ClinicalRepository)     │  through the read path
+                        └────────────┬───────────┘
+                        ┌────────────▼───────────┐
+                        │ Present + Provenance    │  badge only if model helped
+                        └─────────────────────────┘
+```
+
+**Pipeline B — generation** (rewrite the app's own structured text):
+
+```
+  deterministic structured input            fixed, engine-agnostic prompt
+  (RecordSummary.plainText, Handoff,   ┌──────────────────────────────────┐
+   dashboard figures, presenting text) │ "Rewrite… keep every fact, add    │
+        │                              │  none, do not diagnose."          │
+        └───────────────┬──────────────┘──────────────┬───────────────────┘
+                        ▼                              │
+             ┌────────────────────────┐                │
+             │ AiDraftSheet.generate   │◀───────────────┘
+             │  (engine, resolved via  │
+             │   AiEnginePreference)   │
+             └───────────┬────────────┘
+              success ▼            ▼ failure
+        ┌──────────────────┐  ┌────────────────────────────┐
+        │ LanguageModelDraft│  │ fall back to the input text │  (never a dead end)
+        └────────┬─────────┘  └────────────────────────────┘
+                 ▼
+        ┌──────────────────────────────────────────────┐
+        │ Output: AiBadge · MarkdownView (tables/heads) │
+        │  · "Sources (N)" (the real inputs) · Copy      │
+        └──────────────────────────────────────────────┘
+```
+
+**Agentic — voice into a form** (propose-and-confirm, removable):
+
+```
+  speech ─▶ Whisper/Apple ─▶ transcript
+                                │
+                                ▼
+                   ┌──────────────────────────┐   declines ambiguity
+                   │ SpokenValueParser         │──▶ UnclearUtterance → asks again
+                   └────────────┬─────────────┘
+                                ▼
+                   ┌──────────────────────────┐   optional: model.extractValues
+                   │ ContinuousDictationCtrl   │──▶ SurfaceExtraction validates
+                   │  (routes by alias, STAGES)│      against AgentField.min/max
+                   └────────────┬─────────────┘
+                                ▼ staged, not written
+                   ┌──────────────────────────┐
+                   │ Clinician confirms         │──▶ commit() ─▶ AgentField ─▶ form
+                   └──────────────────────────┘                 (then the write path)
+```
+
+---
+
 ## 3. Pipeline A — the assistant / query pipeline (`lib/ai/`)
 
 This is the "agent" that answers questions about the patient register
