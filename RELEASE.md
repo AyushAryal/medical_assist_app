@@ -4,7 +4,7 @@ How to cut a test (or store) build of this app. Repo-side readiness is already
 done (see the "Prep for App Store" commit); this is the repeatable checklist for
 the parts that live in Xcode / App Store Connect.
 
-Bundle ID: `com.ayusharyal.medicalApp` · Min iOS: 15.5 · Version: `pubspec.yaml`
+Bundle ID: `com.medicalapp.opterp` · Min iOS: 15.5 · Version: `pubspec.yaml`
 `version:` (e.g. `1.0.0+1` → CFBundleShortVersionString `1.0.0`, build `1`).
 
 ---
@@ -13,7 +13,7 @@ Bundle ID: `com.ayusharyal.medicalApp` · Min iOS: 15.5 · Version: `pubspec.yam
 
 - **Paid Apple Developer Program** membership (org or individual). A free
   personal team cannot upload to TestFlight/App Store.
-- The **app record exists in App Store Connect** for `com.ayusharyal.medicalApp`.
+- The **app record exists in App Store Connect** for `com.medicalapp.opterp`.
   Creating it needs an **Admin / App Manager** role — a Developer role usually
   cannot. (App Store Connect → Apps → + → New App.)
 - Your Apple ID (with the org team) is signed into **Xcode → Settings →
