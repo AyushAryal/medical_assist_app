@@ -24,6 +24,12 @@
 		<string>????</string>
 		<key>CFBundleVersion</key>
 		<string>$(FLUTTER_BUILD_NUMBER)</string>
+		<!-- Export compliance. The app's only encryption is local data-at-rest
+		     protection (SQLCipher/AES) and standard OS crypto, covered by the
+		     exemption, so no non-exempt encryption is used. Confirm against your
+		     own compliance stance before shipping. -->
+		<key>ITSAppUsesNonExemptEncryption</key>
+		<false/>
 		<key>LSRequiresIPhoneOS</key>
 		<true/>
 		<key>UIApplicationSceneManifest</key>

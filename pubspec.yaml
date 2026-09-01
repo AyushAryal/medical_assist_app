@@ -1,7 +1,7 @@
 name: medical_app
-description: "A new Flutter project."
+description: "Offline-first clinical records with an on-device assistant."
 publish_to: 'none'
-version: 0.1.0+1
+version: 1.0.0+1
 
 environment:
   sdk: ^3.12.2

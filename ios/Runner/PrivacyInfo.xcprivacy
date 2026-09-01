@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  App privacy manifest for the Runner target.
+
+  This app collects nothing and sends nothing off the device: all patient data,
+  transcription, OCR and any language model run on-device. No tracking, no data
+  linked to identity, no third-party analytics.
+
+  The "accessed API" entries below are the standard required-reason declarations
+  for APIs the app and Flutter engine use for their own on-device operation
+  (reading its own files' timestamps, its own preferences, and free disk space
+  when sizing a model download). None are used for tracking.
+
+  IMPORTANT: add this file to the Runner target in Xcode (Target Membership →
+  Runner) so it is copied into the app bundle. CocoaPods ships each pod's own
+  manifest; this one covers the app target.
+-->
+<plist version="1.0">
+	<dict>
+		<key>NSPrivacyTracking</key>
+		<false/>
+		<key>NSPrivacyTrackingDomains</key>
+		<array/>
+		<key>NSPrivacyCollectedDataTypes</key>
+		<array/>
+		<key>NSPrivacyAccessedAPITypes</key>
+		<array>
+			<dict>
+				<key>NSPrivacyAccessedAPIType</key>
+				<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+				<key>NSPrivacyAccessedAPITypeReasons</key>
+				<array>
+					<string>C617.1</string>
+				</array>
+			</dict>
+			<dict>
+				<key>NSPrivacyAccessedAPIType</key>
+				<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+				<key>NSPrivacyAccessedAPITypeReasons</key>
+				<array>
+					<string>CA92.1</string>
+				</array>
+			</dict>
+			<dict>
+				<key>NSPrivacyAccessedAPIType</key>
+				<string>NSPrivacyAccessedAPICategoryDiskSpace</string>
+				<key>NSPrivacyAccessedAPITypeReasons</key>
+				<array>
+					<string>E174.1</string>
+				</array>
+			</dict>
+		</array>
+	</dict>
+</plist>
