@@ -2,21 +2,29 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import 'features/assist/floating_assistant.dart';
+import 'features/assist/assist.dart';
 
+import 'core/agentic/agent_host.dart';
+import 'core/agentic/agent_scope.dart';
 import 'core/app_bootstrap.dart';
 import 'core/routing/app_router.dart';
 import 'core/security/app_lock_service.dart';
+import 'core/modules/workflow_preferences.dart';
 import 'core/session/session_controller.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'core/theme/theme_scope.dart';
 import 'core/widgets/glass.dart';
 import 'data/repositories/clinical_repository.dart';
-import 'features/lock/lock_gate.dart';
+import 'features/lock/lock.dart';
 
 class MedicalApp extends StatefulWidget {
-  const MedicalApp({super.key});
+  const MedicalApp({super.key, this.agentHost});
+
+  /// The agentic module's host, injected at the composition root. Null when
+  /// the module is not installed — the app then runs with no agent affordances
+  /// and never references anything under `lib/agentic/`.
+  final AgentHost? agentHost;
 
   @override
   State<MedicalApp> createState() => _MedicalAppState();
@@ -76,7 +84,12 @@ class _MedicalAppState extends State<MedicalApp> with WidgetsBindingObserver {
         // Without it the translucent panels would have nothing to sample.
         builder: (context, child) => AmbientBackground(
           child: LockGate(
-            child: _DataScope(child: child ?? const SizedBox.shrink()),
+            child: _DataScope(
+              child: AgentScope(
+                host: widget.agentHost,
+                child: child ?? const SizedBox.shrink(),
+              ),
+            ),
           ),
         ),
       ),
@@ -108,6 +121,9 @@ class _DataScope extends StatelessWidget {
         Provider<ClinicalRepository>.value(value: bootstrap.repository),
         ChangeNotifierProvider<SessionController>.value(
           value: bootstrap.session,
+        ),
+        ChangeNotifierProvider<WorkflowPreferences>.value(
+          value: bootstrap.workflows,
         ),
       ],
       // Wrapped here rather than in the shell so the assistant is genuinely

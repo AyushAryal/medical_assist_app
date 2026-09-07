@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 
 import '../../core/db/db_types.dart';
+import 'sync_entity.dart';
 
 enum NoteType { soap, progress, procedure, referral, discharge, telephone }
 
@@ -42,9 +43,9 @@ extension NoteStatusX on NoteStatus {
 /// The four sections are stored separately rather than as one blob because
 /// they are read separately: on a follow-up the clinician jumps straight to
 /// the previous Assessment and Plan.
-class ClinicalNote {
+class ClinicalNote extends SyncEntity {
   const ClinicalNote({
-    required this.id,
+    required super.id,
     required this.patientId,
     required this.encounterId,
     this.noteType = NoteType.soap,
@@ -58,14 +59,13 @@ class ClinicalNote {
     this.signedAt,
     this.signedBy,
     this.contentHash,
-    required this.createdAt,
-    required this.updatedAt,
-    this.deletedAt,
-    this.revision = 1,
-    this.syncStatus = SyncStatus.pending,
+    required super.createdAt,
+    required super.updatedAt,
+    super.deletedAt,
+    super.revision,
+    super.syncStatus,
   });
 
-  final String id;
   final String patientId;
   final String encounterId;
   final NoteType noteType;
@@ -99,11 +99,6 @@ class ClinicalNote {
   /// SHA-256 over the signed content. Any later divergence between the stored
   /// text and this hash is detectable tampering.
   final String? contentHash;
-  final DateTime createdAt;
-  final DateTime updatedAt;
-  final DateTime? deletedAt;
-  final int revision;
-  final String syncStatus;
 
   bool get isLocked => status.isLocked;
 
@@ -160,7 +155,7 @@ class ClinicalNote {
       );
 
   Map<String, Object?> toMap() => <String, Object?>{
-        'id': id,
+        ...envelopeMap(),
         'patient_id': patientId,
         'encounter_id': encounterId,
         'note_type': noteType.name,
@@ -174,11 +169,6 @@ class ClinicalNote {
         'signed_by': signedBy,
         'working_notes': workingNotes,
         'content_hash': contentHash,
-        'created_at': toEpoch(createdAt),
-        'updated_at': toEpoch(updatedAt),
-        'deleted_at': toEpochOrNull(deletedAt),
-        'revision': revision,
-        'sync_status': syncStatus,
       };
 
   ClinicalNote copyWith({

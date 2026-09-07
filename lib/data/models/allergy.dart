@@ -1,4 +1,5 @@
 import '../../core/db/db_types.dart';
+import 'sync_entity.dart';
 
 enum AllergySeverity { unknown, mild, moderate, severe, anaphylaxis }
 
@@ -53,9 +54,9 @@ extension AllergyRecordStatusX on AllergyRecordStatus {
       AllergyRecordStatus.active;
 }
 
-class Allergy {
+class Allergy extends SyncEntity {
   const Allergy({
-    required this.id,
+    required super.id,
     required this.patientId,
     required this.substance,
     this.category = AllergyCategory.drug,
@@ -65,14 +66,13 @@ class Allergy {
     this.onsetDate,
     this.notes,
     this.recordedBy,
-    required this.createdAt,
-    required this.updatedAt,
-    this.deletedAt,
-    this.revision = 1,
-    this.syncStatus = SyncStatus.pending,
+    required super.createdAt,
+    required super.updatedAt,
+    super.deletedAt,
+    super.revision,
+    super.syncStatus,
   });
 
-  final String id;
   final String patientId;
   final String substance;
   final AllergyCategory category;
@@ -82,11 +82,6 @@ class Allergy {
   final DateTime? onsetDate;
   final String? notes;
   final String? recordedBy;
-  final DateTime createdAt;
-  final DateTime updatedAt;
-  final DateTime? deletedAt;
-  final int revision;
-  final String syncStatus;
 
   bool get isActive => status == AllergyRecordStatus.active;
 
@@ -112,7 +107,7 @@ class Allergy {
       );
 
   Map<String, Object?> toMap() => <String, Object?>{
-        'id': id,
+        ...envelopeMap(),
         'patient_id': patientId,
         'substance': substance,
         'category': category.name,
@@ -122,10 +117,5 @@ class Allergy {
         'onset_date': toIsoDateOrNull(onsetDate),
         'notes': notes,
         'recorded_by': recordedBy,
-        'created_at': toEpoch(createdAt),
-        'updated_at': toEpoch(updatedAt),
-        'deleted_at': toEpochOrNull(deletedAt),
-        'revision': revision,
-        'sync_status': syncStatus,
       };
 }

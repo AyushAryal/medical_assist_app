@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/agentic/agentic.dart';
 import '../../core/design/design.dart';
 
 import '../../clinical/news2.dart';
@@ -12,6 +13,8 @@ import '../../core/utils/ids.dart';
 import '../../data/models/patient.dart';
 import '../../data/models/vitals_record.dart';
 import '../../data/repositories/clinical_repository.dart';
+import 'widgets/news2_preview.dart';
+import 'widgets/pain_scale.dart';
 
 /// Observation entry.
 ///
@@ -124,6 +127,132 @@ class _VitalsEntryScreenState extends State<VitalsEntryScreen> {
   double? _double(TextEditingController controller) =>
       double.tryParse(controller.text.trim());
 
+  /// The fields this screen is willing to have an agent fill. An agent only
+  /// *proposes*: each callback writes into the field's controller, which the
+  /// clinician still reviews and saves. Nothing here knows about the agentic
+  /// module — it publishes a plain [AgentSurface] and an [AgentSlot] renders
+  /// whatever driver, if any, is installed.
+  AgentSurface _agentSurface() {
+    void setText(TextEditingController c, num v) => setState(() {
+          c.text = v == v.roundToDouble() ? '${v.toInt()}' : '$v';
+        });
+    return AgentSurface(<AgentField>[
+      AgentField(
+        id: 'bp',
+        label: 'Blood pressure',
+        kind: AgentFieldKind.pair,
+        unit: 'mmHg',
+        example: '120 over 80',
+        aliases: const <String>['bp', 'pressure'],
+        min: 40,
+        max: 300,
+        proposePair: (systolic, diastolic) => setState(() {
+          _systolic.text = '$systolic';
+          _diastolic.text = '$diastolic';
+        }),
+      ),
+      AgentField(
+        id: 'pulse',
+        label: 'Pulse',
+        kind: AgentFieldKind.integer,
+        unit: 'bpm',
+        example: '72',
+        aliases: const <String>['heart rate', 'hr'],
+        min: 20,
+        max: 300,
+        proposeNumber: (v) => setText(_heartRate, v),
+      ),
+      AgentField(
+        id: 'resp',
+        label: 'Respiratory rate',
+        kind: AgentFieldKind.integer,
+        unit: 'breaths/min',
+        example: '16',
+        aliases: const <String>['resp', 'respiration', 'breathing'],
+        min: 4,
+        max: 80,
+        proposeNumber: (v) => setText(_respiratoryRate, v),
+      ),
+      AgentField(
+        id: 'spo2',
+        label: 'Oxygen saturation',
+        kind: AgentFieldKind.integer,
+        unit: '%',
+        example: '98',
+        aliases: const <String>['spo2', 'sats', 'sat', 'saturation'],
+        min: 50,
+        max: 100,
+        proposeNumber: (v) => setText(_spo2, v),
+      ),
+      AgentField(
+        id: 'oxygen_flow',
+        label: 'Oxygen flow',
+        kind: AgentFieldKind.decimal,
+        unit: 'L/min',
+        example: '2 litres',
+        aliases: const <String>['oxygen flow', 'o2 flow', 'flow'],
+        min: 0,
+        max: 60,
+        proposeNumber: (v) => setText(_oxygenFlow, v),
+      ),
+      AgentField(
+        id: 'temp',
+        label: 'Temperature',
+        kind: AgentFieldKind.decimal,
+        unit: '°C',
+        example: '37.2',
+        aliases: const <String>['temp'],
+        min: 30,
+        max: 45,
+        proposeNumber: (v) => setText(_temperature, v),
+      ),
+      AgentField(
+        id: 'glucose',
+        label: 'Blood glucose',
+        kind: AgentFieldKind.decimal,
+        unit: 'mmol/L',
+        example: '5.5',
+        aliases: const <String>['glucose', 'sugar', 'bsl'],
+        min: 1,
+        max: 40,
+        proposeNumber: (v) => setText(_glucose, v),
+      ),
+      AgentField(
+        id: 'pain',
+        label: 'Pain score',
+        kind: AgentFieldKind.integer,
+        unit: '/10',
+        example: '3',
+        aliases: const <String>['pain'],
+        min: 0,
+        max: 10,
+        proposeNumber: (v) => setState(() => _painScore = v.round()),
+      ),
+      AgentField(
+        id: 'weight',
+        label: 'Weight',
+        kind: AgentFieldKind.decimal,
+        unit: 'kg',
+        example: '70',
+        aliases: const <String>['wt'],
+        min: 1,
+        max: 400,
+        proposeNumber: (v) => setText(_weight, v),
+      ),
+      AgentField(
+        id: 'height',
+        label: 'Height',
+        kind: AgentFieldKind.decimal,
+        unit: 'cm',
+        example: '170',
+        aliases: const <String>['ht'],
+        min: 20,
+        max: 250,
+        proposeNumber: (v) => setText(_height, v),
+      ),
+    ]);
+  }
+
   News2Input get _news2Input => News2Input(
     respiratoryRate: _int(_respiratoryRate),
     spo2: _int(_spo2),
@@ -228,7 +357,7 @@ class _VitalsEntryScreenState extends State<VitalsEntryScreen> {
             ],
           ),
           SizedBox(height: m.spaceMd),
-          SwitchListTile(
+          SwitchListTile.adaptive(
             contentPadding: EdgeInsets.zero,
             value: _onOxygen,
             onChanged: (value) => setState(() => _onOxygen = value),
@@ -386,7 +515,7 @@ class _VitalsEntryScreenState extends State<VitalsEntryScreen> {
             maxLength: 5,
           ),
           SizedBox(height: m.spaceLg),
-          _PainScale(
+          PainScale(
             value: _painScore,
             onChanged: (value) => setState(() => _painScore = value),
           ),
@@ -430,6 +559,10 @@ class _VitalsEntryScreenState extends State<VitalsEntryScreen> {
               onPressed: _copyStableValues,
               child: const Text('Copy ht/wt'),
             ),
+          // Publishes these fields to whatever agent is installed. Renders a
+          // mic when the agentic module is present, nothing when it is not —
+          // the screen never depends on the module.
+          AgentSlot(surface: _agentSurface()),
         ],
       ),
       bottomNavigationBar: SafeArea(
@@ -461,7 +594,7 @@ class _VitalsEntryScreenState extends State<VitalsEntryScreen> {
                     0,
                   ),
                   child: ContentWidth.columns(
-                    child: _News2Preview(
+                    child: News2Preview(
                       input: _news2Input,
                       ageYears: age?.years,
                     ),
@@ -498,156 +631,6 @@ class _VitalsEntryScreenState extends State<VitalsEntryScreen> {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// Live NEWS2 as the observations are typed.
-///
-/// Showing the score during entry, rather than after saving, means a
-/// deteriorating patient is flagged while the clinician is still at the
-/// bedside.
-class _News2Preview extends StatelessWidget {
-  const _News2Preview({required this.input, required this.ageYears});
-
-  final News2Input input;
-  final int? ageYears;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final m = context.metrics;
-
-    final reason = News2Calculator.unavailableReason(
-      ageYears: ageYears,
-      isPregnant: false,
-      input: input,
-    );
-
-    if (reason != null) {
-      final message = switch (reason) {
-        News2Unavailable.ageOutOfScope =>
-          'NEWS2 applies to patients aged 16 and over.',
-        News2Unavailable.pregnancy => 'NEWS2 is not validated in pregnancy.',
-        News2Unavailable.incompleteObservations =>
-          'NEWS2 needs all seven observations — '
-              '${News2Calculator.missingParameters(input).length} still missing.',
-      };
-      return Container(
-        padding: EdgeInsets.all(m.spaceMd),
-        decoration: BoxDecoration(
-          color: palette.surfaceMuted,
-          borderRadius: BorderRadius.circular(m.radiusSm),
-          border: Border.all(color: palette.outline),
-        ),
-        child: Row(
-          children: <Widget>[
-            Icon(Icons.info_outline, size: 16, color: palette.onSurfaceMuted),
-            SizedBox(width: m.spaceSm),
-            Expanded(child: Text(message, style: context.texts.bodySmall)),
-          ],
-        ),
-      );
-    }
-
-    final result = News2Calculator.score(
-      ageYears: ageYears,
-      isPregnant: false,
-      input: input,
-    )!;
-
-    final tone = switch (result.risk) {
-      News2Risk.high => PillTone.critical,
-      News2Risk.medium || News2Risk.lowMedium => PillTone.caution,
-      News2Risk.low => PillTone.normal,
-    };
-
-    return Container(
-      padding: EdgeInsets.all(m.spaceMd),
-      decoration: BoxDecoration(
-        color: palette.surface,
-        borderRadius: BorderRadius.circular(m.radiusSm),
-        border: Border.all(color: palette.outline),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              Text('NEWS2', style: context.texts.titleSmall),
-              SizedBox(width: m.spaceSm),
-              StatusPill(
-                label: '${result.total} · ${result.risk.label}',
-                tone: tone,
-              ),
-              const Spacer(),
-              if (result.hasSingleParameterThree)
-                const StatusPill(
-                  label: 'Single param = 3',
-                  tone: PillTone.caution,
-                  dense: true,
-                ),
-            ],
-          ),
-          SizedBox(height: m.spaceSm),
-          Text(result.risk.response, style: context.texts.bodySmall),
-          SizedBox(height: m.spaceSm),
-          Wrap(
-            spacing: m.spaceSm,
-            runSpacing: m.spaceXs,
-            children: result.parameterScores.entries
-                .where((entry) => entry.value > 0)
-                .map(
-                  (entry) => StatusPill(
-                    label: '${entry.key} +${entry.value}',
-                    tone: entry.value >= 3
-                        ? PillTone.critical
-                        : PillTone.caution,
-                    dense: true,
-                  ),
-                )
-                .toList(),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 0–10 numeric pain scale as tappable targets rather than a slider — a slider
-/// cannot be hit accurately with a gloved thumb.
-class _PainScale extends StatelessWidget {
-  const _PainScale({required this.value, required this.onChanged});
-
-  final int? value;
-  final ValueChanged<int?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final m = context.metrics;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text('Pain score (0–10)', style: context.texts.labelMedium),
-        SizedBox(height: m.spaceSm),
-        Wrap(
-          spacing: m.spaceXs,
-          runSpacing: m.spaceXs,
-          children: List<Widget>.generate(11, (index) {
-            final isSelected = value == index;
-            return SizedBox(
-              width: 40,
-              child: ChoiceChip(
-                label: Center(child: Text('$index')),
-                labelPadding: EdgeInsets.zero,
-                selected: isSelected,
-                onSelected: (selected) => onChanged(selected ? index : null),
-              ),
-            );
-          }),
-        ),
-      ],
     );
   }
 }

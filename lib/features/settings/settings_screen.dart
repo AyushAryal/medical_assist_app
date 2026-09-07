@@ -13,7 +13,7 @@ import '../../core/session/session_controller.dart';
 import '../../core/theme/theme_controller.dart';
 import '../../data/fixtures/demo_data.dart';
 import '../../data/repositories/clinical_repository.dart';
-import '../lock/pin_setup_screen.dart';
+import '../lock/lock.dart';
 import 'smart_phrases_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -98,26 +98,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Future<bool> _confirm(String title, String message, String action) async {
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(action),
-          ),
-        ],
-      ),
-    );
-    return result ?? false;
-  }
+  Future<bool> _confirm(String title, String message, String action) =>
+      confirmDialog(
+        context,
+        title: title,
+        message: message,
+        confirmLabel: action,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -207,7 +194,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               leading: const Icon(Icons.lock_outline, size: 20),
               child: Column(
                 children: <Widget>[
-                  SwitchListTile(
+                  SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
                     value: _biometricEnabled && _biometricAvailable,
                     onChanged: _biometricAvailable
@@ -261,7 +248,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  SwitchListTile(
+                  SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
                     value: context.watch<AppBootstrap>().assistantEnabled,
                     onChanged: (value) =>
@@ -286,14 +273,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('Assistant language model'),
+                    title: const Text('AI assistant'),
                     subtitle: Text(
-                      context.watch<AppBootstrap>().activeAssistModel?.name ??
-                          'Optional — translates wording the built-in '
-                              'matching misses',
+                      'Engine: ${context.watch<AppBootstrap>().activeAiEngineLabel}',
                     ),
                     trailing: const Icon(Icons.chevron_right),
-                    onTap: () => context.push(Routes.dictation),
+                    onTap: () => context.push(Routes.ai),
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Read-aloud voice'),
+                    subtitle: const Text(
+                      'The voice used to speak generated text',
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => context.push(Routes.voice),
                   ),
                 ],
               ),
@@ -398,46 +392,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ],
                     ),
-                    SizedBox(height: m.spaceMd),
-                    Row(
-                      children: <Widget>[
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _demoBusy
-                                ? null
-                                : () => _runDemoAction(
-                                    (s) => s.seed(),
-                                    (n) => 'Added $n demo patients.',
-                                  ),
-                            icon: const Icon(Icons.add_chart),
-                            label: const Text('Load'),
-                          ),
-                        ),
-                        SizedBox(width: m.spaceSm),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _demoBusy || _demoPatients == 0
-                                ? null
-                                : () async {
-                                    final ok = await _confirm(
-                                      'Remove demo data?',
-                                      'This removes only the fictional '
-                                          '"(DEMO)" records. Real patient '
-                                          'records are not affected.',
-                                      'Remove',
-                                    );
-                                    if (ok) {
-                                      await _runDemoAction(
-                                        (s) => s.clear(),
-                                        (n) => 'Removed $n demo patients.',
-                                      );
-                                    }
-                                  },
-                            icon: const Icon(Icons.delete_outline),
-                            label: const Text('Remove'),
-                          ),
-                        ),
-                      ],
+                    SizedBox(height: m.spaceSm),
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Load demo data'),
+                      subtitle: Text(
+                        _demoBusy
+                            ? 'Working…'
+                            : _demoPatients > 0
+                                ? 'Fictional "(DEMO)" records are loaded'
+                                : 'Off — no demo records',
+                        style: context.texts.bodySmall,
+                      ),
+                      value: _demoPatients > 0,
+                      onChanged: _demoBusy
+                          ? null
+                          : (on) async {
+                              if (on) {
+                                await _runDemoAction(
+                                  (s) => s.seed(),
+                                  (n) => 'Added $n demo patients.',
+                                );
+                              } else {
+                                final ok = await _confirm(
+                                  'Remove demo data?',
+                                  'This removes only the fictional "(DEMO)" '
+                                      'records. Real patient records are not '
+                                      'affected.',
+                                  'Remove',
+                                );
+                                if (ok) {
+                                  await _runDemoAction(
+                                    (s) => s.clear(),
+                                    (n) => 'Removed $n demo patients.',
+                                  );
+                                }
+                              }
+                            },
                     ),
                   ],
                 ),

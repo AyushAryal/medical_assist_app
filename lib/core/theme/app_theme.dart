@@ -218,23 +218,50 @@ abstract final class AppTheme {
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
-        indicatorColor: p.primaryContainer,
+        // No pill behind the selected icon. The Material indicator is the one
+        // element that read as dated on an iOS-first app; a tab bar that
+        // marks the current tab with tint and weight alone is what a modern
+        // bar looks like on either platform.
+        indicatorColor: Colors.transparent,
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
         elevation: 0,
         height: kAppNavigationBarHeight,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        labelTextStyle: WidgetStatePropertyAll(text.labelSmall),
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (states) => text.labelSmall?.copyWith(
+            color: states.contains(WidgetState.selected)
+                ? p.primary
+                : p.onSurfaceMuted,
+            fontWeight: states.contains(WidgetState.selected)
+                ? FontWeight.w600
+                : FontWeight.w500,
+          ),
+        ),
+        iconTheme: WidgetStateProperty.resolveWith(
+          (states) => IconThemeData(
+            size: 25,
+            color: states.contains(WidgetState.selected)
+                ? p.primary
+                : p.onSurfaceMuted,
+          ),
+        ),
       ),
       navigationRailTheme: NavigationRailThemeData(
         backgroundColor: Colors.transparent,
-        indicatorColor: p.primaryContainer,
+        indicatorColor: Colors.transparent,
         // The default 72dp clips longer destination labels such as
         // "Schedule" against the rail edge.
         minWidth: 88,
         labelType: NavigationRailLabelType.all,
-        selectedLabelTextStyle: text.labelSmall?.copyWith(color: p.primary),
+        selectedLabelTextStyle: text.labelSmall?.copyWith(
+          color: p.primary,
+          fontWeight: FontWeight.w600,
+        ),
         unselectedLabelTextStyle: text.labelSmall?.copyWith(
           color: p.onSurfaceMuted,
         ),
+        selectedIconTheme: IconThemeData(color: p.primary),
+        unselectedIconTheme: IconThemeData(color: p.onSurfaceMuted),
       ),
 
       segmentedButtonTheme: SegmentedButtonThemeData(

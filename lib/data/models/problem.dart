@@ -1,4 +1,5 @@
 import '../../core/db/db_types.dart';
+import 'sync_entity.dart';
 
 enum ProblemStatus { active, resolved, inactive }
 
@@ -16,9 +17,9 @@ extension ProblemStatusX on ProblemStatus {
 
 /// An entry on the patient's problem list — the running summary a clinician
 /// reads first to understand who they are about to see.
-class Problem {
+class Problem extends SyncEntity {
   const Problem({
-    required this.id,
+    required super.id,
     required this.patientId,
     required this.display,
     this.codeSystem,
@@ -29,14 +30,13 @@ class Problem {
     this.resolvedDate,
     this.notes,
     this.recordedBy,
-    required this.createdAt,
-    required this.updatedAt,
-    this.deletedAt,
-    this.revision = 1,
-    this.syncStatus = SyncStatus.pending,
+    required super.createdAt,
+    required super.updatedAt,
+    super.deletedAt,
+    super.revision,
+    super.syncStatus,
   });
 
-  final String id;
   final String patientId;
   final String display;
 
@@ -50,11 +50,6 @@ class Problem {
   final DateTime? resolvedDate;
   final String? notes;
   final String? recordedBy;
-  final DateTime createdAt;
-  final DateTime updatedAt;
-  final DateTime? deletedAt;
-  final int revision;
-  final String syncStatus;
 
   bool get isActive => status == ProblemStatus.active;
 
@@ -81,7 +76,7 @@ class Problem {
       );
 
   Map<String, Object?> toMap() => <String, Object?>{
-        'id': id,
+        ...envelopeMap(),
         'patient_id': patientId,
         'display': display,
         'code_system': codeSystem,
@@ -92,10 +87,5 @@ class Problem {
         'resolved_date': toIsoDateOrNull(resolvedDate),
         'notes': notes,
         'recorded_by': recordedBy,
-        'created_at': toEpoch(createdAt),
-        'updated_at': toEpoch(updatedAt),
-        'deleted_at': toEpochOrNull(deletedAt),
-        'revision': revision,
-        'sync_status': syncStatus,
       };
 }

@@ -7,7 +7,7 @@ import '../../core/utils/formatters.dart';
 import '../../data/models/clinical_note.dart';
 import '../../data/models/encounter.dart';
 import '../../data/models/patient.dart';
-import '../vitals/vitals_summary_card.dart';
+import '../vitals/vitals.dart';
 import 'patient_chart_controller.dart';
 
 /// One past visit, laid out to be *read*.

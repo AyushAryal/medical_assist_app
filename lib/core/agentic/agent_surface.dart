@@ -1,0 +1,121 @@
+/// The contract that makes a screen's fields operable by an agent.
+///
+/// An "agent" here is anything that can fill a form on the clinician's behalf
+/// — the guided voice flow today, a larger cloud model or a local one later.
+/// Rather than let a model poke at arbitrary widgets (unauditable, and against
+/// this app's rule that a model chooses among options a human defined), a
+/// screen publishes an [AgentSurface]: an ordered, named, typed set of the
+/// fields it is willing to have filled. A driver reads that surface, decides a
+/// value, and *proposes* it — the propose callbacks set an unconfirmed value
+/// the clinician still reviews and saves. Nothing here writes to a record.
+///
+/// Pure Dart, no Flutter, so both the surface and the drivers over it are
+/// unit-testable without a widget tree.
+library;
+
+/// What kind of value a field accepts, so a driver knows how to fill it.
+enum AgentFieldKind { integer, decimal, pair, text }
+
+/// One field a widget exposes for an agent to fill.
+///
+/// Exactly one propose callback is set, matching [kind]: [proposeNumber] for
+/// integer/decimal, [proposePair] for a paired reading like blood pressure,
+/// [proposeText] for free text. A field with no matching callback is display
+/// only and an agent must skip it.
+class AgentField {
+  const AgentField({
+    required this.id,
+    required this.label,
+    required this.kind,
+    this.unit,
+    this.example,
+    this.aliases = const <String>[],
+    this.min,
+    this.max,
+    this.proposeNumber,
+    this.proposePair,
+    this.proposeText,
+  });
+
+  /// Stable identifier, e.g. `systolic`. What a model names when it chooses.
+  final String id;
+
+  /// Human- and agent-readable name, e.g. `Systolic blood pressure`.
+  final String label;
+
+  /// Unit shown on read-back, e.g. `mmHg`. Null when the field has none.
+  final String? unit;
+
+  /// A spoken example shown as a prompt, e.g. `120 over 80` — so a clinician
+  /// knows what to say for this field.
+  final String? example;
+
+  final AgentFieldKind kind;
+
+  /// Spoken names that route a value to this field in continuous dictation —
+  /// e.g. `['bp', 'blood pressure', 'pressure']`. The [label] is always an
+  /// implicit alias.
+  final List<String> aliases;
+
+  /// Physiologically plausible bounds. A parsed value outside them is refused
+  /// rather than entered — a misheard "pulse 880" must not reach the record.
+  /// These are *possible* limits, wide on purpose; abnormal-but-real values
+  /// still pass and are flagged later by the reference ranges.
+  final num? min;
+  final num? max;
+
+  final void Function(num value)? proposeNumber;
+  final void Function(int first, int second)? proposePair;
+  final void Function(String value)? proposeText;
+
+  /// Whether [value] is inside this field's plausible bounds.
+  bool accepts(num value) =>
+      (min == null || value >= min!) && (max == null || value <= max!);
+
+  /// The alias (or label) this field is called by in [text], longest first so
+  /// "blood pressure" wins over "pressure". Single-word names must match a
+  /// whole word — otherwise "hr" would match inside "three" — while multi-word
+  /// names match as a phrase.
+  String? matchAlias(String text) {
+    final tokens =
+        text.split(RegExp(r'[^a-z]+')).where((t) => t.isNotEmpty).toSet();
+    final names = <String>[
+      label.toLowerCase(),
+      ...aliases.map((a) => a.toLowerCase()),
+    ]..sort((a, b) => b.length.compareTo(a.length));
+    for (final name in names) {
+      if (name.contains(' ')) {
+        if (text.contains(name)) return name;
+      } else if (tokens.contains(name)) {
+        return name;
+      }
+    }
+    return null;
+  }
+
+  /// True when this field can actually be filled by an agent (a matching
+  /// propose callback is present for its kind).
+  bool get isFillable => switch (kind) {
+        AgentFieldKind.integer || AgentFieldKind.decimal => proposeNumber != null,
+        AgentFieldKind.pair => proposePair != null,
+        AgentFieldKind.text => proposeText != null,
+      };
+}
+
+/// The ordered set of agent-operable fields a screen currently exposes.
+class AgentSurface {
+  const AgentSurface(this.fields);
+
+  final List<AgentField> fields;
+
+  /// Only the fields a driver can actually fill, in order.
+  List<AgentField> get fillable =>
+      fields.where((f) => f.isFillable).toList(growable: false);
+
+  AgentField? byId(String id) {
+    for (final field in fields) {
+      if (field.id == id) return field;
+    }
+    return null;
+  }
+}

@@ -13,7 +13,7 @@ import '../../data/models/encounter.dart';
 import '../../data/models/patient.dart';
 import '../../data/models/vitals_record.dart';
 import '../../data/repositories/clinical_repository.dart';
-import '../vitals/vitals_summary_card.dart';
+import '../vitals/vitals.dart';
 
 /// The encounter workspace: observations, note and disposition for one visit,
 /// ending in a signature.
@@ -79,27 +79,14 @@ class _EncounterScreenState extends State<EncounterScreen> {
     }
 
     final session = context.read<SessionController>();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Sign this encounter?'),
-        content: Text(
-          'Signing locks the note as the final record of this visit. '
+    final confirmed = await confirmDialog(
+      context,
+      title: 'Sign this encounter?',
+      message: 'Signing locks the note as the final record of this visit. '
           'It cannot be edited afterwards — corrections are added as '
           'amendments, which remain visible in the record.\n\n'
           'Signing as ${session.signatureName}.',
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Sign'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Sign',
     );
 
     if (confirmed != true || !mounted) return;

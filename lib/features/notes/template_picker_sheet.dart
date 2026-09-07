@@ -307,7 +307,7 @@ class _SectionDecision extends StatelessWidget {
                   dense: true,
                 )
               else
-                Switch(value: useTemplate, onChanged: onChanged),
+                Switch.adaptive(value: useTemplate, onChanged: onChanged),
             ],
           ),
           if (hasText) ...<Widget>[

@@ -5,6 +5,7 @@ import '../../core/design/design.dart';
 
 import '../../core/modules/entitlements.dart';
 import '../../core/modules/module_registry.dart';
+import '../../core/modules/workflow_preferences.dart';
 
 /// Shows which modules the current licence grants.
 ///
@@ -17,6 +18,7 @@ class ModulesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final entitlements = context.watch<Entitlements>();
+    final workflows = context.watch<WorkflowPreferences>();
     final m = context.metrics;
 
     return Scaffold(
@@ -58,8 +60,48 @@ class ModulesScreen extends StatelessWidget {
               ),
             ),
             SizedBox(height: m.spaceMd),
+            if (WorkflowPreferences.configurable.isNotEmpty)
+              Padding(
+                padding: EdgeInsets.only(bottom: m.spaceMd),
+                child: SectionCard(
+                  title: 'Clinic workflows',
+                  subtitle: 'Optional features this clinic turns on for itself.',
+                  child: Column(
+                    children: WorkflowPreferences.configurable.map((id) {
+                      final module = ModuleRegistry.describe(id);
+                      final licensed = entitlements.has(id);
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          module.icon,
+                          color: licensed
+                              ? context.palette.primary
+                              : context.palette.onSurfaceMuted,
+                        ),
+                        title: Text(module.name),
+                        subtitle: Text(module.description),
+                        trailing: licensed
+                            ? Switch(
+                                value: workflows.isEnabled(id),
+                                onChanged: (v) => workflows.setEnabled(id, v),
+                              )
+                            : const StatusPill(
+                                label: 'Locked',
+                                tone: PillTone.neutral,
+                                icon: Icons.lock_outline,
+                                dense: true,
+                              ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
             ...ModuleTier.values.map((tier) {
-              final modules = ModuleRegistry.ofTier(tier);
+              // Clinic-configurable modules are governed in the card above, so
+              // they do not also appear in the licence list.
+              final modules = ModuleRegistry.ofTier(tier)
+                  .where((id) => !ModuleRegistry.describe(id).clinicConfigurable)
+                  .toList();
               if (modules.isEmpty) return const SizedBox.shrink();
               return Padding(
                 padding: EdgeInsets.only(bottom: m.spaceMd),

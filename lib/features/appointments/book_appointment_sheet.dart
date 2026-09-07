@@ -182,28 +182,34 @@ class _BookAppointmentSheetState extends State<BookAppointmentSheet> {
     final m = context.metrics;
     final palette = context.palette;
 
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: m.spaceLg,
-          right: m.spaceLg,
-          bottom: MediaQuery.viewInsetsOf(context).bottom + m.spaceLg,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+    return SheetScaffold(
+      title: widget.existing == null ? 'Book appointment' : 'Reschedule',
+      subtitle:
+          '${widget.patient.displayName} · ${widget.patient.identityLine}',
+      footer: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Row(
             children: <Widget>[
-              Text(
-                widget.existing == null ? 'Book appointment' : 'Reschedule',
-                style: context.texts.titleMedium,
+              StatusPill(
+                label: Fmt.dateTime(_scheduledAt),
+                tone: PillTone.info,
+                icon: Icons.event,
+                dense: true,
               ),
-              Text(
-                '${widget.patient.displayName} · ${widget.patient.identityLine}',
-                style: context.texts.bodySmall,
-              ),
-              SizedBox(height: m.spaceLg),
-
+            ],
+          ),
+          SizedBox(height: m.spaceMd),
+          FilledButton.icon(
+            onPressed: _busy ? null : _save,
+            icon: const Icon(Icons.check),
+            label: Text(
+              widget.existing == null ? 'Book appointment' : 'Reschedule',
+            ),
+          ),
+        ],
+      ),
+      children: <Widget>[
               Row(
                 children: <Widget>[
                   Expanded(
@@ -284,30 +290,7 @@ class _BookAppointmentSheetState extends State<BookAppointmentSheet> {
                   ),
                 ),
               ],
-
-              SizedBox(height: m.spaceXl),
-              Row(
-                children: <Widget>[
-                  StatusPill(
-                    label: Fmt.dateTime(_scheduledAt),
-                    tone: PillTone.info,
-                    icon: Icons.event,
-                    dense: true,
-                  ),
-                ],
-              ),
-              SizedBox(height: m.spaceMd),
-              FilledButton.icon(
-                onPressed: _busy ? null : _save,
-                icon: const Icon(Icons.check),
-                label: Text(
-                  widget.existing == null ? 'Book appointment' : 'Reschedule',
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      ],
     );
   }
 }

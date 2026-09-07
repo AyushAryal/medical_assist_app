@@ -1,7 +1,7 @@
 name: medical_app
-description: "A new Flutter project."
+description: "Opt Doctor Assistance Intelligence — offline-first clinical records with an on-device assistant."
 publish_to: 'none'
-version: 0.1.0+1
+version: 1.0.0+1
 
 environment:
   sdk: ^3.12.2
@@ -23,6 +23,10 @@ dependencies:
   # 10.3.1 has the same Dart API and builds cleanly. Revisit when AGP supports 37.
   flutter_secure_storage: ^10.3.1
   go_router: ^17.5.0
+  # On-device, offline text recognition (Latin script). Bundles its model into
+  # the app — no network, nothing leaves the device, the same rule the speech
+  # and language models follow.
+  google_mlkit_text_recognition: ^0.15.0
   image_picker: ^1.2.3
   intl: ^0.20.3
   just_audio: ^0.10.6

@@ -1,11 +1,17 @@
 import 'dart:async';
 
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 
 import '../data/repositories/clinical_repository.dart';
 import '../ai/pipeline.dart';
 import '../data/services/assist/assist_service.dart';
+import '../data/fixtures/demo_data.dart';
+import '../data/services/assist/ai_engine_preference.dart';
+import '../data/services/assist/apple_foundation_model.dart';
 import '../data/services/assist/assist_model_catalog.dart';
+import '../data/services/speech_out.dart';
 import '../data/services/assist/assist_model_manager.dart';
 import '../data/services/assist/language_model.dart';
 import '../data/services/assist/llama_engine.dart';
@@ -18,6 +24,7 @@ import 'audit/audit_service.dart';
 import 'db/app_database.dart';
 import 'db/app_meta_store.dart';
 import 'modules/entitlements.dart';
+import 'modules/workflow_preferences.dart';
 import 'security/app_lock_service.dart';
 import 'security/db_key_manager.dart';
 import 'security/secure_store.dart';
@@ -50,6 +57,7 @@ class AppBootstrap extends ChangeNotifier {
   ClinicalRepository? _repository;
   AppMetaStore? _meta;
   SessionController? _session;
+  WorkflowPreferences? _workflows;
   VoiceNoteService? _voiceNotes;
   DictationRecorder? _dictation;
   AssistService? _assist;
@@ -75,6 +83,8 @@ class AppBootstrap extends ChangeNotifier {
 
   /// Which installed assistant model interprets unmatched questions.
   static const String assistModelKey = 'assist_model_id';
+  static const String aiEnginePrefKey = 'ai_engine_pref';
+  static const String ttsVoiceKey = 'tts_voice_id';
 
   /// Whether the floating assistant appears over every screen.
   static const String assistantEnabledKey = 'assistant_enabled';
@@ -104,6 +114,14 @@ class AppBootstrap extends ChangeNotifier {
   AssistModel? _activeAssistModel;
   LanguageModelEngine? _assistEngine;
 
+  /// Which engine the user chose. Honoured by [refreshAssistEngine].
+  AiEnginePreference get aiEnginePreference => _aiEnginePreference;
+  AiEnginePreference _aiEnginePreference = AiEnginePreference.auto;
+
+  /// A human label for whatever is actually live now — for Settings.
+  String get activeAiEngineLabel =>
+      _assistEngine?.name ?? 'None — deterministic features only';
+
   /// Whether an assistant model is installed and live.
   bool get assistModelActive => _assistEngine != null;
 
@@ -122,33 +140,122 @@ class AppBootstrap extends ChangeNotifier {
   /// first installed model serves, so removing one falls back rather than
   /// silently switching the feature off.
   Future<void> refreshAssistEngine() async {
-    final preferredId =
-        _meta == null ? null : await meta.read(assistModelKey);
-    final preferred = AssistModelCatalog.byId(preferredId);
+    final pref = _aiEnginePreference;
 
+    // Resolve each candidate independently, then apply the user's choice.
+    final apple = AppleFoundationLanguageModel();
+    final appleReady =
+        pref == AiEnginePreference.off ? false : await apple.isReady();
+
+    LanguageModelEngine? next;
+    AssistModel? activeModel;
+
+    Future<void> useDownloaded() async {
+      final installed = await _resolveDownloadedAssistModel();
+      if (installed != null) {
+        next = LlamaEngine(
+          modelPath: installed.path,
+          modelName: installed.model.name,
+        );
+        activeModel = installed.model;
+      }
+    }
+
+    switch (pref) {
+      case AiEnginePreference.off:
+        next = null;
+      case AiEnginePreference.appleIntelligence:
+        next = appleReady ? apple : null;
+      case AiEnginePreference.downloaded:
+        await useDownloaded();
+      case AiEnginePreference.auto:
+        if (appleReady) {
+          next = apple;
+        } else {
+          await useDownloaded();
+        }
+    }
+
+    await _assistEngine?.dispose();
+    _assistEngine = next;
+    _activeAssistModel = activeModel; // null for the system model
+    notifyListeners();
+  }
+
+  /// The installed downloaded model to use — the user's pick if present, else
+  /// the first one installed. Null when none is installed.
+  Future<InstalledAssistModel?> _resolveDownloadedAssistModel() async {
+    final preferredId = _meta == null ? null : await meta.read(assistModelKey);
+    final preferred = AssistModelCatalog.byId(preferredId);
     final model = preferred != null &&
             await assistModels.installed(preferred) != null
         ? preferred
         : await assistModels.firstInstalled();
+    return model == null ? null : await assistModels.installed(model);
+  }
 
-    final installed =
-        model == null ? null : await assistModels.installed(model);
-
-    await _assistEngine?.dispose();
-    _activeAssistModel = installed?.model;
-    _assistEngine = installed == null
-        ? null
-        : LlamaEngine(
-            modelPath: installed.path,
-            modelName: installed.model.name,
-          );
-    notifyListeners();
+  /// Sets which engine backs the assistant and re-resolves it now.
+  Future<void> setAiEnginePreference(AiEnginePreference preference) async {
+    _aiEnginePreference = preference;
+    await meta.write(aiEnginePrefKey, preference.name);
+    await refreshAssistEngine();
   }
 
   /// Chooses which installed assistant model answers from now on.
   Future<void> setAssistModel(AssistModel model) async {
     await meta.write(assistModelKey, model.id);
     await refreshAssistEngine();
+  }
+
+  /// Pins the voice used for read-aloud (null = let the platform pick the best).
+  Future<void> setTtsVoice(String? voiceId) async {
+    SpeechOut.preferredVoiceId = voiceId;
+    await meta.write(ttsVoiceKey, voiceId);
+    notifyListeners();
+  }
+
+  /// Auto-provisioning (seed demo data + pull the smallest model) runs wherever
+  /// demo data is allowed — debug builds, and release builds explicitly made
+  /// for review with `--dart-define=ALLOW_DEMO_DATA=true`. Never under
+  /// `flutter test`, and never in a shipped build (which passes neither), so it
+  /// cannot seed a real deployment or trigger a surprise download.
+  bool get _debugProvisioningEnabled =>
+      demoDataAllowed && !Platform.environment.containsKey('FLUTTER_TEST');
+
+  /// Debug only: fills an empty database with the realistic demo dataset, so a
+  /// fresh debug install lands on populated triage/recall/charts. Idempotent —
+  /// it seeds only when nothing is there — and swallows its own failures rather
+  /// than ever blocking startup.
+  Future<void> _seedDemoDataIfEmpty(ClinicalRepository repository) async {
+    try {
+      final seeder = DemoDataSeeder(repository);
+      if (await seeder.count() == 0) {
+        await seeder.seed();
+      }
+    } on Object catch (error) {
+      debugPrint('Debug demo seed skipped: $error');
+    }
+  }
+
+  /// Debug only: downloads and activates the smallest assistant model when none
+  /// is installed, so the AI features are visible without a manual install.
+  Future<void> _installLightestAssistModelIfNone() async {
+    try {
+      // Respect the user's choice: a downloaded model only helps auto/downloaded.
+      if (_aiEnginePreference == AiEnginePreference.off ||
+          _aiEnginePreference == AiEnginePreference.appleIntelligence) {
+        return;
+      }
+      // Nothing to download if the OS already provides a system model.
+      if (await AppleFoundationLanguageModel().isReady()) return;
+      if (await assistModels.firstInstalled() != null) return;
+      final lightest = AssistModelCatalog.models
+          .reduce((a, b) => a.bytes <= b.bytes ? a : b);
+      await assistModels.download(lightest);
+      await setAssistModel(lightest);
+    } on Object catch (error) {
+      debugPrint('Debug assist-model auto-install skipped: $error');
+    }
   }
 
   BootstrapPhase get phase => _phase;
@@ -160,6 +267,7 @@ class AppBootstrap extends ChangeNotifier {
   ClinicalRepository get repository => _require(_repository, 'repository');
   AppMetaStore get meta => _require(_meta, 'meta');
   SessionController get session => _require(_session, 'session');
+  WorkflowPreferences get workflows => _require(_workflows, 'workflows');
   VoiceNoteService get voiceNotes => _require(_voiceNotes, 'voiceNotes');
   DictationRecorder get dictation => _require(_dictation, 'dictation');
   AssistService get assist => _require(_assist, 'assist');
@@ -239,6 +347,14 @@ class AppBootstrap extends ChangeNotifier {
       final session = SessionController(repository, meta);
       await session.load();
 
+      final workflows = WorkflowPreferences(meta);
+      await workflows.load();
+
+      // Restore the chosen read-aloud voice, if any.
+      SpeechOut.preferredVoiceId = await meta.read(ttsVoiceKey);
+      _aiEnginePreference =
+          AiEnginePreferenceX.parse(await meta.read(aiEnginePrefKey));
+
       audit.configure(
         actor: session.signatureName,
         deviceId: session.deviceId,
@@ -256,6 +372,7 @@ class AppBootstrap extends ChangeNotifier {
       _repository = repository;
       _meta = meta;
       _session = session;
+      _workflows = workflows;
       _voiceNotes = VoiceNoteService();
       _dictation = DictationRecorder(
         quality:
@@ -275,11 +392,26 @@ class AppBootstrap extends ChangeNotifier {
       _assistantEnabled =
           (await meta.read(assistantEnabledKey) ?? 'true') != 'false';
 
+      // Debug builds arrive populated: a realistic dataset so triage, recall
+      // and the charts have something to show, seeded before the dashboard
+      // first loads. Never runs in a shipped build (guarded by demoDataAllowed).
+      if (_debugProvisioningEnabled) {
+        await _seedDemoDataIfEmpty(repository);
+      }
+
       _phase = BootstrapPhase.ready;
       // Not awaited: they only read file sizes, and an unlock must not wait
       // on the filesystem to show the dashboard.
       unawaited(refreshTranscriptionEngine());
       unawaited(refreshAssistEngine());
+
+      // Debug convenience: pull the smallest assistant model in the background
+      // so the AI features are visible without a manual install. Non-blocking
+      // and best-effort — the app is fully usable while it downloads, and the
+      // deterministic features never depend on it.
+      if (_debugProvisioningEnabled) {
+        unawaited(_installLightestAssistModelIfNone());
+      }
     } on Object catch (error) {
       _error = error;
       _phase = BootstrapPhase.failed;
@@ -309,6 +441,7 @@ class AppBootstrap extends ChangeNotifier {
     _repository = null;
     _meta = null;
     _session = null;
+    _workflows = null;
     _voiceNotes = null;
     _phase = BootstrapPhase.idle;
     notifyListeners();

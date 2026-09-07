@@ -1,5 +1,6 @@
 import '../../core/db/db_types.dart';
 import 'encounter.dart';
+import 'sync_entity.dart';
 
 /// Where an appointment sits in the front-desk workflow.
 ///
@@ -46,9 +47,9 @@ extension AppointmentStatusX on AppointmentStatus {
 
 /// A booked slot. Distinct from [Encounter], which records that care actually
 /// happened; [encounterId] links the two once the visit starts.
-class Appointment {
+class Appointment extends SyncEntity {
   const Appointment({
-    required this.id,
+    required super.id,
     required this.patientId,
     required this.clinicId,
     this.encounterId,
@@ -63,14 +64,13 @@ class Appointment {
     this.startedAt,
     this.completedAt,
     this.cancelledReason,
-    required this.createdAt,
-    required this.updatedAt,
-    this.deletedAt,
-    this.revision = 1,
-    this.syncStatus = SyncStatus.pending,
+    required super.createdAt,
+    required super.updatedAt,
+    super.deletedAt,
+    super.revision,
+    super.syncStatus,
   });
 
-  final String id;
   final String patientId;
   final String clinicId;
   final String? encounterId;
@@ -85,11 +85,6 @@ class Appointment {
   final DateTime? startedAt;
   final DateTime? completedAt;
   final String? cancelledReason;
-  final DateTime createdAt;
-  final DateTime updatedAt;
-  final DateTime? deletedAt;
-  final int revision;
-  final String syncStatus;
 
   DateTime get scheduledEnd =>
       scheduledAt.add(Duration(minutes: durationMinutes));
@@ -136,7 +131,7 @@ class Appointment {
       );
 
   Map<String, Object?> toMap() => <String, Object?>{
-        'id': id,
+        ...envelopeMap(),
         'patient_id': patientId,
         'clinic_id': clinicId,
         'encounter_id': encounterId,
@@ -151,11 +146,6 @@ class Appointment {
         'started_at': toEpochOrNull(startedAt),
         'completed_at': toEpochOrNull(completedAt),
         'cancelled_reason': cancelledReason,
-        'created_at': toEpoch(createdAt),
-        'updated_at': toEpoch(updatedAt),
-        'deleted_at': toEpochOrNull(deletedAt),
-        'revision': revision,
-        'sync_status': syncStatus,
       };
 
   Appointment copyWith({

@@ -17,6 +17,8 @@ enum ModuleId {
   problemList,
   medications,
   appointments,
+  triage,
+  recall,
   analytics,
   cloudSync,
   multiUser,
@@ -41,6 +43,7 @@ class ModuleDescriptor {
     required this.tier,
     required this.icon,
     this.dependsOn = const <ModuleId>[],
+    this.clinicConfigurable = false,
   });
 
   final ModuleId id;
@@ -52,6 +55,12 @@ class ModuleDescriptor {
   /// Enabling a module implies enabling what it reads from. Checked by
   /// [ModuleRegistry.resolve] so a licence can never grant an unusable module.
   final List<ModuleId> dependsOn;
+
+  /// Whether a clinic turns this on or off for itself, independent of the
+  /// licence. An optional *workflow* — triage, say — is licensed but not every
+  /// clinic wants it, so its presence is a clinic setting, not just an
+  /// entitlement. Governed by [WorkflowPreferences]; defaults off for these.
+  final bool clinicConfigurable;
 }
 
 abstract final class ModuleRegistry {
@@ -118,6 +127,27 @@ abstract final class ModuleRegistry {
       tier: ModuleTier.core,
       icon: Icons.event_outlined,
       dependsOn: <ModuleId>[ModuleId.patients, ModuleId.clinics],
+    ),
+    ModuleId.triage: ModuleDescriptor(
+      id: ModuleId.triage,
+      name: 'Triage board',
+      description: 'Ranks the waiting room by acuity — NEWS2 risk, red flags '
+          'and wait time — so the sickest are seen first when it is busy. '
+          'Optional per clinic.',
+      tier: ModuleTier.professional,
+      icon: Icons.emergency_outlined,
+      dependsOn: <ModuleId>[ModuleId.appointments, ModuleId.earlyWarningScore],
+      clinicConfigurable: true,
+    ),
+    ModuleId.recall: ModuleDescriptor(
+      id: ModuleId.recall,
+      name: 'Recall list',
+      description: 'Patients overdue for a review they were promised, ranked '
+          'by how overdue. Optional per clinic.',
+      tier: ModuleTier.professional,
+      icon: Icons.event_repeat_outlined,
+      dependsOn: <ModuleId>[ModuleId.encounters],
+      clinicConfigurable: true,
     ),
     ModuleId.attachments: ModuleDescriptor(
       id: ModuleId.attachments,

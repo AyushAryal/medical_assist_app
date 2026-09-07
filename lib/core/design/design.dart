@@ -25,6 +25,9 @@ export '../theme/theme_scope.dart';
 export '../widgets/glass.dart'
     show GlassPanel, GlassChrome, AmbientBackground, StatusBarScrim;
 export '../widgets/section_card.dart' show SectionCard;
+export '../widgets/markdown_view.dart' show MarkdownView;
+export '../widgets/sheet_scaffold.dart' show SheetScaffold;
+export '../widgets/confirm_dialog.dart' show confirmDialog;
 
 // Layout and responsive behaviour.
 export 'layout.dart';
@@ -40,6 +43,7 @@ export 'ai_effects.dart'
         AiBadge,
         AiSparkleIcon,
         AiAuroraBackground,
+        GlowLasso,
         GeneratedText,
         GeneratedTextLegend,
         GeneratedSpanController,

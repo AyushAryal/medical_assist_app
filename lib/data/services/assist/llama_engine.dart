@@ -205,6 +205,25 @@ class LlamaEngine implements LanguageModelEngine {
   }
 
   @override
+  Future<String?> extractValues(
+    String description, {
+    required List<String> fields,
+  }) {
+    // The reply is only ever *proposed* into a form after being validated
+    // field-by-field against the schema (kinds and plausible bounds), so a
+    // hallucinated key or an impossible number is discarded, not entered.
+    return _complete(
+      'You extract clinical measurements from a spoken description into JSON. '
+      'Reply with ONLY a JSON object and nothing else. Use exactly these keys '
+      'and no others: ${fields.join(', ')}. A value is the number said for '
+      'that measurement; blood pressure is "systolic/diastolic" like "120/80". '
+      'Omit any field that is not clearly stated. Invent nothing.',
+      description,
+      maxTokens: 160,
+    );
+  }
+
+  @override
   Future<String?> assignSentencesToSections(
     List<String> numberedSentences,
   ) async {
@@ -235,6 +254,95 @@ class LlamaEngine implements LanguageModelEngine {
       maxTokens: 384,
     );
     return _draft(answer ?? plan);
+  }
+
+  @override
+  Future<LanguageModelDraft> spokenHandoff(String structuredHandoff) async {
+    final answer = await _complete(
+      'Rewrite this SBAR handoff as one short, natural paragraph a clinician '
+      'could read aloud at a shift change. Keep every fact and add none; '
+      'invent nothing. Where a line says something is "not recorded", say so '
+      'rather than omitting it.',
+      structuredHandoff,
+      maxTokens: 384,
+    );
+    // Falls back to the structured text when the model cannot answer — the
+    // deterministic handoff is always a valid handoff.
+    return _draft(answer ?? structuredHandoff);
+  }
+
+  @override
+  Future<LanguageModelDraft> spokenBrief(String structuredSummary) async {
+    final answer = await _complete(
+      'Rewrite this patient summary as one short, natural paragraph to hear '
+      'before a consultation. Keep every fact and add none; where a line says '
+      'something is "not recorded", say so.',
+      structuredSummary,
+      maxTokens: 320,
+    );
+    return _draft(answer ?? structuredSummary);
+  }
+
+  @override
+  Future<LanguageModelDraft> patientReminder(String reviewContext) async {
+    final answer = await _complete(
+      'Write a short, warm, plain-language appointment reminder for a patient '
+      'whose review is due, using only the facts given. No medical advice, no '
+      'new facts, no diagnosis — just a friendly reminder to book.',
+      reviewContext,
+      maxTokens: 200,
+    );
+    return _draft(answer ?? reviewContext);
+  }
+
+  @override
+  Future<LanguageModelDraft> triageTalkingPoints(String presentation) async {
+    final answer = await _complete(
+      'List 3 to 5 focused questions or examination points a clinician might '
+      'consider for this presentation. These are prompts to consider, not a '
+      'diagnosis and not instructions. Add no new facts. One per line.',
+      presentation,
+      maxTokens: 256,
+    );
+    return _draft(answer ?? '');
+  }
+
+  @override
+  Future<LanguageModelDraft> referralLetter(String record) async {
+    final answer = await _complete(
+      'Write a concise referral letter from these patient details: a brief '
+      'opening, the reason for referral, relevant history, current medications '
+      'and allergies, and the latest observations. Use only the facts given; '
+      'add none; do not diagnose.',
+      record,
+      maxTokens: 512,
+    );
+    return _draft(answer ?? record);
+  }
+
+  @override
+  Future<LanguageModelDraft> explainPlainly(String data) async {
+    final answer = await _complete(
+      'Explain what these clinical values show, in plain language a patient '
+      'could follow. Describe the numbers and their direction only. Do not '
+      'diagnose, do not advise, and add no facts.',
+      data,
+      maxTokens: 320,
+    );
+    return _draft(answer ?? data);
+  }
+
+  @override
+  Future<LanguageModelDraft> caseloadReport(String figures) async {
+    final answer = await _complete(
+      'Write a short, plain-language brief of the clinic\'s day from these '
+      'figures. State the numbers and what stands out. Add no facts, no '
+      'advice, no diagnosis. A short Markdown table is fine if it makes the '
+      'figures clearer.',
+      figures,
+      maxTokens: 320,
+    );
+    return _draft(answer ?? figures);
   }
 
   LanguageModelDraft _draft(String text) =>

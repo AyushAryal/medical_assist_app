@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 
 import '../../core/design/design.dart';
 import '../../core/smart_phrases/smart_phrase.dart';
-import '../../core/smart_phrases/smart_phrase_field.dart';
 import '../../core/smart_phrases/smart_phrase_library.dart';
 
 import '../../core/session/session_controller.dart';
@@ -21,14 +20,20 @@ import '../../data/models/problem.dart';
 import '../../data/repositories/clinical_repository.dart';
 import '../../core/app_bootstrap.dart';
 import '../../clinical/insights/note_intelligence.dart';
-import '../attachments/attachment_strip.dart';
-import '../attachments/field_attach_bar.dart';
+import '../attachments/attachments.dart';
+import '../scan/scan.dart';
 import 'amend_note_sheet.dart';
 import 'dictation_sheet.dart';
 import 'draft_review_screen.dart';
 import 'patient_instructions_sheet.dart';
 import '../../data/services/assist/note_drafting.dart';
 import 'template_picker_sheet.dart';
+import 'widgets/edit_status.dart';
+import 'widgets/note_toolbar.dart';
+import 'widgets/signed_note_view.dart';
+import 'widgets/soap_field.dart';
+import 'widgets/suggestion_panel.dart';
+import 'widgets/working_notes_card.dart';
 
 /// The SOAP note editor.
 ///
@@ -661,38 +666,25 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final generated = _fields.keys.where(_isGenerated).toList();
 
     final session = context.read<SessionController>();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Sign this note?'),
-        content: Text(
-          <String>[
-            if (unsorted.isNotEmpty)
-              'Your working notes still hold '
-                  '${unsorted.split(RegExp(r'\s+')).length} words that are '
-                  'not in any section. They are not part of the signed record '
-                  'and will be cleared.',
-            if (generated.isNotEmpty)
-              'You have not edited the text the model put into '
-                  '${generated.map((k) => _fieldLabels[k]!).join(' and ')} — '
-                  'read it once more before it becomes the record.',
-            'The note becomes the final record and can no longer be edited. '
-                'Later corrections are added as amendments, which stay '
-                'visible alongside the original.',
-            'Signing as ${session.signatureName}.',
-          ].join('\n\n'),
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Sign'),
-          ),
-        ],
-      ),
+    final confirmed = await confirmDialog(
+      context,
+      title: 'Sign this note?',
+      message: <String>[
+        if (unsorted.isNotEmpty)
+          'Your working notes still hold '
+              '${unsorted.split(RegExp(r'\s+')).length} words that are '
+              'not in any section. They are not part of the signed record '
+              'and will be cleared.',
+        if (generated.isNotEmpty)
+          'You have not edited the text the model put into '
+              '${generated.map((k) => _fieldLabels[k]!).join(' and ')} — '
+              'read it once more before it becomes the record.',
+        'The note becomes the final record and can no longer be edited. '
+            'Later corrections are added as amendments, which stay '
+            'visible alongside the original.',
+        'Signing as ${session.signatureName}.',
+      ].join('\n\n'),
+      confirmLabel: 'Sign',
     );
     if (confirmed != true || !mounted) return;
 
@@ -744,25 +736,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   Future<void> _removeAttachment(Attachment attachment) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Remove attachment?'),
-        content: const Text(
+    final confirmed = await confirmDialog(
+      context,
+      title: 'Remove attachment?',
+      message:
           'The file is deleted from this device. The record of it having been '
           'added remains in the access log.',
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Remove',
     );
     if (confirmed != true || !mounted) return;
     await context.read<ClinicalRepository>().removeAttachment(attachment);
@@ -831,7 +811,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               if (_undoMessage case final message?)
-                _UndoBanner(
+                UndoBanner(
                   message: message,
                   onUndo: _undo,
                   onDismiss: _dismissUndo,
@@ -859,9 +839,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         body: Column(
           children: <Widget>[
             PatientIdentityBar(patient: patient),
-            if (isLocked) _SignatureBar(note: note),
+            if (isLocked) SignatureBar(note: note),
             if (!isLocked)
-              _NoteToolbar(
+              NoteToolbar(
                 onTemplate: _applyTemplate,
                 onCopyForward: _copyForward,
                 onDictate: () => _dictate(_focusedSection),
@@ -879,7 +859,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                           padding: EdgeInsets.only(
                             bottom: context.metrics.spaceMd,
                           ),
-                          child: _WorkingNotesCard(
+                          child: WorkingNotesCard(
                             controller: _working,
                             focusNode: _workingFocus,
                             smartPhrases: _registry,
@@ -890,13 +870,14 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                             isDrafting: _drafting,
                             onSort: _sortWorkingNotes,
                             onDictate: () => _dictateWorking(),
+                            onScan: _scanIntoWorking,
                           ),
                         ),
                       for (final key in _fields.keys) _soapField(key, isLocked),
                     ],
                     secondary: <Widget>[
                       if (!isLocked && _suggestions.isNotEmpty)
-                        _SuggestionPanel(
+                        SuggestionPanel(
                           suggestions: _suggestions,
                           onAccept: _acceptSuggestion,
                           onDismiss: _dismissSuggestion,
@@ -913,9 +894,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                           ),
                         ),
                       if (_amendments.isNotEmpty)
-                        _AmendmentList(amendments: _amendments),
+                        AmendmentList(amendments: _amendments),
                       if (!isLocked)
-                        _SaveStatus(dirty: _dirty, savedAt: _savedAt),
+                        SaveStatus(dirty: _dirty, savedAt: _savedAt),
                       SizedBox(height: m.space2xl),
                     ],
                   ),
@@ -986,6 +967,19 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   /// Sorts the working notes into the four sections, via the on-device model.
   ///
+  /// Scans text off a photo of a page into the working notes. The text is
+  /// appended, never a section — it lands in the scratch box like dictation
+  /// does, to be read, edited and sorted before any of it reaches the note.
+  Future<void> _scanIntoWorking() async {
+    final text = await scanTextFrom(context);
+    if (text == null || text.trim().isEmpty || !mounted) return;
+    _markUndoPoint();
+    final existing = _working.text.trimRight();
+    _working.text = existing.isEmpty ? text : '$existing\n$text';
+    _onChanged();
+    _offerUndo('Added scanned text to the working notes.');
+  }
+
   /// Reads only the working notes, and empties them of whatever was accepted.
   /// That is the whole shape of the feature: dictate a consultation into one
   /// box, have it distributed, and be left with the remainder — so what did
@@ -1169,7 +1163,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final label = _fieldLabels[key]!;
     return Padding(
       padding: EdgeInsets.only(bottom: context.metrics.spaceMd),
-      child: _SoapField(
+      child: SoapField(
         letter: label[0],
         title: label,
         hint: _hints[key]!,
@@ -1211,665 +1205,4 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     'assessment': 'Impression, differential, reasoning',
     'plan': 'Treatment, investigations, safety-netting, follow-up',
   };
-}
-
-class _SoapField extends StatelessWidget {
-  const _SoapField({
-    required this.letter,
-    required this.title,
-    required this.hint,
-    required this.controller,
-    required this.enabled,
-    required this.attachments,
-    required this.paths,
-    required this.onCaptured,
-    required this.onDeleteAttachment,
-    required this.onDictate,
-    required this.onTranscribe,
-    required this.transcribingId,
-    this.aiAction,
-    this.isGenerated = false,
-    this.focusNode,
-    this.smartPhrases,
-    this.scope = const SmartPhraseScope(),
-  });
-
-  final String letter;
-  final String title;
-  final String hint;
-  final TextEditingController controller;
-  final FocusNode? focusNode;
-
-  /// The smart-phrase vocabulary, and the patient this note is about, so a `\`
-  /// menu here can fetch this patient's record.
-  final SmartPhraseRegistry? smartPhrases;
-  final SmartPhraseScope scope;
-  final bool enabled;
-  final List<Attachment> attachments;
-  final Map<String, String> paths;
-  final Future<void> Function({
-    required File file,
-    required AttachmentKind kind,
-    String? mimeType,
-    int? durationMs,
-  }) onCaptured;
-  final void Function(Attachment) onDeleteAttachment;
-  final VoidCallback onDictate;
-  final void Function(Attachment)? onTranscribe;
-  final String? transcribingId;
-
-  /// A model-drafting action for this section — sort, reword — or null when
-  /// no model is installed or the section has none. Rendered under the text
-  /// so the field itself stays what it is everywhere else in the app.
-  final Widget? aiAction;
-
-  /// True while this section holds text the model wrote and nobody has edited.
-  /// The badge comes off on the first keystroke — the rule the design system
-  /// states for generated content everywhere.
-  final bool isGenerated;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final m = context.metrics;
-
-    return SectionCard(
-      title: title,
-      leading: Container(
-        width: 28,
-        height: 28,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: palette.primaryContainer,
-          borderRadius: BorderRadius.circular(m.radiusSm - 2),
-        ),
-        child: Text(
-          letter,
-          style: context.texts.labelLarge
-              ?.copyWith(color: palette.onPrimaryContainer),
-        ),
-      ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          if (isGenerated) ...<Widget>[
-            // Short label — the section title is right beside it, so "AI" reads
-            // clearly without the width of "AI generated".
-            const AiBadge(label: 'AI', dense: true),
-            SizedBox(width: m.spaceXs),
-          ],
-          FieldAttachBar(
-            enabled: enabled,
-            onCaptured: onCaptured,
-            onDictate: onDictate,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          _wrapSmart(
-            TextField(
-              controller: controller,
-              focusNode: focusNode,
-              enabled: enabled,
-              maxLines: null,
-              minLines: 3,
-              keyboardType: TextInputType.multiline,
-              textCapitalization: TextCapitalization.sentences,
-              style: context.texts.bodyMedium,
-              decoration: InputDecoration(
-                hintText: hint,
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                disabledBorder: InputBorder.none,
-                filled: false,
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-          ),
-          ?aiAction,
-          // Evidence sits under the text it belongs to, playable and viewable
-          // in place — never filed away on a separate screen.
-          AttachmentStrip(
-            attachments: attachments,
-            paths: paths,
-            onDelete: enabled ? onDeleteAttachment : null,
-            onTranscribe: onTranscribe,
-            transcribingId: transcribingId,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _wrapSmart(Widget field) {
-    final registry = smartPhrases;
-    final node = focusNode;
-    final ctrl = controller;
-    if (registry == null || node == null || ctrl is! SmartPhraseController) {
-      return field;
-    }
-    return SmartPhraseField(
-      controller: ctrl,
-      focusNode: node,
-      registry: registry,
-      scope: scope,
-      child: field,
-    );
-  }
-}
-
-class _SignatureBar extends StatelessWidget {
-  const _SignatureBar({required this.note});
-
-  final ClinicalNote note;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final m = context.metrics;
-    final intact = note.verifyIntegrity();
-
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(
-        horizontal: m.spaceLg,
-        vertical: m.spaceSm,
-      ),
-      color: intact ? palette.surfaceSunken : palette.criticalSubtle,
-      child: Row(
-        children: <Widget>[
-          Icon(
-            intact ? Icons.verified_outlined : Icons.gpp_bad_outlined,
-            size: 16,
-            color: intact ? palette.signedLock : palette.critical,
-          ),
-          SizedBox(width: m.spaceSm),
-          Expanded(
-            child: Text(
-              intact
-                  ? 'Signed by ${note.signedBy ?? 'unknown'} · '
-                      '${Fmt.dateTime(note.signedAt)}'
-                  : 'Integrity check failed — stored content does not match '
-                      'the signature',
-              style: context.texts.labelSmall?.copyWith(
-                color: intact ? palette.onSurfaceMuted : palette.critical,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AmendmentList extends StatelessWidget {
-  const _AmendmentList({required this.amendments});
-
-  final List<NoteAmendment> amendments;
-
-  @override
-  Widget build(BuildContext context) {
-    final m = context.metrics;
-
-    return SectionCard(
-      title: 'Amendments',
-      subtitle: 'Appended after signing — the original text is unchanged',
-      leading: const Icon(Icons.playlist_add_check_outlined, size: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: amendments.map((amendment) {
-          return Padding(
-            padding: EdgeInsets.only(bottom: m.spaceMd),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  '${Fmt.dateTime(amendment.createdAt)} · '
-                  '${amendment.author ?? 'unknown'}',
-                  style: context.texts.labelSmall,
-                ),
-                Text(
-                  'Reason: ${amendment.reason}',
-                  style: context.texts.labelMedium,
-                ),
-                SizedBox(height: m.spaceXs),
-                Text(amendment.body, style: context.texts.bodyMedium),
-              ],
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-}
-
-
-/// The three bulk actions, spelled out.
-///
-/// These were icon-only buttons in the app bar: a page icon for "insert
-/// template" and a copy icon for "copy forward". Neither is guessable — the
-/// page icon is used for documents, articles, notes and lists across the
-/// platform, and a copy icon in a text editor means copy the text. An action
-/// that rewrites four fields cannot be behind a glyph the user has to tap to
-/// learn. They are labelled, and they sit above the fields they change.
-class _NoteToolbar extends StatelessWidget {
-  const _NoteToolbar({
-    required this.onTemplate,
-    required this.onCopyForward,
-    required this.onDictate,
-  });
-
-  final VoidCallback onTemplate;
-  final VoidCallback onCopyForward;
-  final VoidCallback onDictate;
-
-  @override
-  Widget build(BuildContext context) {
-    final m = context.metrics;
-    final palette = context.palette;
-
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(
-        horizontal: m.spaceLg,
-        vertical: m.spaceSm,
-      ),
-      decoration: BoxDecoration(
-        color: palette.surfaceSunken,
-        border: Border(
-          bottom: BorderSide(color: palette.outline, width: m.hairline),
-        ),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: <Widget>[
-            _ToolbarButton(
-              icon: Icons.mic_none_outlined,
-              label: 'Dictate',
-              onPressed: onDictate,
-              emphasised: true,
-            ),
-            SizedBox(width: m.spaceSm),
-            _ToolbarButton(
-              icon: Icons.dashboard_customize_outlined,
-              label: 'Template',
-              onPressed: onTemplate,
-            ),
-            SizedBox(width: m.spaceSm),
-            _ToolbarButton(
-              icon: Icons.history_edu_outlined,
-              label: 'Copy forward',
-              onPressed: onCopyForward,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ToolbarButton extends StatelessWidget {
-  const _ToolbarButton({
-    required this.icon,
-    required this.label,
-    required this.onPressed,
-    this.emphasised = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onPressed;
-  final bool emphasised;
-
-  @override
-  Widget build(BuildContext context) {
-    final style = TextButton.styleFrom(
-      visualDensity: VisualDensity.compact,
-      foregroundColor:
-          emphasised ? context.palette.primary : context.palette.onSurface,
-    );
-    return emphasised
-        ? FilledButton.tonalIcon(
-            onPressed: onPressed,
-            icon: Icon(icon, size: 18),
-            label: Text(label),
-          )
-        : TextButton.icon(
-            onPressed: onPressed,
-            style: style,
-            icon: Icon(icon, size: 18),
-            label: Text(label),
-          );
-  }
-}
-
-/// Structured entries the written text implies, offered rather than applied.
-///
-/// This exists because of a specific, ordinary failure: a clinician writes
-/// "started on amlodipine 5mg" in the plan and the medication list still says
-/// nothing. Six months later the medication list is not trustworthy enough to
-/// prescribe against. Every row here is one tap to file and one tap to
-/// dismiss, and dismissal is remembered so the same suggestion does not
-/// reappear on the next keystroke.
-class _SuggestionPanel extends StatelessWidget {
-  const _SuggestionPanel({
-    required this.suggestions,
-    required this.onAccept,
-    required this.onDismiss,
-  });
-
-  final List<ExtractedTerm> suggestions;
-  final Future<void> Function(ExtractedTerm) onAccept;
-  final void Function(ExtractedTerm) onDismiss;
-
-  @override
-  Widget build(BuildContext context) {
-    final m = context.metrics;
-    final palette = context.palette;
-
-    return SectionCard(
-      title: 'From your note',
-      subtitle: 'Nothing is filed until you tap it',
-      leading: const AiSparkleIcon(size: 20),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          const AiBadge(label: 'Suggested', dense: true),
-          InfoDot(
-            explanation: NoteIntelligence.explain(suggestions.length),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          for (final term in suggestions)
-            Padding(
-              padding: EdgeInsets.only(bottom: m.spaceSm),
-              child: Row(
-                children: <Widget>[
-                  Icon(
-                    switch (term.kind) {
-                      ExtractedTermKind.medication =>
-                        Icons.medication_outlined,
-                      ExtractedTermKind.problem => Icons.checklist_outlined,
-                      ExtractedTermKind.allergy =>
-                        Icons.warning_amber_outlined,
-                      ExtractedTermKind.redFlag => Icons.priority_high,
-                      ExtractedTermKind.followUp =>
-                        Icons.event_available_outlined,
-                    },
-                    size: 17,
-                    color: term.kind == ExtractedTermKind.redFlag
-                        ? palette.critical
-                        : palette.onSurfaceMuted,
-                  ),
-                  SizedBox(width: m.spaceSm),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(term.text, style: context.texts.bodyMedium),
-                        Text(
-                          '${term.kind.label} · from "${term.matchedPhrase}"',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: context.texts.labelSmall,
-                        ),
-                      ],
-                    ),
-                  ),
-                  // A red flag is a prompt to think, not a record to file, so
-                  // it gets no "add" action — only acknowledgement.
-                  if (term.kind != ExtractedTermKind.redFlag)
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      tooltip: 'Add to chart',
-                      icon: const Icon(Icons.add_circle_outline, size: 20),
-                      onPressed: () => onAccept(term),
-                    ),
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    tooltip: 'Dismiss',
-                    icon: const Icon(Icons.close, size: 18),
-                    onPressed: () => onDismiss(term),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SaveStatus extends StatelessWidget {
-  const _SaveStatus({required this.dirty, required this.savedAt});
-
-  final bool dirty;
-  final DateTime? savedAt;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final m = context.metrics;
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: <Widget>[
-        Icon(
-          dirty ? Icons.sync : Icons.cloud_done_outlined,
-          size: 14,
-          color: palette.onSurfaceMuted,
-        ),
-        SizedBox(width: m.spaceXs),
-        Text(
-          dirty
-              ? 'Saving…'
-              : savedAt == null
-                  ? 'Autosaves as you type'
-                  : 'Saved ${Fmt.time(savedAt)}',
-          style: context.texts.labelSmall,
-        ),
-      ],
-    );
-  }
-}
-
-
-/// "That was inserted — you can take it back", with a timer this app owns.
-class _UndoBanner extends StatelessWidget {
-  const _UndoBanner({
-    required this.message,
-    required this.onUndo,
-    required this.onDismiss,
-  });
-
-  final String message;
-  final VoidCallback onUndo;
-  final VoidCallback onDismiss;
-
-  @override
-  Widget build(BuildContext context) {
-    final m = context.metrics;
-    final palette = context.palette;
-
-    return Container(
-      margin: EdgeInsets.fromLTRB(m.spaceLg, 0, m.spaceLg, m.spaceXs),
-      padding: EdgeInsets.fromLTRB(m.spaceMd, m.spaceSm, m.spaceXs, m.spaceSm),
-      decoration: BoxDecoration(
-        color: palette.surfaceMuted,
-        borderRadius: BorderRadius.circular(m.radiusSm),
-        border: Border.all(color: palette.outline, width: m.hairline),
-      ),
-      child: Row(
-        children: <Widget>[
-          Icon(Icons.history, size: 16, color: palette.onSurfaceMuted),
-          SizedBox(width: m.spaceSm),
-          Expanded(
-            child: Text(message, style: context.texts.bodySmall),
-          ),
-          TextButton(
-            onPressed: onUndo,
-            style: TextButton.styleFrom(
-              visualDensity: VisualDensity.compact,
-            ),
-            child: const Text('Undo'),
-          ),
-          IconButton(
-            visualDensity: VisualDensity.compact,
-            iconSize: 16,
-            tooltip: 'Dismiss',
-            icon: const Icon(Icons.close),
-            onPressed: onDismiss,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// The rough-draft box that sits above the four sections.
-///
-/// It exists because the SOAP structure describes where a note *ends up*, not
-/// how it is produced: a clinician talks through a consultation in the order
-/// it happened, and asking them to pre-sort into four boxes as they speak is
-/// asking them to do the work the structure was supposed to save.
-///
-/// So this is a plain scratch box with a microphone, and — when a model is
-/// installed — one button that distributes what is in it. Without a model it
-/// is still useful on its own: somewhere to put words while a patient is
-/// still talking. It is deliberately not part of the signed record, and the
-/// editor refuses to sign quietly while anything is still sitting in it.
-class _WorkingNotesCard extends StatelessWidget {
-  const _WorkingNotesCard({
-    required this.controller,
-    required this.hasModel,
-    required this.isDrafting,
-    required this.onSort,
-    required this.onDictate,
-    this.focusNode,
-    this.smartPhrases,
-    this.scope = const SmartPhraseScope(),
-  });
-
-  final TextEditingController controller;
-  final FocusNode? focusNode;
-  final SmartPhraseRegistry? smartPhrases;
-  final SmartPhraseScope scope;
-  final bool hasModel;
-  final bool isDrafting;
-  final VoidCallback onSort;
-  final VoidCallback onDictate;
-
-  @override
-  Widget build(BuildContext context) {
-    final m = context.metrics;
-    final palette = context.palette;
-
-    return ListenableBuilder(
-      listenable: controller,
-      builder: (context, _) {
-        final hasText = controller.text.trim().isNotEmpty;
-
-        return SectionCard(
-          title: 'Working notes',
-          subtitle: 'Talk or type it all here — sort it after',
-          leading: Container(
-            width: 28,
-            height: 28,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: palette.surfaceMuted,
-              borderRadius: BorderRadius.circular(m.radiusSm - 2),
-            ),
-            child: Icon(
-              Icons.edit_note,
-              size: 18,
-              color: palette.onSurfaceMuted,
-            ),
-          ),
-          trailing: IconButton(
-            tooltip: 'Dictate into the working notes',
-            icon: const Icon(Icons.mic_none_outlined),
-            onPressed: onDictate,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              _wrapSmart(
-                TextField(
-                  controller: controller,
-                  focusNode: focusNode,
-                  maxLines: null,
-                  minLines: 3,
-                  keyboardType: TextInputType.multiline,
-                  textCapitalization: TextCapitalization.sentences,
-                  style: context.texts.bodyMedium,
-                  decoration: InputDecoration(
-                    hintText: 'Whatever the consultation produced, in any '
-                        'order. Nothing here is part of the signed note.',
-                    hintStyle: context.texts.bodySmall
-                        ?.copyWith(color: palette.onSurfaceMuted),
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    filled: false,
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ),
-              ),
-              if (hasText) ...<Widget>[
-                SizedBox(height: m.spaceSm),
-                AiGlowBorder(
-                  active: isDrafting,
-                  borderRadius: BorderRadius.circular(m.radiusSm),
-                  child: FilledButton.tonalIcon(
-                    onPressed: isDrafting ? null : onSort,
-                    icon: isDrafting
-                        ? const AiSparkleIcon(size: 18)
-                        : const Icon(Icons.auto_awesome_outlined, size: 18),
-                    label: Text(
-                      isDrafting ? 'Sorting…' : 'Sort into S · O · A · P',
-                    ),
-                  ),
-                ),
-                SizedBox(height: m.spaceXs),
-                Text(
-                  hasModel
-                      ? 'Sorted by the note rules first; the model places '
-                          'whatever they cannot. Nothing is reworded.'
-                      : 'Sorted by the note rules — "on examination", '
-                          '"likely", "review in a week". An assistant model '
-                          'in Settings › On-device AI places the rest.',
-                  style: context.texts.labelSmall
-                      ?.copyWith(color: palette.onSurfaceMuted),
-                ),
-              ],
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _wrapSmart(Widget field) {
-    final registry = smartPhrases;
-    final node = focusNode;
-    final ctrl = controller;
-    if (registry == null || node == null || ctrl is! SmartPhraseController) {
-      return field;
-    }
-    return SmartPhraseField(
-      controller: ctrl,
-      focusNode: node,
-      registry: registry,
-      scope: scope,
-      child: field,
-    );
-  }
 }

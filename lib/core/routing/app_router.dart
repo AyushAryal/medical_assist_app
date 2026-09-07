@@ -1,21 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../features/clinics/clinic_list_screen.dart';
-import '../../features/appointments/schedule_screen.dart';
-import '../../features/dashboard/dashboard_screen.dart';
-import '../../features/encounters/encounter_screen.dart';
-import '../../features/notes/note_editor_screen.dart';
-import '../../features/patients/patient_chart_screen.dart';
-import '../../features/patients/patient_form_screen.dart';
-import '../../features/patients/patient_list_screen.dart';
-import '../../features/assist/ask_screen.dart';
-import '../../features/settings/settings_screen.dart';
-import '../../features/settings/audit_log_screen.dart';
-import '../../features/settings/dictation_settings_screen.dart';
-import '../../features/settings/modules_screen.dart';
-import '../../features/shell/app_shell.dart';
-import '../../features/vitals/vitals_entry_screen.dart';
+import '../../features/appointments/appointments.dart';
+import '../../features/assist/assist.dart';
+import '../../features/clinics/clinics.dart';
+import '../../features/dashboard/dashboard.dart';
+import '../../features/encounters/encounters.dart';
+import '../../features/notes/notes.dart';
+import '../../features/patients/patients.dart';
+import '../../features/settings/settings.dart';
+import '../../features/recall/recall.dart';
+import '../../features/shell/shell.dart';
+import '../../features/triage/triage.dart';
+import '../../features/vitals/vitals.dart';
 import 'fade_through_route.dart';
 
 /// Full-screen route pages get their own opaque ambient background plus a
@@ -52,10 +49,14 @@ abstract final class Routes {
   static const String encounter = '/encounters/:encounterId';
   static const String noteEditor = '/encounters/:encounterId/note';
   static const String clinics = '/clinics';
+  static const String triage = '/triage';
+  static const String recall = '/recall';
   static const String settings = '/settings';
   static const String modules = '/settings/modules';
   static const String auditLog = '/settings/audit';
   static const String dictation = '/settings/dictation';
+  static const String voice = '/settings/voice';
+  static const String ai = '/settings/ai';
 
   static String chartFor(String patientId) => '/patients/$patientId';
   static String editFor(String patientId) => '/patients/$patientId/edit';
@@ -205,6 +206,16 @@ abstract final class AppRouter {
               _fadeThrough(state, const ClinicListScreen()),
         ),
         GoRoute(
+          path: Routes.triage,
+          parentNavigatorKey: rootNavigatorKey,
+          builder: (context, state) => const TriageBoardScreen(),
+        ),
+        GoRoute(
+          path: Routes.recall,
+          parentNavigatorKey: rootNavigatorKey,
+          builder: (context, state) => const RecallBoardScreen(),
+        ),
+        GoRoute(
           path: Routes.modules,
           parentNavigatorKey: rootNavigatorKey,
           pageBuilder: (context, state) =>
@@ -221,6 +232,16 @@ abstract final class AppRouter {
           parentNavigatorKey: rootNavigatorKey,
           pageBuilder: (context, state) =>
               _fadeThrough(state, const DictationSettingsScreen()),
+        ),
+        GoRoute(
+          path: Routes.voice,
+          parentNavigatorKey: rootNavigatorKey,
+          builder: (context, state) => const VoiceSettingsScreen(),
+        ),
+        GoRoute(
+          path: Routes.ai,
+          parentNavigatorKey: rootNavigatorKey,
+          builder: (context, state) => const AiSettingsScreen(),
         ),
       ],
       errorBuilder: (context, state) => Scaffold(
