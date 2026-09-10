@@ -47,8 +47,8 @@ class ChartAnswerView extends StatelessWidget {
         result.unit != null && result.points.any((p) => p.n > 1);
 
     return AnswerTableCard(
-      title: result.caption,
-      leading: Icon(DataChart.iconFor(result.style), size: 20),
+      caption: result.caption,
+      captionIcon: DataChart.iconFor(result.style),
       columns: <String>[
         result.axisLabel ?? 'Group',
         result.valueLabel ?? 'Value',
@@ -82,11 +82,14 @@ class ChartAnswerView extends StatelessWidget {
     final m = context.metrics;
 
     return SectionCard(
-      title: result.caption,
-      leading: Icon(DataChart.iconFor(result.style), size: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
+          AnswerCaption(
+            text: result.caption,
+            icon: DataChart.iconFor(result.style),
+          ),
+          SizedBox(height: m.spaceSm),
           if (result.valueLabel case final label?)
             Padding(
               padding: EdgeInsets.only(bottom: m.spaceXs),

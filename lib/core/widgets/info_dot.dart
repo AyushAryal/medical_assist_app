@@ -13,11 +13,7 @@ import 'glass.dart';
 /// still expanded to the minimum comfortable size, because a 14px hit box is
 /// unusable with a gloved thumb.
 class InfoDot extends StatelessWidget {
-  const InfoDot({
-    super.key,
-    required this.explanation,
-    this.semanticLabel,
-  });
+  const InfoDot({super.key, required this.explanation, this.semanticLabel});
 
   /// Convenience for prose that needs no derivation — a definition rather than
   /// a calculation.
@@ -31,13 +27,13 @@ class InfoDot extends StatelessWidget {
     ExplainConfidence confidence = ExplainConfidence.measured,
     this.semanticLabel,
   }) : explanation = MetricExplanation(
-          title: title,
-          summary: summary,
-          method: method,
-          source: source,
-          caveat: caveat,
-          confidence: confidence,
-        );
+         title: title,
+         summary: summary,
+         method: method,
+         source: source,
+         caveat: caveat,
+         confidence: confidence,
+       );
 
   final MetricExplanation explanation;
   final String? semanticLabel;
@@ -125,90 +121,117 @@ class ExplainSheet extends StatelessWidget {
           maxHeight: MediaQuery.sizeOf(context).height * 0.85,
           maxWidth: m.contentMaxWidth,
         ),
-        child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(
-            m.spaceLg,
-            0,
-            m.spaceLg,
-            m.spaceXl,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(e.title, style: context.texts.titleLarge),
-              SizedBox(height: m.spaceSm),
-              Text(e.summary, style: context.texts.bodyMedium),
-              SizedBox(height: m.spaceLg),
-              _ConfidenceStrip(confidence: e.confidence),
-              if (e.method.isNotEmpty) ...<Widget>[
-                SizedBox(height: m.spaceLg),
-                Text('How it is worked out', style: context.texts.labelLarge),
-                SizedBox(height: m.spaceSm),
-                for (var i = 0; i < e.method.length; i++)
-                  _Step(index: i + 1, text: e.method[i]),
-              ],
-              if (e.hasDerivation) ...<Widget>[
-                SizedBox(height: m.spaceLg),
-                Text(
-                  'For this record',
-                  style: context.texts.labelLarge,
-                ),
-                SizedBox(height: m.spaceSm),
-                _DerivationTable(rows: e.derivation, total: e.total),
-              ] else if (e.total != null) ...<Widget>[
-                SizedBox(height: m.spaceLg),
-                Text('Result', style: context.texts.labelLarge),
-                SizedBox(height: m.spaceXs),
-                Text(e.total!, style: context.texts.titleMedium),
-              ],
-              if (e.caveat != null) ...<Widget>[
-                SizedBox(height: m.spaceLg),
-                Container(
-                  padding: EdgeInsets.all(m.spaceMd),
-                  decoration: BoxDecoration(
-                    color: palette.caution.withValues(alpha: context.isDark
-                        ? 0.14
-                        : 0.09),
-                    borderRadius: BorderRadius.circular(m.radiusSm),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            // Pinned above the scroll: a sheet tall enough to fill the screen
+            // reads as a page, and a page needs a visible way out — the drag
+            // handle alone was being missed, and a drag on the content scrolls
+            // rather than dismisses.
+            Padding(
+              padding: EdgeInsets.fromLTRB(m.spaceLg, 0, m.spaceSm, 0),
+              child: Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Text(e.title, style: context.texts.titleLarge),
                   ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Icon(
-                        Icons.error_outline,
-                        size: 17,
-                        color: palette.caution,
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    tooltip: 'Close',
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(
+                  m.spaceLg,
+                  0,
+                  m.spaceLg,
+                  m.spaceXl,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(e.summary, style: context.texts.bodyMedium),
+                    SizedBox(height: m.spaceLg),
+                    _ConfidenceStrip(confidence: e.confidence),
+                    if (e.method.isNotEmpty) ...<Widget>[
+                      SizedBox(height: m.spaceLg),
+                      Text(
+                        'How it is worked out',
+                        style: context.texts.labelLarge,
                       ),
-                      SizedBox(width: m.spaceSm),
-                      Expanded(
-                        child: Text(
-                          e.caveat!,
-                          style: context.texts.bodySmall,
+                      SizedBox(height: m.spaceSm),
+                      for (var i = 0; i < e.method.length; i++)
+                        _Step(index: i + 1, text: e.method[i]),
+                    ],
+                    if (e.hasDerivation) ...<Widget>[
+                      SizedBox(height: m.spaceLg),
+                      Text('For this record', style: context.texts.labelLarge),
+                      SizedBox(height: m.spaceSm),
+                      _DerivationTable(rows: e.derivation, total: e.total),
+                    ] else if (e.total != null) ...<Widget>[
+                      SizedBox(height: m.spaceLg),
+                      Text('Result', style: context.texts.labelLarge),
+                      SizedBox(height: m.spaceXs),
+                      Text(e.total!, style: context.texts.titleMedium),
+                    ],
+                    if (e.caveat != null) ...<Widget>[
+                      SizedBox(height: m.spaceLg),
+                      Container(
+                        padding: EdgeInsets.all(m.spaceMd),
+                        decoration: BoxDecoration(
+                          color: palette.caution.withValues(
+                            alpha: context.isDark ? 0.14 : 0.09,
+                          ),
+                          borderRadius: BorderRadius.circular(m.radiusSm),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Icon(
+                              Icons.error_outline,
+                              size: 17,
+                              color: palette.caution,
+                            ),
+                            SizedBox(width: m.spaceSm),
+                            Expanded(
+                              child: Text(
+                                e.caveat!,
+                                style: context.texts.bodySmall,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
-                  ),
-                ),
-              ],
-              if (e.source != null) ...<Widget>[
-                SizedBox(height: m.spaceLg),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Icon(
-                      Icons.menu_book_outlined,
-                      size: 15,
-                      color: palette.onSurfaceMuted,
-                    ),
-                    SizedBox(width: m.spaceSm),
-                    Expanded(
-                      child: Text(e.source!, style: context.texts.labelSmall),
-                    ),
+                    if (e.source != null) ...<Widget>[
+                      SizedBox(height: m.spaceLg),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Icon(
+                            Icons.menu_book_outlined,
+                            size: 15,
+                            color: palette.onSurfaceMuted,
+                          ),
+                          SizedBox(width: m.spaceSm),
+                          Expanded(
+                            child: Text(
+                              e.source!,
+                              style: context.texts.labelSmall,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
-              ],
-            ],
-          ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -228,14 +251,11 @@ class _ConfidenceStrip extends StatelessWidget {
     final (Color tone, IconData icon) = switch (confidence) {
       ExplainConfidence.measured => (palette.info, Icons.calculate_outlined),
       ExplainConfidence.validated => (palette.normal, Icons.verified_outlined),
-      ExplainConfidence.heuristic => (
-          palette.caution,
-          Icons.lightbulb_outline,
-        ),
+      ExplainConfidence.heuristic => (palette.caution, Icons.lightbulb_outline),
       ExplainConfidence.insufficientData => (
-          palette.onSurfaceMuted,
-          Icons.data_usage_outlined,
-        ),
+        palette.onSurfaceMuted,
+        Icons.data_usage_outlined,
+      ),
     };
 
     return Container(
@@ -322,10 +342,7 @@ class _DerivationTable extends StatelessWidget {
     final palette = context.palette;
 
     return GlassPanel(
-      padding: EdgeInsets.symmetric(
-        horizontal: m.spaceMd,
-        vertical: m.spaceSm,
-      ),
+      padding: EdgeInsets.symmetric(horizontal: m.spaceMd, vertical: m.spaceSm),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
@@ -346,9 +363,7 @@ class _DerivationTable extends StatelessWidget {
             ),
             Row(
               children: <Widget>[
-                Expanded(
-                  child: Text('Total', style: context.texts.labelLarge),
-                ),
+                Expanded(child: Text('Total', style: context.texts.labelLarge)),
                 Text(
                   total!,
                   style: context.texts.titleSmall?.copyWith(

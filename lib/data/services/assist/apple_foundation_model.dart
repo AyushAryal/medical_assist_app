@@ -105,10 +105,13 @@ class AppleFoundationLanguageModel implements LanguageModelEngine {
   @override
   Future<LanguageModelDraft> referralLetter(String record) async {
     final answer = await _complete(
-      'Write a concise referral letter from these patient details: a brief '
-      'opening, the reason for referral, relevant history, current medications '
-      'and allergies, and the latest observations. Use only the facts given; '
-      'add none; do not diagnose.',
+      'Below is a draft referral letter. Rewrite it so it reads as natural, '
+      'formal prose from one clinician to a colleague — vary the phrasing, '
+      'merge choppy sentences, keep it courteous and concise. Keep every '
+      'clinical fact exactly as given; add none; remove none; do not '
+      'diagnose. Do not add a date, addresses, a salutation or a signature '
+      'block — the letter template provides those. Return only the letter '
+      'body.',
       record,
     );
     return _draft(answer ?? record);

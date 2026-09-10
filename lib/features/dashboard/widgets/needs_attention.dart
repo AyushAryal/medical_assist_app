@@ -24,7 +24,7 @@ class NeedsAttention extends StatelessWidget {
     final palette = context.palette;
 
     return Padding(
-      padding: EdgeInsets.only(bottom: m.spaceLg),
+      padding: EdgeInsets.only(bottom: m.spaceMd),
       child: Container(
         decoration: BoxDecoration(
           color: palette.criticalSubtle,

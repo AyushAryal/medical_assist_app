@@ -27,7 +27,7 @@ class PinPad extends StatelessWidget {
     final m = context.metrics;
 
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 320),
+      constraints: const BoxConstraints(maxWidth: 340),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
@@ -91,7 +91,7 @@ class _PinKey extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    const double size = 72;
+    const double size = 76;
 
     if (label == null && icon == null) {
       return const SizedBox(width: size, height: size);

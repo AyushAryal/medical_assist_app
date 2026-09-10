@@ -46,6 +46,7 @@ class AssistPresentationView extends StatefulWidget {
     this.onSuggestion,
     this.onExpand,
     this.showHeadline = true,
+    this.title,
     this.followUps = const <FollowUp>[],
     this.onFollowUp,
   });
@@ -80,6 +81,11 @@ class AssistPresentationView extends StatefulWidget {
   /// panel says it in the assistant's own bubble, and repeating it directly
   /// underneath makes the app look like it is stuttering.
   final bool showHeadline;
+
+  /// A short name seated in the control row when [showHeadline] is false —
+  /// a dashboard tile's title. On the same line as the view toggle, because a
+  /// left-aligned title over a right-floating toggle read as two stray rows.
+  final String? title;
 
   @override
   State<AssistPresentationView> createState() => _AssistPresentationViewState();
@@ -184,11 +190,12 @@ class _AssistPresentationViewState extends State<AssistPresentationView> {
           // headline (the tile title already says what it is). Everything a
           // single answer guarantees — its own explanation, its own honest
           // emptiness — holds per tile because it *is* the same renderer.
-          panelBuilder: (body) => AssistPresentationView(
+          panelBuilder: (title, body) => AssistPresentationView(
             presentation: body,
             provenance: widget.provenance,
             compact: true,
             showHeadline: false,
+            title: title,
             isGenerated: false,
           ),
         ),
@@ -229,17 +236,24 @@ class _AssistPresentationViewState extends State<AssistPresentationView> {
     if (!widget.showHeadline) {
       // The explanation control still has to be reachable — an answer that
       // cannot say how it was reached is exactly what this app refuses.
-      return Align(
-        alignment: Alignment.centerRight,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            toggle,
-            SizedBox(width: m.spaceXs),
-            if (widget.isGenerated) const AiBadge(dense: true),
-            explanation,
-          ],
-        ),
+      return Row(
+        children: <Widget>[
+          Expanded(
+            child: widget.title == null
+                ? const SizedBox.shrink()
+                : Text(
+                    widget.title!,
+                    style: context.texts.labelLarge,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+          ),
+          SizedBox(width: m.spaceXs),
+          toggle,
+          SizedBox(width: m.spaceXs),
+          if (widget.isGenerated) const AiBadge(dense: true),
+          explanation,
+        ],
       );
     }
 

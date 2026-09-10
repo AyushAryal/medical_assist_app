@@ -15,6 +15,8 @@ class AnswerTableCard extends StatelessWidget {
     required this.columns,
     required this.rows,
     this.title,
+    this.caption,
+    this.captionIcon = Icons.table_rows_outlined,
     this.leading,
     this.onTapRow,
     this.footer,
@@ -23,6 +25,15 @@ class AnswerTableCard extends StatelessWidget {
   final List<String> columns;
   final List<List<String>> rows;
   final String? title;
+
+  /// Provenance metadata ("Donut chart · 8 rows read · from 17 Jun") rather
+  /// than a name. Drawn as one quiet line that truncates, where [title] is a
+  /// heading that wraps — a caption set as the title dominated the card.
+  final String? caption;
+
+  /// Glyph for the caption line.
+  final IconData captionIcon;
+
   final Widget? leading;
 
   /// Row index → action. Set where a row stands for a record that can be
@@ -37,10 +48,16 @@ class AnswerTableCard extends StatelessWidget {
 
     return SectionCard(
       title: title,
-      leading: leading ?? const Icon(Icons.table_rows_outlined, size: 20),
+      leading: title == null
+          ? null
+          : leading ?? const Icon(Icons.table_rows_outlined, size: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
+          if (caption != null) ...<Widget>[
+            AnswerCaption(text: caption!, icon: captionIcon),
+            SizedBox(height: m.spaceSm),
+          ],
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: DataTable(
@@ -74,6 +91,37 @@ class AnswerTableCard extends StatelessWidget {
           ?footer,
         ],
       ),
+    );
+  }
+}
+
+/// One quiet, truncating line of provenance metadata at the top of an answer
+/// card — how the figure was drawn, from how many rows, since when.
+class AnswerCaption extends StatelessWidget {
+  const AnswerCaption({super.key, required this.text, required this.icon});
+
+  final String text;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+
+    return Row(
+      children: <Widget>[
+        Icon(icon, size: 16, color: palette.onSurfaceMuted),
+        SizedBox(width: context.metrics.spaceSm),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: context.texts.labelMedium?.copyWith(
+              color: palette.onSurfaceMuted,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

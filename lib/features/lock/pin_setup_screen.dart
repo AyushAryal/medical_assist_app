@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/design/design.dart';
 
 import '../../core/security/app_lock_service.dart';
+import 'lock_layout.dart';
 import 'pin_pad.dart';
 
 /// First-run PIN enrolment, and PIN change from settings.
@@ -150,56 +151,53 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: widget.isFirstRun ? null : AppBar(title: const Text('Change PIN')),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.all(m.spaceXl),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                if (widget.isFirstRun) ...<Widget>[
-                  Icon(Icons.shield_outlined, size: 36, color: palette.primary),
-                  SizedBox(height: m.spaceLg),
-                ],
-                Text(_title, style: context.texts.titleLarge),
-                SizedBox(height: m.spaceXs),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 320),
-                  child: Text(
-                    _subtitle,
-                    style: context.texts.bodySmall,
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                SizedBox(height: m.spaceXl),
-                PinDots(
-                  length: _pinLength,
-                  filled: _entry.length,
-                  hasError: _hasError,
-                ),
-                SizedBox(height: m.spaceLg),
-                SizedBox(
-                  height: 40,
-                  child: _message == null
-                      ? null
-                      : Text(
-                          _message!,
-                          textAlign: TextAlign.center,
-                          style: context.texts.bodySmall
-                              ?.copyWith(color: palette.critical),
-                        ),
-                ),
-                PinPad(
-                  onDigit: _onDigit,
-                  onBackspace: () {
-                    if (_entry.isEmpty) return;
-                    setState(() =>
-                        _entry = _entry.substring(0, _entry.length - 1));
-                  },
-                ),
-              ],
+      body: LockLayout(
+        header: Column(
+          children: <Widget>[
+            if (widget.isFirstRun) ...<Widget>[
+              Icon(Icons.shield_outlined, size: 44, color: palette.primary),
+              SizedBox(height: m.spaceLg),
+            ],
+            Text(_title, style: context.texts.headlineSmall),
+            SizedBox(height: m.spaceXs),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 320),
+              child: Text(
+                _subtitle,
+                style: context.texts.bodySmall,
+                textAlign: TextAlign.center,
+              ),
             ),
-          ),
+          ],
+        ),
+        progress: Column(
+          children: <Widget>[
+            PinDots(
+              length: _pinLength,
+              filled: _entry.length,
+              hasError: _hasError,
+            ),
+            SizedBox(height: m.spaceLg),
+            SizedBox(
+              height: 40,
+              child: _message == null
+                  ? null
+                  : Text(
+                      _message!,
+                      textAlign: TextAlign.center,
+                      style: context.texts.bodySmall
+                          ?.copyWith(color: palette.critical),
+                    ),
+            ),
+          ],
+        ),
+        keypad: PinPad(
+          onDigit: _onDigit,
+          onBackspace: () {
+            if (_entry.isEmpty) return;
+            setState(
+                () => _entry = _entry.substring(0, _entry.length - 1));
+          },
         ),
       ),
     );

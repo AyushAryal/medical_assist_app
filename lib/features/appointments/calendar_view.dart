@@ -113,6 +113,9 @@ class MonthGrid extends StatelessWidget {
         SizedBox(height: m.spaceXs),
         GridView.count(
           shrinkWrap: true,
+          // Explicitly zero, or the grid inherits the ambient safe-area
+          // insets as padding and opens a dead band around the month.
+          padding: EdgeInsets.zero,
           physics: const NeverScrollableScrollPhysics(),
           crossAxisCount: 7,
           mainAxisSpacing: m.spaceXs,

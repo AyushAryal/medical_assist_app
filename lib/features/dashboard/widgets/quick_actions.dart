@@ -65,6 +65,10 @@ class QuickActions extends StatelessWidget {
 
     return GridView.count(
       shrinkWrap: true,
+      // Explicitly zero: a scrollable with no padding of its own inherits the
+      // ambient safe-area insets, which here showed up as a ~60px dead band
+      // above and below the grid, mid-page.
+      padding: EdgeInsets.zero,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisCount: columns,
       mainAxisSpacing: m.spaceSm,

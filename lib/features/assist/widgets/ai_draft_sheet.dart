@@ -4,8 +4,14 @@ import 'package:provider/provider.dart';
 
 import '../../../core/app_bootstrap.dart';
 import '../../../core/design/design.dart';
+import '../../../core/smart_phrases/smart_phrase.dart';
+import '../../../core/smart_phrases/smart_phrase_field.dart';
+import '../../../core/smart_phrases/smart_phrase_library.dart';
+import '../../../data/repositories/clinical_repository.dart';
 import '../../../data/services/assist/language_model.dart';
+import '../../../data/services/letter_pdf.dart';
 import '../../../data/services/speech_out.dart';
+import 'letter_preview_screen.dart';
 import 'speak_button.dart';
 
 /// One input a generated draft was built from — a record section, an
@@ -41,10 +47,26 @@ class AiDraftSheet extends StatefulWidget {
     this.caveat,
     this.notice,
     this.sources = const <AiSource>[],
+    this.editable = false,
+    this.patientId,
+    this.letter,
   });
 
   final String title;
   final String? subtitle;
+
+  /// Lets the clinician correct the draft in place before copying or
+  /// exporting it. The edited text is what every action then uses.
+  final bool editable;
+
+  /// The patient the draft is about, so `\`-macros that read the chart
+  /// (`\vitals`, `\meds`, …) resolve against the right record while editing.
+  final String? patientId;
+
+  /// When set, the footer offers a PDF of the (possibly edited) draft laid on
+  /// this letterhead — previewable, printable, shareable (which is also how
+  /// it is emailed: the share sheet attaches the PDF to a new message).
+  final LetterPdf? letter;
 
   /// What the draft was built from — shown behind a "Sources" button.
   final List<AiSource> sources;
@@ -68,16 +90,23 @@ class AiDraftSheet extends StatefulWidget {
     String? caveat,
     String? notice,
     List<AiSource> sources = const <AiSource>[],
+    bool editable = false,
+    String? patientId,
+    LetterPdf? letter,
   }) {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      showDragHandle: true,
       builder: (_) => AiDraftSheet(
         title: title,
         subtitle: subtitle,
         caveat: caveat,
         notice: notice,
         sources: sources,
+        editable: editable,
+        patientId: patientId,
+        letter: letter,
         generate: generate,
       ),
     );
@@ -87,11 +116,148 @@ class AiDraftSheet extends StatefulWidget {
   State<AiDraftSheet> createState() => _AiDraftSheetState();
 }
 
+/// Formatting controls for the draft editor.
+///
+/// They operate on the Markdown source — bold and italic wrap the selection,
+/// heading and bullet prefix the current line — so the "rich text" the
+/// clinician sees in the preview is exactly what the PDF prints and Copy
+/// carries; there is no second format to drift.
+class _FormatBar extends StatelessWidget {
+  const _FormatBar({required this.controller});
+
+  final TextEditingController controller;
+
+  void _wrap(String mark) {
+    final value = controller.value;
+    final selection = value.selection;
+    if (!selection.isValid) return;
+    final text = value.text;
+    final selected = selection.textInside(text);
+    final replaced = '$mark$selected$mark';
+    controller.value = value.copyWith(
+      text: selection.textBefore(text) + replaced + selection.textAfter(text),
+      selection: selected.isEmpty
+          // Nothing selected: park the caret between the marks, ready to type.
+          ? TextSelection.collapsed(offset: selection.start + mark.length)
+          : TextSelection(
+              baseOffset: selection.start,
+              extentOffset: selection.start + replaced.length,
+            ),
+    );
+  }
+
+  void _prefixLine(String prefix) {
+    final value = controller.value;
+    final selection = value.selection;
+    if (!selection.isValid) return;
+    final text = value.text;
+    final lineStart = text.lastIndexOf('\n', selection.start - 1) + 1;
+    final already = text.startsWith(prefix, lineStart);
+    final updated = already
+        ? text.replaceRange(lineStart, lineStart + prefix.length, '')
+        : text.replaceRange(lineStart, lineStart, prefix);
+    final shift = already ? -prefix.length : prefix.length;
+    controller.value = value.copyWith(
+      text: updated,
+      selection: TextSelection.collapsed(offset: selection.start + shift),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final m = context.metrics;
+    final palette = context.palette;
+
+    Widget action(IconData icon, String tooltip, VoidCallback onTap) =>
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          iconSize: 18,
+          tooltip: tooltip,
+          icon: Icon(icon),
+          onPressed: onTap,
+        );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: palette.surfaceMuted,
+        borderRadius: BorderRadius.circular(m.radiusSm),
+      ),
+      child: Row(
+        children: <Widget>[
+          action(Icons.format_bold, 'Bold', () => _wrap('**')),
+          action(Icons.format_italic, 'Italic', () => _wrap('*')),
+          action(Icons.title, 'Heading', () => _prefixLine('## ')),
+          action(
+            Icons.format_list_bulleted,
+            'Bullet list',
+            () => _prefixLine('- '),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Compact provenance affordance in the draft panel's header — quiet enough
+/// not to compete with the badge, present enough to be found.
+class _SourcesButton extends StatelessWidget {
+  const _SourcesButton({required this.count, required this.onTap});
+
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final m = context.metrics;
+    final palette = context.palette;
+
+    return Material(
+      color: palette.surfaceMuted,
+      borderRadius: BorderRadius.circular(m.radiusLg * 2),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: m.spaceSm + 2,
+            vertical: m.spaceXs,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Icon(
+                Icons.fact_check_outlined,
+                size: 14,
+                color: palette.onSurfaceMuted,
+              ),
+              SizedBox(width: m.spaceXs),
+              Text(
+                'Sources · $count',
+                style: context.texts.labelSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _AiDraftSheetState extends State<AiDraftSheet> {
   bool _started = false;
   bool _busy = false;
+  bool _editing = false;
   String? _message;
   LanguageModelDraft? _draft;
+  final SmartPhraseController _edited = SmartPhraseController();
+  final FocusNode _editFocus = FocusNode();
+  SmartPhraseRegistry _phrases = buildSmartPhraseRegistry(const []);
+
+  /// What every action (copy, speak, PDF) operates on: the clinician's edited
+  /// text once they have touched it, the generated draft until then.
+  String get _text => _edited.text;
 
   @override
   void didChangeDependencies() {
@@ -99,18 +265,22 @@ class _AiDraftSheetState extends State<AiDraftSheet> {
     if (_started) return;
     _started = true;
     _run();
+    _loadPhrases();
   }
 
   @override
   void dispose() {
     // Don't keep talking after the sheet is gone.
     SpeechOut.stop();
+    _edited.dispose();
+    _editFocus.dispose();
     super.dispose();
   }
 
   static void _showSources(BuildContext context, List<AiSource> sources) {
     showModalBottomSheet<void>(
       context: context,
+      showDragHandle: true,
       builder: (context) => SafeArea(
         child: ListView(
           shrinkWrap: true,
@@ -148,6 +318,17 @@ class _AiDraftSheetState extends State<AiDraftSheet> {
     );
   }
 
+  /// Custom expansions from Settings; the built-in macros work regardless.
+  Future<void> _loadPhrases() async {
+    try {
+      final records =
+          await context.read<ClinicalRepository>().smartPhrases.all();
+      if (mounted) setState(() => _phrases = buildSmartPhraseRegistry(records));
+    } on Object {
+      // Built-ins only.
+    }
+  }
+
   Future<void> _run() async {
     final bootstrap = context.read<AppBootstrap>();
     var engine = bootstrap.assistEngine;
@@ -175,7 +356,13 @@ class _AiDraftSheetState extends State<AiDraftSheet> {
         }
       }
       final draft = await widget.generate(engine);
-      if (mounted) setState(() => _draft = draft);
+      if (mounted) {
+        setState(() {
+          _draft = draft;
+          _edited.text = draft.text;
+          _editing = false;
+        });
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -186,93 +373,174 @@ class _AiDraftSheetState extends State<AiDraftSheet> {
     final m = context.metrics;
     final draft = _draft;
 
+    final palette = context.palette;
+
     return SheetScaffold(
       title: widget.title,
       subtitle: widget.subtitle,
+      // One primary action and one secondary, side by side — everything else
+      // lives with the content it describes.
       footer: draft == null
           ? null
-          : FilledButton.icon(
-              onPressed: () async {
-                await Clipboard.setData(ClipboardData(text: draft.text));
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Copied')),
-                  );
-                  Navigator.of(context).pop();
-                }
-              },
-              icon: const Icon(Icons.copy_all_outlined),
-              label: const Text('Copy'),
+          // Quiet by design: a generated draft's actions should read as
+          // offers, not as the loudest thing on the sheet.
+          : Row(
+              children: <Widget>[
+                IconButton(
+                  onPressed: _busy ? null : _run,
+                  visualDensity: VisualDensity.compact,
+                  tooltip: 'Regenerate',
+                  icon: const Icon(Icons.refresh, size: 20),
+                ),
+                const Spacer(),
+                if (widget.letter != null) ...<Widget>[
+                  FilledButton.tonalIcon(
+                    onPressed: () => LetterPreviewScreen.open(
+                      context,
+                      title: widget.title,
+                      build: () => widget.letter!.render(_text),
+                    ),
+                    icon: const Icon(Icons.picture_as_pdf_outlined, size: 17),
+                    label: const Text('Preview'),
+                  ),
+                  SizedBox(width: m.spaceSm),
+                ],
+                FilledButton.tonalIcon(
+                  onPressed: () async {
+                    await Clipboard.setData(ClipboardData(text: _text));
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Copied')),
+                      );
+                      Navigator.of(context).pop();
+                    }
+                  },
+                  icon: const Icon(Icons.copy_all_outlined, size: 17),
+                  label: const Text('Copy'),
+                ),
+              ],
             ),
       children: <Widget>[
-        if (_busy) ...<Widget>[
-          Row(
-            children: <Widget>[
-              const AiBadge(),
-              SizedBox(width: m.spaceSm),
-              Text('Generating…',
+        if (_busy)
+          // The same framed panel the finished draft arrives in, so the sheet
+          // does not reflow when the text lands.
+          GlassPanel(
+            padding: EdgeInsets.all(m.spaceLg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                const Row(children: <Widget>[AiBadge(label: 'Generating…')]),
+                SizedBox(height: m.spaceMd),
+                const AiTextPlaceholder(lines: 4),
+                SizedBox(height: m.spaceSm),
+                Text(
+                  'The first run loads the model and can take a few seconds.',
                   style: context.texts.bodySmall
-                      ?.copyWith(color: context.palette.onSurfaceMuted)),
-            ],
-          ),
-          SizedBox(height: m.spaceMd),
-          const AiTextPlaceholder(lines: 4),
-          SizedBox(height: m.spaceSm),
-          Text(
-            'The first run loads the model and can take a few seconds.',
-            style: context.texts.bodySmall
-                ?.copyWith(color: context.palette.onSurfaceMuted),
-          ),
-        ] else if (_message != null)
+                      ?.copyWith(color: palette.onSurfaceMuted),
+                ),
+              ],
+            ),
+          )
+        else if (_message != null)
           Padding(
             padding: EdgeInsets.symmetric(vertical: m.spaceMd),
             child: Text(_message!, style: context.texts.bodyMedium),
           )
         else if (draft != null) ...<Widget>[
-          Row(
-            children: <Widget>[
-              const AiBadge(),
-              const Spacer(),
-              SpeakButton(text: draft.text),
-            ],
-          ),
-          SizedBox(height: m.spaceSm),
-          // Rendered as Markdown so a generated table shows as a table; plain
-          // prose renders as plain text.
-          MarkdownView(data: draft.text),
-          if (widget.sources.isNotEmpty) ...<Widget>[
-            SizedBox(height: m.spaceSm),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: () => _showSources(context, widget.sources),
-                icon: const Icon(Icons.fact_check_outlined, size: 18),
-                label: Text('Sources (${widget.sources.length})'),
-              ),
+          // The draft and everything about its provenance in one frame: the
+          // badge names what it is, the sources say what it was built from,
+          // the notice under it says what it may be used for. One place to
+          // look instead of a page of scattered rows.
+          GlassPanel(
+            padding: EdgeInsets.all(m.spaceLg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Row(
+                  children: <Widget>[
+                    const AiBadge(),
+                    const Spacer(),
+                    if (widget.sources.isNotEmpty) ...<Widget>[
+                      _SourcesButton(
+                        count: widget.sources.length,
+                        onTap: () => _showSources(context, widget.sources),
+                      ),
+                      SizedBox(width: m.spaceXs),
+                    ],
+                    if (widget.editable)
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        tooltip: _editing ? 'Done' : 'Edit',
+                        icon: Icon(
+                          _editing ? Icons.check : Icons.edit_outlined,
+                          size: 18,
+                        ),
+                        onPressed: () => setState(() => _editing = !_editing),
+                      ),
+                    SpeakButton(text: _text),
+                  ],
+                ),
+                SizedBox(height: m.spaceMd),
+                if (_editing) ...<Widget>[
+                  // Rich-text controls over the Markdown source: the same
+                  // formatting renders in the preview, in Copy, and in the
+                  // printed letter, because they all read this one text.
+                  _FormatBar(controller: _edited),
+                  SizedBox(height: m.spaceSm),
+                  // The clinician's corrections happen here, in place; copy,
+                  // speak and the PDF all follow the edited text. Wrapped in
+                  // the smart-phrase mechanism, so \-macros expand here the
+                  // same way they do in a note.
+                  SmartPhraseField(
+                    controller: _edited,
+                    focusNode: _editFocus,
+                    registry: _phrases,
+                    scope: SmartPhraseScope(patientId: widget.patientId),
+                    child: TextField(
+                      controller: _edited,
+                      focusNode: _editFocus,
+                      maxLines: null,
+                      minLines: 6,
+                      autofocus: true,
+                      style: context.texts.bodyMedium,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                ] else
+                  // Rendered as Markdown so a generated table shows as a
+                  // table; plain prose renders as plain text.
+                  MarkdownView(data: _text),
+                SizedBox(height: m.spaceMd),
+                Text(
+                  widget.notice ?? LanguageModelDraft.generatedNotice,
+                  style: context.texts.labelSmall
+                      ?.copyWith(color: palette.onSurfaceMuted),
+                ),
+              ],
             ),
-          ],
+          ),
           if (widget.caveat != null) ...<Widget>[
-            SizedBox(height: m.spaceSm),
-            Text(widget.caveat!,
-                style: context.texts.bodySmall?.copyWith(
-                    color: context.palette.caution,
-                    fontWeight: FontWeight.w600)),
-          ],
-          SizedBox(height: m.spaceSm),
-          Text(
-            widget.notice ?? LanguageModelDraft.generatedNotice,
-            style: context.texts.bodySmall
-                ?.copyWith(color: context.palette.onSurfaceMuted),
-          ),
-          SizedBox(height: m.spaceSm),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: _busy ? null : _run,
-              icon: const Icon(Icons.refresh, size: 18),
-              label: const Text('Regenerate'),
+            SizedBox(height: m.spaceMd),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Icon(Icons.error_outline, size: 16, color: palette.caution),
+                SizedBox(width: m.spaceSm),
+                Expanded(
+                  child: Text(
+                    widget.caveat!,
+                    style: context.texts.bodySmall?.copyWith(
+                      color: palette.caution,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
+          ],
         ],
       ],
     );

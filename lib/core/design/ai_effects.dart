@@ -33,6 +33,7 @@ export 'ai_effects/ai_text_placeholder.dart';
 export 'ai_effects/ai_badge.dart';
 export 'ai_effects/ai_aurora.dart';
 export 'ai_effects/ai_sparkle.dart';
+export 'ai_effects/ai_pill_button.dart';
 export 'ai_effects/generated_text.dart';
 export 'ai_effects/generated_span_controller.dart';
 export 'ai_effects/glow_lasso.dart';

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:medical_app/core/design/ai_effects/ai_glow_border.dart'
+    show GlowBorderPainter;
 import 'package:medical_app/core/design/design.dart';
 import 'package:medical_app/core/theme/theme_config.dart';
 
@@ -334,14 +336,13 @@ void _animationRegressions() {
         child: MaterialApp(home: Scaffold(body: Center(child: child))),
       );
 
-  /// The gradient actually painted on the badge this frame.
-  Gradient? gradientOf(WidgetTester tester) {
-    final container = tester.widgetList<Container>(find.byType(Container));
-    for (final widget in container) {
-      final decoration = widget.decoration;
-      if (decoration is BoxDecoration && decoration.gradient != null) {
-        return decoration.gradient;
-      }
+  /// The badge wears the shared rotating sweep border, so its motion is the
+  /// glow painter's progress rather than a Container gradient.
+  double? sweepProgressOf(WidgetTester tester) {
+    for (final widget
+        in tester.widgetList<CustomPaint>(find.byType(CustomPaint))) {
+      final painter = widget.foregroundPainter;
+      if (painter is GlowBorderPainter) return painter.progress;
     }
     return null;
   }
@@ -350,16 +351,16 @@ void _animationRegressions() {
     await tester.pumpWidget(host(const AiBadge(label: 'AI generated')));
     await tester.pump();
 
-    final first = gradientOf(tester);
-    expect(first, isNotNull, reason: 'the badge paints a gradient');
+    final first = sweepProgressOf(tester);
+    expect(first, isNotNull, reason: 'the badge paints the sweep border');
 
     await tester.pump(const Duration(milliseconds: 700));
-    final second = gradientOf(tester);
+    final second = sweepProgressOf(tester);
 
     expect(
       second,
       isNot(equals(first)),
-      reason: 'a badge that paints the same gradient every frame is frozen',
+      reason: 'a badge that paints the same sweep every frame is frozen',
     );
   });
 
@@ -372,9 +373,9 @@ void _animationRegressions() {
     );
     await tester.pump();
 
-    final first = gradientOf(tester);
+    final first = sweepProgressOf(tester);
     await tester.pump(const Duration(milliseconds: 700));
 
-    expect(gradientOf(tester), equals(first));
+    expect(sweepProgressOf(tester), equals(first));
   });
 }

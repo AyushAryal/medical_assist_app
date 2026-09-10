@@ -5,8 +5,12 @@ import 'package:provider/provider.dart';
 import '../../core/design/design.dart';
 
 import '../../core/routing/app_router.dart';
+import '../../clinical/summary/referral_letter.dart';
+import '../../core/session/session_controller.dart';
 import '../../data/models/patient.dart';
 import '../../data/repositories/clinical_repository.dart';
+import '../../data/services/assist/language_model.dart';
+import '../../data/services/letter_pdf.dart';
 import '../../core/app_bootstrap.dart';
 import '../assist/assist.dart';
 import '../vitals/vitals.dart';
@@ -222,18 +226,56 @@ class _PatientChartScreenState extends State<PatientChartScreen> {
                   ),
           onReferral: !aiActive
               ? null
-              : () => AiDraftSheet.show(
+              : () {
+                  final session = context.read<SessionController>();
+                  AiDraftSheet.show(
                     context,
                     title: 'Referral letter',
                     subtitle: patient.displayName,
                     notice: 'Draft from the record — check every line before '
                         'sending. The record is the source of truth.',
                     sources: sources,
-                    generate: (engine) => engine.referralLetter(
-                      '${patient.displayName}\n${patient.identityLine}\n\n'
-                      '${summary.plainText}',
+                    // The clinician corrects the draft in place; copy, the
+                    // PDF and the emailed attachment all follow the edits.
+                    editable: true,
+                    patientId: patient.id,
+                    letter: LetterPdf(
+                      title: 'Referral letter',
+                      clinicianName: session.signatureName,
+                      clinicName: session.activeClinic?.name,
+                      patientName: patient.displayName,
+                      patientDetails: <String>[patient.identityLine],
                     ),
-                  ),
+                    generate: (engine) async {
+                      // The letter is composed deterministically from the
+                      // record; the model only polishes the prose. If it
+                      // fails, echoes, or mangles the draft, the composed
+                      // letter stands — a field dump is never shown again.
+                      final base = ReferralLetterComposer.compose(
+                        patient: patient,
+                        reason: chart.encounters.firstOrNull?.chiefComplaint,
+                        problems: chart.problems,
+                        medications: chart.medications,
+                        allergies: chart.allergies,
+                        latestVitals: chart.latestVitals,
+                      );
+                      final polished = await engine.referralLetter(base);
+                      final text = polished.text.trim();
+                      final surname =
+                          patient.familyName.trim().toLowerCase();
+                      final usable = text.length >= 120 &&
+                          !text.contains('Referring clinician:') &&
+                          (surname.isEmpty ||
+                              text.toLowerCase().contains(surname));
+                      return usable
+                          ? polished
+                          : LanguageModelDraft(
+                              text: base,
+                              engineName: 'record template',
+                            );
+                    },
+                  );
+                },
         ),
         SizedBox(height: context.metrics.spaceLg),
       ],

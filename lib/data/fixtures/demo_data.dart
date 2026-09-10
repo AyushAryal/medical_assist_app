@@ -468,6 +468,9 @@ class DemoDataSeeder {
             durationMinutes: 20,
             type: EncounterType.emergency,
             reason: 'Asthma review after exacerbation',
+            // Already in the waiting room: with two arrivals the triage board
+            // shows an actual ranking, and hers carries the elevated NEWS2.
+            status: AppointmentStatus.arrived,
           ),
         ],
         visits: [
@@ -619,7 +622,9 @@ class DemoDataSeeder {
             ),
             signed: true,
             disposition: Disposition.home,
-            followUpInDays: 14,
+            // In the past: keeps the recall list populated — a review that was
+            // promised and whose date has already gone by.
+            followUpInDays: -9,
             amendment: 'TSH 6.8 mIU/L (raised), free T4 low-normal. '
                 'Levothyroxine increased to 100 mcg daily. Patient telephoned '
                 'and informed; repeat TFTs in six weeks.',
@@ -677,7 +682,9 @@ class DemoDataSeeder {
             ),
             signed: true,
             disposition: Disposition.home,
-            followUpInDays: 30,
+            // Also overdue, so the recall list shows ranking (most overdue
+            // first) rather than a single row.
+            followUpInDays: -21,
           ),
         ],
       ),

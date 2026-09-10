@@ -42,6 +42,7 @@ export 'ai_effects.dart'
         AiTextPlaceholder,
         AiBadge,
         AiSparkleIcon,
+        AiPillButton,
         AiAuroraBackground,
         GlowLasso,
         GeneratedText,

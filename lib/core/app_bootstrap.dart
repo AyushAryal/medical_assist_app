@@ -237,6 +237,24 @@ class AppBootstrap extends ChangeNotifier {
     }
   }
 
+  /// Debug only: switches the optional workflow modules on so the seeded data
+  /// is actually visible. Runs only while the clinic has never made a choice
+  /// (no `enabled_workflows` key yet) — an explicit toggle in Settings →
+  /// Modules, including switching one off, is kept.
+  Future<void> _enableWorkflowsIfUnset(
+    WorkflowPreferences workflows,
+    AppMetaStore meta,
+  ) async {
+    try {
+      if (await meta.read(WorkflowPreferences.metaKey) != null) return;
+      for (final id in WorkflowPreferences.configurable) {
+        await workflows.setEnabled(id, true);
+      }
+    } on Object catch (error) {
+      debugPrint('Debug workflow enable skipped: $error');
+    }
+  }
+
   /// Debug only: downloads and activates the smallest assistant model when none
   /// is installed, so the AI features are visible without a manual install.
   Future<void> _installLightestAssistModelIfNone() async {
@@ -397,6 +415,7 @@ class AppBootstrap extends ChangeNotifier {
       // first loads. Never runs in a shipped build (guarded by demoDataAllowed).
       if (_debugProvisioningEnabled) {
         await _seedDemoDataIfEmpty(repository);
+        await _enableWorkflowsIfUnset(workflows, meta);
       }
 
       _phase = BootstrapPhase.ready;

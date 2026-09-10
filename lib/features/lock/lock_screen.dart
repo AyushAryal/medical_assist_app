@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../core/design/design.dart';
 
 import '../../core/security/app_lock_service.dart';
+import 'lock_layout.dart';
 import 'pin_pad.dart';
 
 class LockScreen extends StatefulWidget {
@@ -113,58 +114,55 @@ class _LockScreenState extends State<LockScreen> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.all(m.spaceXl),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Icon(
-                  Icons.lock_outline,
-                  size: 36,
-                  color: palette.primary,
-                ),
-                SizedBox(height: m.spaceLg),
-                Text('Clinical Records', style: context.texts.titleLarge),
-                SizedBox(height: m.spaceXs),
-                Text(
-                  'Patient data is encrypted on this device.',
-                  style: context.texts.bodySmall,
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: m.space2xl),
-                PinDots(
-                  length: _pinLength,
-                  filled: _entry.length,
-                  hasError: _hasError,
-                ),
-                SizedBox(height: m.spaceLg),
-                SizedBox(
-                  height: 40,
-                  child: _message == null
-                      ? null
-                      : Text(
-                          _message!,
-                          textAlign: TextAlign.center,
-                          style: context.texts.bodySmall?.copyWith(
-                            color: _hasError || lock.isThrottled
-                                ? palette.critical
-                                : palette.onSurfaceMuted,
-                          ),
-                        ),
-                ),
-                PinPad(
-                  enabled: !_busy && !lock.isThrottled,
-                  onDigit: _onDigit,
-                  onBackspace: _onBackspace,
-                  onBiometric: _biometricAvailable
-                      ? () => _tryBiometrics(userInitiated: true)
-                      : null,
-                ),
-              ],
+      body: LockLayout(
+        header: Column(
+          children: <Widget>[
+            Icon(
+              Icons.lock_outline,
+              size: 44,
+              color: palette.primary,
             ),
-          ),
+            SizedBox(height: m.spaceLg),
+            Text('Clinical Records', style: context.texts.headlineSmall),
+            SizedBox(height: m.spaceXs),
+            Text(
+              'Patient data is encrypted on this device.',
+              style: context.texts.bodySmall,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        progress: Column(
+          children: <Widget>[
+            PinDots(
+              length: _pinLength,
+              filled: _entry.length,
+              hasError: _hasError,
+            ),
+            SizedBox(height: m.spaceLg),
+            SizedBox(
+              height: 40,
+              child: _message == null
+                  ? null
+                  : Text(
+                      _message!,
+                      textAlign: TextAlign.center,
+                      style: context.texts.bodySmall?.copyWith(
+                        color: _hasError || lock.isThrottled
+                            ? palette.critical
+                            : palette.onSurfaceMuted,
+                      ),
+                    ),
+            ),
+          ],
+        ),
+        keypad: PinPad(
+          enabled: !_busy && !lock.isThrottled,
+          onDigit: _onDigit,
+          onBackspace: _onBackspace,
+          onBiometric: _biometricAvailable
+              ? () => _tryBiometrics(userInitiated: true)
+              : null,
         ),
       ),
     );

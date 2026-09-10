@@ -1,7 +1,7 @@
 name: medical_app
 description: "Opt Doctor Assistance Intelligence — offline-first clinical records with an on-device assistant."
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.0+2
 
 environment:
   sdk: ^3.12.2
@@ -33,12 +33,25 @@ dependencies:
   local_auth: ^3.0.2
   path: ^1.9.1
   path_provider: ^2.1.6
+  pdf: ^3.13.0
+  printing: ^5.15.0
   provider: ^6.1.5+1
   record: ^7.1.1
   sherpa_onnx: ^1.13.6
   sqflite_sqlcipher: ^3.4.1
   url_launcher: ^6.3.2
   uuid: ^4.6.0
+
+# ML Kit is the Android OCR path only — iOS uses Apple Vision natively (see
+# data/services/ocr/text_scanner.dart). These vendored copies are the pub.dev
+# packages with the iOS implementation removed, so the ML Kit pods (which ship
+# no arm64-simulator slice and would break iOS simulator builds) never enter
+# the iOS build at all.
+dependency_overrides:
+  google_mlkit_commons:
+    path: packages/google_mlkit_commons
+  google_mlkit_text_recognition:
+    path: packages/google_mlkit_text_recognition
 
 dev_dependencies:
   flutter_test:

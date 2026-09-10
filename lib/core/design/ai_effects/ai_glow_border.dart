@@ -79,7 +79,7 @@ class _AiGlowBorderState extends State<AiGlowBorder>
       animation: _controller,
       builder: (context, child) => CustomPaint(
         foregroundPainter: widget.active
-            ? _GlowBorderPainter(
+            ? GlowBorderPainter(
                 progress: reduced ? 0 : _controller.value,
                 colors: reduced
                     ? <Color>[context.palette.accent, context.palette.accent]
@@ -95,8 +95,10 @@ class _AiGlowBorderState extends State<AiGlowBorder>
   }
 }
 
-class _GlowBorderPainter extends CustomPainter {
-  _GlowBorderPainter({
+/// Public for tests, which assert the sweep actually advances between frames;
+/// not exported through the design barrel.
+class GlowBorderPainter extends CustomPainter {
+  GlowBorderPainter({
     required this.progress,
     required this.colors,
     required this.radius,
@@ -127,7 +129,7 @@ class _GlowBorderPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_GlowBorderPainter old) =>
+  bool shouldRepaint(GlowBorderPainter old) =>
       old.progress != progress ||
       old.strokeWidth != strokeWidth ||
       old.colors != colors;

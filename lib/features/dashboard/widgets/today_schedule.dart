@@ -41,7 +41,12 @@ class TodaySchedule extends StatelessWidget {
                 child: AppointmentTile(
                   appointment: item.appointment,
                   patient: item.patient,
-                  onTap: () => context.go(Routes.schedule),
+                  // Tapping a specific appointment opens that patient's chart
+                  // (a real drill-in with a back button), the same as tapping a
+                  // recent patient — rather than dropping onto the schedule tab
+                  // and making the user find them again. "All" still switches
+                  // to the schedule tab to see everything.
+                  onTap: () => context.push(Routes.chartFor(item.patient.id)),
                 ),
               ),
           ],

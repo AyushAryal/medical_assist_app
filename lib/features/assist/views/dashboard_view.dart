@@ -22,25 +22,17 @@ class DashboardAnswerView extends StatelessWidget {
   final bool compact;
 
   /// Renders one panel's presentation the way any lone answer is rendered.
-  final Widget Function(Presentation body) panelBuilder;
+  /// The title goes with it so the renderer can seat it on the same line as
+  /// the view toggle — a floating right-aligned toggle above a left-aligned
+  /// title read as two stray rows.
+  final Widget Function(String title, Presentation body) panelBuilder;
 
   @override
   Widget build(BuildContext context) {
     final m = context.metrics;
 
     final tiles = <Widget>[
-      for (final panel in result.panels)
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Padding(
-              padding: EdgeInsets.only(bottom: m.spaceXs, left: m.spaceXs),
-              child: Text(panel.title, style: context.texts.labelLarge),
-            ),
-            panelBuilder(panel.body),
-          ],
-        ),
+      for (final panel in result.panels) panelBuilder(panel.title, panel.body),
     ];
 
     if (compact) {

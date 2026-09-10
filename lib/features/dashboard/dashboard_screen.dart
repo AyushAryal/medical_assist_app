@@ -173,49 +173,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             await ClinicPickerSheet.show(context);
                             if (context.mounted) await _reload();
                           },
+                          trailing: context
+                                  .watch<AppBootstrap>()
+                                  .assistModelActive
+                              ? AiPillButton(
+                                  label: 'Daily brief',
+                                  onTap: () => AiDraftSheet.show(
+                                    context,
+                                    title: 'Daily brief',
+                                    subtitle: session.activeClinic?.name,
+                                    notice: 'Generated from today\'s figures.',
+                                    sources: <AiSource>[
+                                      for (final line in
+                                          _caseloadFigures(dashboard)
+                                              .split('\n'))
+                                        AiSource(label: line),
+                                    ],
+                                    generate: (engine) => engine.caseloadReport(
+                                        _caseloadFigures(dashboard)),
+                                  ),
+                                )
+                              : null,
                         ),
-                        SizedBox(height: m.spaceLg),
-                        if (context.watch<AppBootstrap>().assistModelActive) ...<Widget>[
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: OutlinedButton.icon(
-                              onPressed: () => AiDraftSheet.show(
-                                context,
-                                title: 'Daily brief',
-                                subtitle: session.activeClinic?.name,
-                                notice: 'Generated from today\'s figures.',
-                                sources: <AiSource>[
-                                  for (final line
-                                      in _caseloadFigures(dashboard).split('\n'))
-                                    AiSource(label: line),
-                                ],
-                                generate: (engine) => engine
-                                    .caseloadReport(_caseloadFigures(dashboard)),
-                              ),
-                              icon: const Icon(Icons.auto_awesome, size: 18),
-                              label: const Text('Daily brief'),
-                            ),
-                          ),
-                          SizedBox(height: m.spaceLg),
-                        ],
+                        SizedBox(height: m.spaceMd),
                         // Who is next, and anything abnormal, always come
                         // first and always full width — they are the two
                         // things that must not be missed, and putting them in
                         // a column would let the layout decide their
                         // prominence.
                         NextUpCard(dashboard: dashboard, onChanged: _reload),
-                        SizedBox(height: m.spaceLg),
+                        SizedBox(height: m.spaceMd),
                         // Optional per clinic: only present when the triage
                         // module is licensed and switched on. When it is not,
                         // this line renders nothing and the dashboard is
                         // unchanged.
                         if (TriageModule.isVisible(context)) ...<Widget>[
                           const TriageCard(),
-                          SizedBox(height: m.spaceLg),
+                          SizedBox(height: m.spaceMd),
                         ],
                         if (RecallModule.isVisible(context)) ...<Widget>[
                           const RecallCard(),
-                          SizedBox(height: m.spaceLg),
+                          SizedBox(height: m.spaceMd),
                         ],
                         NeedsAttention(dashboard: dashboard),
                         QuickActions(
@@ -223,7 +221,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           onBook: _bookForPatient,
                           onChanged: _reload,
                         ),
-                        SizedBox(height: m.spaceLg),
+                        SizedBox(height: m.spaceMd),
                         // Below the fold the panels are independent, so a wide
                         // screen runs them in two columns rather than a single
                         // strip between two empty margins.
