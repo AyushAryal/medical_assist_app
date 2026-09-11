@@ -184,8 +184,10 @@ class _AskScreenState extends State<AskScreen> {
   /// The built-in macros stand alone if the read fails.
   Future<void> _loadPhrases() async {
     try {
-      final records =
-          await context.read<ClinicalRepository>().smartPhrases.all();
+      final records = await context
+          .read<ClinicalRepository>()
+          .smartPhrases
+          .all();
       if (mounted) {
         setState(() => _registry = buildSmartPhraseRegistry(records));
       }
@@ -243,9 +245,9 @@ class _AskScreenState extends State<AskScreen> {
         child: Column(
           children: <Widget>[
             Expanded(child: _body(context)),
-            // Input at the bottom, where the thing you are composing belongs
-            // and where a thumb already is. At the top it reads as a filter
-            // over a page; at the bottom it reads as a conversation.
+            // Input at the bottom while a conversation is on screen — but on
+            // the empty page it starts mid-screen (see the riser below), the
+            // way a prompt invites rather than hides.
             AskComposer(
               controller: _question,
               smartPhrases: _registry,
@@ -254,8 +256,11 @@ class _AskScreenState extends State<AskScreen> {
               hasText: _hasText,
               canSpeak: canSpeak,
               lastAsked: _lastAsked,
-              contextSummary:
-                  context.watch<AppBootstrap>().pipeline.thread.summary,
+              contextSummary: context
+                  .watch<AppBootstrap>()
+                  .pipeline
+                  .thread
+                  .summary,
               onAsk: _ask,
               onClear: _clear,
               onStartListening: _startListening,
@@ -263,8 +268,53 @@ class _AskScreenState extends State<AskScreen> {
               onCancelListening: _cancelListening,
               onOpenGuide: _openCapabilities,
             ),
+            // The riser: empty page → the composer floats at mid-height;
+            // the moment an answer starts it eases down to the bottom and
+            // stays there for the conversation.
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 420),
+              curve: Curves.easeOutCubic,
+              height: _running || _result != null
+                  ? 0
+                  : MediaQuery.viewInsetsOf(context).bottom > 0
+                  ? MediaQuery.sizeOf(context).height * 0.05
+                  : MediaQuery.sizeOf(context).height * 0.28,
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// The question this answer (or search) belongs to, pinned above it — an
+  /// answer without its question is a number with no units.
+  Widget? _askedHeader(BuildContext context) {
+    final asked = _lastAsked;
+    if (asked == null) return null;
+    final m = context.metrics;
+    final palette = context.palette;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(m.spaceLg, m.spaceSm, m.spaceLg, m.spaceMd),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Icon(
+            Icons.chat_bubble_outline,
+            size: 15,
+            color: palette.onSurfaceMuted,
+          ),
+          SizedBox(width: m.spaceSm),
+          Expanded(
+            child: Text(
+              asked,
+              style: context.texts.bodyMedium?.copyWith(
+                color: palette.onSurfaceMuted,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -273,31 +323,18 @@ class _AskScreenState extends State<AskScreen> {
     final m = context.metrics;
 
     if (_running) {
-      return Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 320),
-          child: AiGlowBorder(
-            active: true,
-            child: Padding(
-              padding: EdgeInsets.all(m.spaceLg),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  Row(
-                    children: <Widget>[
-                      const AiSparkleIcon(size: 18),
-                      SizedBox(width: m.spaceSm),
-                      Text('Searching', style: context.texts.labelLarge),
-                    ],
-                  ),
-                  SizedBox(height: m.spaceMd),
-                  const AiTextPlaceholder(lines: 3),
-                ],
+      return Column(
+        children: <Widget>[
+          ?_askedHeader(context),
+          Expanded(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 320),
+                child: _searchingCard(context),
               ),
             ),
           ),
-        ),
+        ],
       );
     }
 
@@ -307,6 +344,8 @@ class _AskScreenState extends State<AskScreen> {
     return ListView(
       padding: EdgeInsets.fromLTRB(m.spaceLg, 0, m.spaceLg, m.spaceLg),
       children: <Widget>[
+        if (_askedHeader(context) case final header?)
+          Padding(padding: EdgeInsets.zero, child: header),
         // The same renderer the floating panel uses, so an answer reads
         // identically wherever it is shown and a new kind of output appears in
         // both places at once.
@@ -326,6 +365,31 @@ class _AskScreenState extends State<AskScreen> {
           ),
         ],
       ],
+    );
+  }
+
+  Widget _searchingCard(BuildContext context) {
+    final m = context.metrics;
+    return AiGlowBorder(
+      active: true,
+      child: Padding(
+        padding: EdgeInsets.all(m.spaceLg),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                const AiSparkleIcon(size: 18),
+                SizedBox(width: m.spaceSm),
+                Text('Searching', style: context.texts.labelLarge),
+              ],
+            ),
+            SizedBox(height: m.spaceMd),
+            const AiTextPlaceholder(lines: 3),
+          ],
+        ),
+      ),
     );
   }
 }

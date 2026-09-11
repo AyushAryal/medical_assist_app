@@ -198,6 +198,155 @@ class _FormatBar extends StatelessWidget {
   }
 }
 
+/// Who the letter is addressed to — one glanceable row with an edit
+/// affordance, instead of burying the recipient inside the prose where the
+/// model could touch it.
+class _RecipientRow extends StatelessWidget {
+  const _RecipientRow({required this.recipient, required this.onEdit});
+
+  final LetterRecipient? recipient;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    final m = context.metrics;
+    final palette = context.palette;
+    final r = recipient;
+
+    return Material(
+      color: palette.surfaceMuted,
+      borderRadius: BorderRadius.circular(m.radiusSm),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onEdit,
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: m.spaceMd,
+            vertical: m.spaceSm,
+          ),
+          child: Row(
+            children: <Widget>[
+              Icon(
+                Icons.outgoing_mail,
+                size: 18,
+                color: palette.onSurfaceMuted,
+              ),
+              SizedBox(width: m.spaceSm),
+              Expanded(
+                child: r == null
+                    ? Text(
+                        'To: not set — addressed "Dear colleague"',
+                        style: context.texts.bodySmall
+                            ?.copyWith(color: palette.onSurfaceMuted),
+                      )
+                    : Text(
+                        'To: ${r.name}'
+                        '${r.clinic == null ? '' : ' · ${r.clinic}'}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: context.texts.bodySmall,
+                      ),
+              ),
+              Icon(
+                r == null ? Icons.add : Icons.edit_outlined,
+                size: 16,
+                color: palette.primary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Structured entry for the referred-to clinician. Returned to the sheet,
+/// which threads it into the salutation and the letterhead addressee block.
+class _RecipientSheet extends StatefulWidget {
+  const _RecipientSheet({this.current});
+
+  final LetterRecipient? current;
+
+  static Future<LetterRecipient?> show(
+    BuildContext context, {
+    LetterRecipient? current,
+  }) {
+    return showModalBottomSheet<LetterRecipient>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _RecipientSheet(current: current),
+    );
+  }
+
+  @override
+  State<_RecipientSheet> createState() => _RecipientSheetState();
+}
+
+class _RecipientSheetState extends State<_RecipientSheet> {
+  late final TextEditingController _name =
+      TextEditingController(text: widget.current?.name ?? '');
+  late final TextEditingController _specialty =
+      TextEditingController(text: widget.current?.specialty ?? '');
+  late final TextEditingController _clinic =
+      TextEditingController(text: widget.current?.clinic ?? '');
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _specialty.dispose();
+    _clinic.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final name = _name.text.trim();
+    if (name.isEmpty) return;
+    Navigator.of(context).pop(
+      LetterRecipient(
+        name: name,
+        specialty:
+            _specialty.text.trim().isEmpty ? null : _specialty.text.trim(),
+        clinic: _clinic.text.trim().isEmpty ? null : _clinic.text.trim(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final m = context.metrics;
+
+    return SheetScaffold(
+      title: 'Referred to',
+      subtitle: 'Addresses the letter — the draft text is not changed',
+      onSave: _save,
+      saveLabel: 'Use',
+      children: <Widget>[
+        LabeledField(
+          label: 'Name',
+          controller: _name,
+          autofocus: true,
+          hint: 'e.g. Dr S. Sharma',
+          textCapitalization: TextCapitalization.words,
+        ),
+        SizedBox(height: m.spaceMd),
+        LabeledField(
+          label: 'Specialty or department',
+          controller: _specialty,
+          hint: 'e.g. Cardiology',
+          textCapitalization: TextCapitalization.words,
+        ),
+        SizedBox(height: m.spaceMd),
+        LabeledField(
+          label: 'Clinic or hospital',
+          controller: _clinic,
+          hint: 'e.g. Patan Hospital',
+          textCapitalization: TextCapitalization.words,
+        ),
+      ],
+    );
+  }
+}
+
 /// Compact provenance affordance in the draft panel's header — quiet enough
 /// not to compete with the badge, present enough to be found.
 class _SourcesButton extends StatelessWidget {
@@ -250,6 +399,7 @@ class _AiDraftSheetState extends State<AiDraftSheet> {
   bool _busy = false;
   bool _editing = false;
   String? _message;
+  LetterRecipient? _recipient;
   LanguageModelDraft? _draft;
   final SmartPhraseController _edited = SmartPhraseController();
   final FocusNode _editFocus = FocusNode();
@@ -398,7 +548,8 @@ class _AiDraftSheetState extends State<AiDraftSheet> {
                     onPressed: () => LetterPreviewScreen.open(
                       context,
                       title: widget.title,
-                      build: () => widget.letter!.render(_text),
+                      build: () =>
+                          widget.letter!.render(_text, recipient: _recipient),
                     ),
                     icon: const Icon(Icons.picture_as_pdf_outlined, size: 17),
                     label: const Text('Preview'),
@@ -447,6 +598,17 @@ class _AiDraftSheetState extends State<AiDraftSheet> {
             child: Text(_message!, style: context.texts.bodyMedium),
           )
         else if (draft != null) ...<Widget>[
+          if (widget.letter != null) ...<Widget>[
+            _RecipientRow(
+              recipient: _recipient,
+              onEdit: () async {
+                final chosen =
+                    await _RecipientSheet.show(context, current: _recipient);
+                if (chosen != null) setState(() => _recipient = chosen);
+              },
+            ),
+            SizedBox(height: m.spaceSm),
+          ],
           // The draft and everything about its provenance in one frame: the
           // badge names what it is, the sources say what it was built from,
           // the notice under it says what it may be used for. One place to
@@ -496,6 +658,9 @@ class _AiDraftSheetState extends State<AiDraftSheet> {
                     focusNode: _editFocus,
                     registry: _phrases,
                     scope: SmartPhraseScope(patientId: widget.patientId),
+                    // A tall editor: the default top anchor floats the menu a
+                    // paragraph above the caret.
+                    anchorToFieldBottom: true,
                     child: TextField(
                       controller: _edited,
                       focusNode: _editFocus,

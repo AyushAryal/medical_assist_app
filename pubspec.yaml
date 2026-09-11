@@ -1,7 +1,7 @@
 name: medical_app
 description: "Opt Doctor Assistance Intelligence — offline-first clinical records with an on-device assistant."
 publish_to: 'none'
-version: 1.0.0+2
+version: 1.0.0+3
 
 environment:
   sdk: ^3.12.2

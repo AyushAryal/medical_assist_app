@@ -17,14 +17,16 @@ class ClinicListScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(title: const Text('Clinics')),
-      floatingActionButton: FloatingActionButton.extended(
-        // Distinct tag: default FAB tags collide across the IndexedStack
-        // shell tabs, which are all mounted at once.
-        heroTag: 'clinicListFab',
-        onPressed: () => _ClinicEditorSheet.show(context),
-        icon: const Icon(Icons.add),
-        label: const Text('Add clinic'),
+      appBar: AppBar(
+        title: const Text('Clinics'),
+        actions: <Widget>[
+          // Top-right, iOS-style: a FAB here sat behind the floating pill bar.
+          IconButton(
+            tooltip: 'Add clinic',
+            icon: const Icon(Icons.add),
+            onPressed: () => _ClinicEditorSheet.show(context),
+          ),
+        ],
       ),
       body: ContentWidth(
         child: session.clinics.isEmpty

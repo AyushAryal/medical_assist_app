@@ -227,9 +227,16 @@ class _FloatingAssistantState extends State<FloatingAssistant> {
           // Ride above the keyboard. A panel anchored to a fixed offset is
           // simply invisible the moment its own text field is focused, which
           // is the one moment it is certainly being used.
+          // Down to a hair above the pill bar (3px gap), no further — and no
+          // higher floor than that.
           bottom: keyboard > 0
               ? keyboard + m.spaceMd
-              : (context.breakpoint.isCompact ? m.space2xl * 3 : m.space2xl),
+              : (context.breakpoint.isCompact
+                  ? pillNavBottomMargin(
+                          MediaQuery.viewPaddingOf(context).bottom) +
+                      kPillNavBarHeight +
+                      3
+                  : m.space2xl + MediaQuery.viewPaddingOf(context).bottom),
           top: m.space2xl * 2,
           left: m.spaceLg,
           right: m.spaceLg,
@@ -259,6 +266,11 @@ class _FloatingAssistantState extends State<FloatingAssistant> {
 
               return SafeArea(
                 top: false,
+                // The floor above already includes the home-indicator inset
+                // (via the pill bar's own margin); letting SafeArea add it
+                // again held the bubble ~34px too high — the "still can't
+                // reach the bar" bug.
+                bottom: false,
                 // A local Overlay. Mounting above the router's Navigator is
                 // what lets this float over every screen, and it is also what
                 // leaves it with no Overlay of its own — so every tooltip in

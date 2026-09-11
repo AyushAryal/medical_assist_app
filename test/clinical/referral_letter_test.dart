@@ -4,7 +4,6 @@ import 'package:medical_app/data/models/allergy.dart';
 import 'package:medical_app/data/models/medication.dart';
 import 'package:medical_app/data/models/patient.dart';
 import 'package:medical_app/data/models/problem.dart';
-import 'package:medical_app/data/models/vitals_record.dart';
 
 /// The letter shown when no model is installed (and the floor under whatever
 /// a model produces). What it guards: the output must read as a letter — a

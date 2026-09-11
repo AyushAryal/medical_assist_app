@@ -19,6 +19,7 @@ class SmartPhraseField extends StatefulWidget {
     required this.registry,
     required this.child,
     this.scope = const SmartPhraseScope(),
+    this.anchorToFieldBottom = false,
   });
 
   final SmartPhraseController controller;
@@ -28,6 +29,12 @@ class SmartPhraseField extends StatefulWidget {
 
   /// What the surrounding screen already knows — mainly the patient in view.
   final SmartPhraseScope scope;
+
+  /// Anchor the menu just above the field's *bottom* edge rather than above
+  /// its top. For a one-line field the two are the same; for a tall editor
+  /// the top anchor floats the menu a whole paragraph away from the caret,
+  /// which usually sits on the last line.
+  final bool anchorToFieldBottom;
 
   @override
   State<SmartPhraseField> createState() => _SmartPhraseFieldState();
@@ -106,9 +113,16 @@ class _SmartPhraseFieldState extends State<SmartPhraseField> {
       child: CompositedTransformFollower(
         link: _link,
         showWhenUnlinked: false,
-        targetAnchor: Alignment.topLeft,
+        targetAnchor: widget.anchorToFieldBottom
+            ? Alignment.bottomLeft
+            : Alignment.topLeft,
         followerAnchor: Alignment.bottomLeft,
-        offset: Offset(0, -m.spaceXs),
+        // Bottom-anchored: sit above the last line, where the caret is while
+        // a macro is being typed.
+        offset: Offset(
+          0,
+          widget.anchorToFieldBottom ? -(m.spaceXl + m.spaceSm) : -m.spaceXs,
+        ),
         child: Align(
           alignment: Alignment.bottomLeft,
           child: ConstrainedBox(

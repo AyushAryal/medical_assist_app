@@ -9,6 +9,17 @@ import 'theme_config.dart';
 /// the bar — keep the two in sync if this changes.
 const double kAppNavigationBarHeight = 68;
 
+/// The floating pill tab bar. Height of the pill itself, and how far it
+/// floats above the bottom edge: on devices with a home indicator it sits
+/// just above it (dipping slightly into the inset — the pill's corner radius
+/// keeps it clear of the screen's corner curve); on flat-bottomed devices a
+/// small fixed margin is enough. Shared here because
+/// [BuildContext.bottomBarClearance] must reserve the same space.
+const double kPillNavBarHeight = 60;
+
+double pillNavBottomMargin(double safeInset) =>
+    safeInset > 0 ? (safeInset - 10).clamp(14.0, safeInset) : 10.0;
+
 /// Builds Flutter [ThemeData] purely from [ThemeConfig] tokens.
 ///
 /// The visual language: surfaces separated by soft shadow rather than hairline

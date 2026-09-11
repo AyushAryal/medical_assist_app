@@ -66,7 +66,16 @@ class _GuidedDictationSheetState extends State<GuidedDictationSheet> {
   String? _heard;
   Timer? _levelTimer;
 
-  static const _silenceStop = Duration(milliseconds: 1300);
+  /// A short pause ends the phrase. 1.3s read as "have to stop before it
+  /// fills"; at 650ms a value lands on the checklist the moment the speaker
+  /// draws breath for the next one — the live-fill feel.
+  static const _silenceStop = Duration(milliseconds: 650);
+
+  /// And a phrase cannot run forever: continuous speech (or a noisy room that
+  /// never reads as silent) is cut and transcribed after this long, so values
+  /// keep landing mid-flow instead of waiting for the stop button.
+  static const _maxPhrase = Duration(seconds: 5);
+  DateTime? _phraseStartedAt;
 
   @override
   void dispose() {
@@ -100,13 +109,22 @@ class _GuidedDictationSheetState extends State<GuidedDictationSheet> {
       _sawSpeech = false;
       _level = 0;
     });
+    _phraseStartedAt = null;
     _levelTimer = Timer.periodic(const Duration(milliseconds: 80), (_) {
       if (!mounted || !_listening) return;
       final level = widget.bootstrap.dictation.level;
-      if (level.isSpeaking) _sawSpeech = true;
+      if (level.isSpeaking && !_sawSpeech) {
+        _sawSpeech = true;
+        _phraseStartedAt = DateTime.now();
+      }
       setState(() => _level = level.current);
-      // A pause after speech ends the phrase — no button.
-      if (_sawSpeech && level.silenceRun >= _silenceStop) _capturePhrase();
+      // A pause after speech ends the phrase — no button. A phrase that never
+      // pauses is cut at _maxPhrase so the checklist still fills live.
+      final ranLong = _phraseStartedAt != null &&
+          DateTime.now().difference(_phraseStartedAt!) >= _maxPhrase;
+      if (_sawSpeech && (level.silenceRun >= _silenceStop || ranLong)) {
+        _capturePhrase();
+      }
     });
   }
 

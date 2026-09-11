@@ -218,15 +218,27 @@ class _DayCell extends StatelessWidget {
               else
                 Column(
                   children: <Widget>[
-                    Text(
-                      '$total',
-                      style: context.texts.labelSmall?.copyWith(
-                        color: waiting > 0
-                            ? palette.caution
-                            : isSelected
-                                ? palette.onPrimaryContainer
-                                : palette.onSurfaceMuted,
-                        fontWeight: FontWeight.w700,
+                    // A count pill, not a muted digit: how loaded a day is
+                    // must be readable at month-glance, per date.
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 0.5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: (waiting > 0 ? palette.caution : palette.primary)
+                            .withValues(alpha: context.isDark ? 0.28 : 0.14),
+                        borderRadius: BorderRadius.circular(m.radiusSm),
+                      ),
+                      child: Text(
+                        '$total',
+                        style: context.texts.labelSmall?.copyWith(
+                          color: waiting > 0 ? palette.caution : palette.primary,
+                          fontWeight: FontWeight.w700,
+                          fontFeatures: const <FontFeature>[
+                            FontFeature.tabularFigures(),
+                          ],
+                        ),
                       ),
                     ),
                     SizedBox(height: m.spaceXs / 2),

@@ -111,6 +111,21 @@ class ClinicalRepository {
     await _enqueue('patient', patient.id, 'update');
   }
 
+  /// Soft-archives a patient: the record drops out of every list and search
+  /// but nothing is destroyed — a medical record is never truly deleted, and
+  /// the audit trail records who archived it and when.
+  Future<void> archivePatient(Patient patient) async {
+    await patients.archive(patient.id);
+    await audit.log(
+      AuditAction.patientDelete,
+      entityType: 'patient',
+      entityId: patient.id,
+      patientId: patient.id,
+      detail: 'archived',
+    );
+    await _enqueue('patient', patient.id, 'archive');
+  }
+
   /// Records that a chart was opened. Access logging is the point of the audit
   /// trail, so this fires on every read of a full chart.
   Future<Patient?> openPatient(String id) async {

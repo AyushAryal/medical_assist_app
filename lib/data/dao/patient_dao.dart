@@ -67,7 +67,10 @@ class PatientDao {
     final rows = await _db.query(
       table,
       where: 'deleted_at IS NULL',
-      orderBy: 'last_seen_at DESC, created_at DESC',
+      // COALESCE, because DESC sorts NULL last: a just-registered patient has
+      // no last_seen_at yet and would land at the bottom of the list — which
+      // reads as "registration didn't work". Registering counts as contact.
+      orderBy: 'COALESCE(last_seen_at, created_at) DESC, created_at DESC',
       limit: limit,
     );
     return rows.map(Patient.fromMap).toList();

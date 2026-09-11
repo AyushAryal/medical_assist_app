@@ -1,8 +1,8 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/design/design.dart';
+import 'pill_nav_bar.dart';
 
 /// Top-level navigation frame.
 ///
@@ -31,10 +31,12 @@ class AppShell extends StatelessWidget {
       icon: Icons.today_outlined,
       selectedIcon: Icons.today,
     ),
+    // Deliberately not another square-calendar glyph: beside "Today" the two
+    // read as the same tab. The month grid says "the whole diary".
     _Destination(
       label: 'Schedule',
-      icon: Icons.event_outlined,
-      selectedIcon: Icons.event,
+      icon: Icons.calendar_month_outlined,
+      selectedIcon: Icons.calendar_month,
     ),
     _Destination(
       label: 'Patients',
@@ -130,53 +132,20 @@ class AppShell extends StatelessWidget {
     );
   }
 
-  /// The bottom tab bar, native to the platform. Theming a Material
-  /// NavigationBar to look less like Android only goes so far — its layout,
-  /// proportions and ripple stay Android. On iOS this is a real
-  /// CupertinoTabBar (compact, its own translucent blur, SF-style icon over a
-  /// small label); on Android it stays the Material bar inside the app's glass
-  /// chrome.
+  /// The floating pill bar, on both platforms — the pill is the design, not
+  /// a themed platform strip.
   Widget _bottomBar(BuildContext context) {
-    final palette = context.palette;
-
-    if (Theme.of(context).platform == TargetPlatform.iOS) {
-      return CupertinoTabBar(
-        currentIndex: navigationShell.currentIndex,
-        onTap: _onSelect,
-        activeColor: palette.primary,
-        inactiveColor: palette.onSurfaceMuted,
-        // A translucent fill makes CupertinoTabBar draw its own native blur,
-        // so the app's content still shows through the bar.
-        backgroundColor: palette.surface.withValues(alpha: 0.72),
-        border: Border(
-          top: BorderSide(color: palette.outline, width: context.metrics.hairline),
-        ),
-        items: <BottomNavigationBarItem>[
-          for (final d in _destinations)
-            BottomNavigationBarItem(
-              icon: Icon(d.icon),
-              activeIcon: Icon(d.selectedIcon),
-              label: d.label,
-            ),
-        ],
-      );
-    }
-
-    return GlassChrome(
-      topBorder: true,
-      child: NavigationBar(
-        backgroundColor: Colors.transparent,
-        selectedIndex: navigationShell.currentIndex,
-        onDestinationSelected: _onSelect,
-        destinations: <Widget>[
-          for (final d in _destinations)
-            NavigationDestination(
-              icon: Icon(d.icon),
-              selectedIcon: Icon(d.selectedIcon),
-              label: d.label,
-            ),
-        ],
-      ),
+    return PillNavBar(
+      currentIndex: navigationShell.currentIndex,
+      onTap: _onSelect,
+      destinations: <PillNavDestination>[
+        for (final d in _destinations)
+          PillNavDestination(
+            label: d.label,
+            icon: d.icon,
+            selectedIcon: d.selectedIcon,
+          ),
+      ],
     );
   }
 }

@@ -72,10 +72,32 @@ abstract final class SpeechOut {
   static Future<void> preview(String text, String voiceId) =>
       _speak(text, voiceId);
 
+  /// Rewrites display text into speakable text.
+  ///
+  /// A synthesiser only pauses at punctuation, so a line break between
+  /// "waiting now: 0" and "Appointments remaining: 1" is heard as
+  /// "zero appointments remaining" — the number attaches itself to the next
+  /// label and correct text *sounds* wrong. Every line becomes a sentence,
+  /// and markdown marks that mean nothing aloud are dropped.
+  static String speakable(String text) {
+    final lines = text
+        .split('\n')
+        .map((line) => line
+            .replaceAll(RegExp(r'[*_#|`>]+'), ' ')
+            .replaceAll(RegExp(r'^\s*[-•]\s*'), '')
+            .replaceAll(RegExp(r'\s+'), ' ')
+            .trim())
+        .where((line) => line.isNotEmpty);
+    return lines
+        .map((line) =>
+            RegExp(r'[.!?:;]$').hasMatch(line) ? line : '$line.')
+        .join(' ');
+  }
+
   static Future<void> _speak(String text, String? voiceId) async {
     if (text.trim().isEmpty) return;
     _ensureHandler();
-    final args = <String, Object?>{'text': text};
+    final args = <String, Object?>{'text': speakable(text)};
     if (voiceId != null) args['voiceId'] = voiceId;
     try {
       await _channel.invokeMethod<bool>('speak', args);

@@ -13,6 +13,24 @@ import 'package:pdf/widgets.dart' as pw;
 /// says, the letter is always attributed to the real clinician at the real
 /// clinic, about an unambiguous patient.
 ///
+/// Who a letter is addressed to — chosen by the clinician, never generated.
+class LetterRecipient {
+  const LetterRecipient({required this.name, this.clinic, this.specialty});
+
+  final String name;
+  final String? clinic;
+  final String? specialty;
+
+  /// "Dear Dr Sharma," — falls back to the neutral form when unset.
+  String get salutation => 'Dear $name,';
+
+  List<String> get addressLines => <String>[
+        name,
+        if (specialty != null && specialty!.trim().isNotEmpty) specialty!,
+        if (clinic != null && clinic!.trim().isNotEmpty) clinic!,
+      ];
+}
+
 /// The body is treated as Markdown at the block level (headings, bullets,
 /// numbered lists, bold/italic), so what the clinician formats in the app is
 /// what prints.
@@ -54,7 +72,7 @@ class LetterPdf {
       .replaceAll('…', '...')
       .replaceAll('•', '-');
 
-  Future<Uint8List> render(String body) async {
+  Future<Uint8List> render(String body, {LetterRecipient? recipient}) async {
     body = _latin1Safe(body);
     final title = _latin1Safe(this.title);
     final clinicName =
@@ -72,8 +90,17 @@ class LetterPdf {
 
     doc.addPage(
       pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.symmetric(horizontal: 64, vertical: 52),
+        pageTheme: pw.PageTheme(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.symmetric(horizontal: 64, vertical: 52),
+          // Painted paper, not assumed paper: a PDF page has no background of
+          // its own, so a raster of it is transparent — which on a dark
+          // screen shows the letter as ink on nothing.
+          buildBackground: (context) => pw.FullPage(
+            ignoreMargins: true,
+            child: pw.Container(color: PdfColors.white),
+          ),
+        ),
         footer: (context) => pw.Padding(
           padding: const pw.EdgeInsets.only(top: 8),
           child: pw.Row(
@@ -123,6 +150,13 @@ class LetterPdf {
           pw.Divider(thickness: 1, color: _rule, height: 1),
           pw.SizedBox(height: 18),
 
+          // ---- Addressee -------------------------------------------------
+          if (recipient != null) ...<pw.Widget>[
+            for (final line in recipient.addressLines)
+              pw.Text(_latin1Safe(line), style: base),
+            pw.SizedBox(height: 14),
+          ],
+
           // ---- Patient identification block ------------------------------
           if (patientName != null) ...<pw.Widget>[
             pw.Container(
@@ -160,7 +194,12 @@ class LetterPdf {
           ),
           pw.SizedBox(height: 12),
           if (!_startsWithSalutation(body)) ...<pw.Widget>[
-            pw.Text('Dear colleague,', style: base),
+            pw.Text(
+              recipient == null
+                  ? 'Dear colleague,'
+                  : _latin1Safe(recipient.salutation),
+              style: base,
+            ),
             pw.SizedBox(height: 10),
           ],
 

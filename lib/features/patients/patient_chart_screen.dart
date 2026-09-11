@@ -60,6 +60,26 @@ class _PatientChartScreenState extends State<PatientChartScreen> {
     super.dispose();
   }
 
+  /// Archive is reversible in the database but absent from the app's lists,
+  /// so it gets a spelled-out confirmation, not a casual tap.
+  Future<void> _archive(BuildContext context, Patient patient) async {
+    final confirmed = await confirmDialog(
+      context,
+      title: 'Archive ${patient.displayName}?',
+      message: 'The record is kept and audited, but the patient disappears '
+          'from lists and search. Nothing is deleted.',
+      confirmLabel: 'Archive',
+    );
+    if (!confirmed || !context.mounted) return;
+    await context.read<ClinicalRepository>().archivePatient(patient);
+    if (context.mounted) {
+      context.pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Archived ${patient.displayName}.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = _controller;
@@ -122,6 +142,22 @@ class _PatientChartScreenState extends State<PatientChartScreen> {
                     await context.push(Routes.editFor(patient.id));
                     await chart.refresh();
                   },
+                ),
+                MenuAnchor(
+                  builder: (context, controller, _) => IconButton(
+                    tooltip: 'More',
+                    icon: const Icon(Icons.more_vert),
+                    onPressed: () => controller.isOpen
+                        ? controller.close()
+                        : controller.open(),
+                  ),
+                  menuChildren: <Widget>[
+                    MenuItemButton(
+                      leadingIcon: const Icon(Icons.archive_outlined),
+                      onPressed: () => _archive(context, patient),
+                      child: const Text('Archive patient'),
+                    ),
+                  ],
                 ),
               ],
             ),

@@ -11,6 +11,7 @@ import '../../core/routing/app_router.dart';
 import '../../core/session/session_controller.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/ids.dart';
+import '../../data/models/allergy.dart';
 import '../../data/models/patient.dart';
 import '../../data/repositories/clinical_repository.dart';
 import 'duplicate_warning_sheet.dart';
@@ -48,6 +49,11 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
 
   SexAtBirth _sex = SexAtBirth.unknown;
   AllergyStatus _allergyStatus = AllergyStatus.unknown;
+
+  /// Allergies captured during registration, written right after the patient
+  /// record is created. Registration is when the question is actually asked —
+  /// sending the clerk into the chart afterwards is how the answer gets lost.
+  final List<Allergy> _newAllergies = <Allergy>[];
   DateTime? _dateOfBirth;
   bool _dobIsEstimated = false;
   Patient? _existing;
@@ -228,6 +234,20 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
         if (!mounted) return;
 
         final created = await repository.createPatient(draft);
+        for (final allergy in _newAllergies) {
+          await repository.patients.addAllergy(
+            Allergy(
+              id: allergy.id,
+              patientId: created.id,
+              substance: allergy.substance,
+              category: allergy.category,
+              reaction: allergy.reaction,
+              severity: allergy.severity,
+              createdAt: allergy.createdAt,
+              updatedAt: allergy.updatedAt,
+            ),
+          );
+        }
         if (!mounted) return;
         Navigator.of(context).pop(created.id);
         messenger.showSnackBar(
@@ -250,6 +270,16 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
       setState(() => _busy = false);
       _showMessage('Could not save: $error');
     }
+  }
+
+  Future<void> _addAllergy() async {
+    final allergy = await _RegistrationAllergySheet.show(context);
+    if (allergy == null) return;
+    setState(() {
+      _newAllergies.add(allergy);
+      // An entered allergy answers the status question by itself.
+      _allergyStatus = AllergyStatus.hasAllergies;
+    });
   }
 
   void _showMessage(String message) {
@@ -399,12 +429,50 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
               SectionCard(
                 title: 'Allergies',
                 subtitle: 'Ask at registration — it cannot be assumed later',
-                child: ChoiceChipRow<AllergyStatus>(
-                  values: AllergyStatus.values,
-                  labelOf: (s) => s.label,
-                  selected: _allergyStatus,
-                  onSelected: (s) =>
-                      setState(() => _allergyStatus = s ?? _allergyStatus),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    ChoiceChipRow<AllergyStatus>(
+                      values: AllergyStatus.values,
+                      labelOf: (s) => s.label,
+                      selected: _allergyStatus,
+                      onSelected: (s) =>
+                          setState(() => _allergyStatus = s ?? _allergyStatus),
+                    ),
+                    if (!widget.isEditing) ...<Widget>[
+                      for (final allergy in _newAllergies)
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                          leading: Icon(
+                            Icons.warning_amber_outlined,
+                            size: 18,
+                            color: context.palette.caution,
+                          ),
+                          title: Text(allergy.substance),
+                          subtitle: allergy.reaction == null
+                              ? Text(allergy.severity.label)
+                              : Text(
+                                  '${allergy.reaction} · '
+                                  '${allergy.severity.label}',
+                                ),
+                          trailing: IconButton(
+                            tooltip: 'Remove',
+                            icon: const Icon(Icons.close, size: 18),
+                            onPressed: () =>
+                                setState(() => _newAllergies.remove(allergy)),
+                          ),
+                        ),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: _addAllergy,
+                          icon: const Icon(Icons.add, size: 18),
+                          label: const Text('Add allergy'),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               SizedBox(height: m.spaceMd),
@@ -467,6 +535,98 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Allergy entry at registration — same fields as the chart's sheet, but it
+/// returns the draft instead of writing it: the patient does not exist yet.
+class _RegistrationAllergySheet extends StatefulWidget {
+  const _RegistrationAllergySheet();
+
+  static Future<Allergy?> show(BuildContext context) {
+    return showModalBottomSheet<Allergy>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => const _RegistrationAllergySheet(),
+    );
+  }
+
+  @override
+  State<_RegistrationAllergySheet> createState() =>
+      _RegistrationAllergySheetState();
+}
+
+class _RegistrationAllergySheetState extends State<_RegistrationAllergySheet> {
+  final TextEditingController _substance = TextEditingController();
+  final TextEditingController _reaction = TextEditingController();
+  AllergyCategory _category = AllergyCategory.drug;
+  AllergySeverity _severity = AllergySeverity.unknown;
+
+  @override
+  void dispose() {
+    _substance.dispose();
+    _reaction.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    if (_substance.text.trim().isEmpty) return;
+    final now = DateTime.now();
+    Navigator.of(context).pop(
+      Allergy(
+        id: newId(),
+        // Replaced with the real id once the patient record exists.
+        patientId: '',
+        substance: _substance.text.trim(),
+        category: _category,
+        reaction:
+            _reaction.text.trim().isEmpty ? null : _reaction.text.trim(),
+        severity: _severity,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final m = context.metrics;
+
+    return SheetScaffold(
+      title: 'Add allergy',
+      onSave: _save,
+      saveLabel: 'Add',
+      children: <Widget>[
+        LabeledField(
+          label: 'Substance',
+          controller: _substance,
+          autofocus: true,
+          hint: 'e.g. Penicillin',
+        ),
+        SizedBox(height: m.spaceMd),
+        LabeledField(
+          label: 'Reaction',
+          controller: _reaction,
+          hint: 'e.g. Urticaria, airway swelling',
+        ),
+        SizedBox(height: m.spaceLg),
+        ChoiceChipRow<AllergyCategory>(
+          label: 'Category',
+          values: AllergyCategory.values,
+          labelOf: (c) => c.label,
+          selected: _category,
+          onSelected: (c) => setState(() => _category = c ?? _category),
+        ),
+        SizedBox(height: m.spaceLg),
+        ChoiceChipRow<AllergySeverity>(
+          label: 'Severity',
+          values: AllergySeverity.values,
+          labelOf: (s) => s.label,
+          selected: _severity,
+          onSelected: (s) => setState(() => _severity = s ?? _severity),
+        ),
+      ],
     );
   }
 }

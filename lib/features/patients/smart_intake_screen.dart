@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../clinical/insights/note_intelligence.dart';
+import '../../core/app_bootstrap.dart';
 import '../../core/design/design.dart';
 import '../../core/utils/ids.dart';
 import '../../data/models/allergy.dart';
@@ -9,6 +10,7 @@ import '../../data/models/medication.dart';
 import '../../data/models/problem.dart';
 import '../../data/repositories/clinical_repository.dart';
 import '../scan/scan.dart';
+import 'widgets/guided_intake_sheet.dart';
 
 /// Pull structured entries out of a block of text — a referral letter, old
 /// notes, a photo of a page — and file the ones you want.
@@ -44,6 +46,21 @@ class _SmartIntakeScreenState extends State<SmartIntakeScreen> {
     });
   }
 
+  /// The guided voice-intake ceremony — same UI as vitals voice entry:
+  /// section checklist, waveform, clarification prompts. The transcript comes
+  /// back here and goes through the same extract-review-Add path as pasted
+  /// text; dictation never files anything directly.
+  Future<void> _dictate() async {
+    final transcript = await GuidedIntakeSheet.show(
+      context,
+      context.read<AppBootstrap>(),
+    );
+    if (transcript == null || transcript.trim().isEmpty) return;
+    final existing = _input.text.trimRight();
+    _input.text = existing.isEmpty ? transcript : '$existing\n$transcript';
+    _extract();
+  }
+
   Future<void> _scan() async {
     final text = await scanTextFrom(context);
     if (text == null || text.trim().isEmpty) return;
@@ -58,17 +75,35 @@ class _SmartIntakeScreenState extends State<SmartIntakeScreen> {
     final id = newId();
     switch (term.kind) {
       case ExtractedTermKind.allergy:
-        await repo.patients.addAllergy(Allergy(
-          id: id, patientId: widget.patientId, substance: term.text,
-          createdAt: now, updatedAt: now));
+        await repo.patients.addAllergy(
+          Allergy(
+            id: id,
+            patientId: widget.patientId,
+            substance: term.text,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
       case ExtractedTermKind.problem:
-        await repo.patients.addProblem(Problem(
-          id: id, patientId: widget.patientId, display: term.text,
-          createdAt: now, updatedAt: now));
+        await repo.patients.addProblem(
+          Problem(
+            id: id,
+            patientId: widget.patientId,
+            display: term.text,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
       case ExtractedTermKind.medication:
-        await repo.patients.addMedication(Medication(
-          id: id, patientId: widget.patientId, name: term.text,
-          createdAt: now, updatedAt: now));
+        await repo.patients.addMedication(
+          Medication(
+            id: id,
+            patientId: widget.patientId,
+            name: term.text,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
       case ExtractedTermKind.followUp:
       case ExtractedTermKind.redFlag:
         return; // prompts, not list entries
@@ -82,13 +117,16 @@ class _SmartIntakeScreenState extends State<SmartIntakeScreen> {
   Widget build(BuildContext context) {
     final m = context.metrics;
     final fileable = _terms
-        .where((t) =>
-            t.kind == ExtractedTermKind.allergy ||
-            t.kind == ExtractedTermKind.problem ||
-            t.kind == ExtractedTermKind.medication)
+        .where(
+          (t) =>
+              t.kind == ExtractedTermKind.allergy ||
+              t.kind == ExtractedTermKind.problem ||
+              t.kind == ExtractedTermKind.medication,
+        )
         .toList();
-    final flags =
-        _terms.where((t) => t.kind == ExtractedTermKind.redFlag).toList();
+    final flags = _terms
+        .where((t) => t.kind == ExtractedTermKind.redFlag)
+        .toList();
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -124,23 +162,25 @@ class _SmartIntakeScreenState extends State<SmartIntakeScreen> {
                     ),
                   ),
                   SizedBox(height: m.spaceSm),
-                  Row(
+                  Wrap(
+                    spacing: m.spaceSm,
+                    runSpacing: m.spaceSm,
                     children: <Widget>[
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _scan,
-                          icon: const Icon(Icons.document_scanner_outlined,
-                              size: 18),
-                          label: const Text('Scan'),
-                        ),
+                      CapsuleAction(
+                        onTap: _scan,
+                        icon: Icons.document_scanner_outlined,
+                        label: 'Scan',
                       ),
-                      SizedBox(width: m.spaceSm),
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: _extract,
-                          icon: const Icon(Icons.auto_fix_high, size: 18),
-                          label: const Text('Find entries'),
+                      if (context.watch<AppBootstrap>().canTranscribe)
+                        CapsuleAction(
+                          onTap: _dictate,
+                          icon: Icons.mic_none,
+                          label: 'Dictate',
                         ),
+                      CapsuleAction(
+                        onTap: _extract,
+                        icon: Icons.auto_fix_high,
+                        label: 'Find entries',
                       ),
                     ],
                   ),
@@ -152,20 +192,24 @@ class _SmartIntakeScreenState extends State<SmartIntakeScreen> {
               const EmptyState(
                 icon: Icons.playlist_add_check_outlined,
                 title: 'Suggestions appear here',
-                message: 'Add some text and tap "Find entries". Nothing is '
+                message:
+                    'Add some text and tap "Find entries". Nothing is '
                     'filed until you tap Add.',
               )
             else ...<Widget>[
               if (fileable.isEmpty)
                 Padding(
                   padding: EdgeInsets.symmetric(vertical: m.spaceSm),
-                  child: Text('No medicines, problems or allergies recognised.',
-                      style: context.texts.bodySmall),
+                  child: Text(
+                    'No medicines, problems or allergies recognised.',
+                    style: context.texts.bodySmall,
+                  ),
                 )
               else
                 SectionCard(
                   title: 'Found ${fileable.length} to review',
-                  subtitle: 'Tap Add to file — nothing here is on the chart yet',
+                  subtitle:
+                      'Tap Add to file — nothing here is on the chart yet',
                   child: Column(
                     children: <Widget>[
                       for (final term in fileable)
@@ -189,8 +233,11 @@ class _SmartIntakeScreenState extends State<SmartIntakeScreen> {
                           padding: EdgeInsets.symmetric(vertical: m.spaceXs),
                           child: Row(
                             children: <Widget>[
-                              Icon(Icons.flag_outlined,
-                                  size: 16, color: context.palette.caution),
+                              Icon(
+                                Icons.flag_outlined,
+                                size: 16,
+                                color: context.palette.caution,
+                              ),
                               SizedBox(width: m.spaceSm),
                               Expanded(child: Text(f.text)),
                             ],
@@ -223,10 +270,16 @@ class _SuggestionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      leading: StatusPill(label: term.kind.label, tone: PillTone.info, dense: true),
+      leading: StatusPill(
+        label: term.kind.label,
+        tone: PillTone.info,
+        dense: true,
+      ),
       title: Text(term.text),
-      subtitle: Text('from "${term.matchedPhrase}"',
-          style: context.texts.bodySmall),
+      subtitle: Text(
+        'from "${term.matchedPhrase}"',
+        style: context.texts.bodySmall,
+      ),
       trailing: filed
           ? Icon(Icons.check_circle, color: context.palette.normal)
           : FilledButton.tonal(onPressed: onAdd, child: const Text('Add')),

@@ -30,6 +30,7 @@ export '../widgets/sheet_scaffold.dart' show SheetScaffold;
 export '../widgets/confirm_dialog.dart' show confirmDialog;
 
 // Layout and responsive behaviour.
+export '../theme/app_theme.dart' show kPillNavBarHeight, pillNavBottomMargin;
 export 'layout.dart';
 export 'adaptive.dart';
 
@@ -57,6 +58,7 @@ export 'playback_waveform.dart' show PlaybackWaveform;
 export '../widgets/quick_fields.dart'
     show LabeledField, NumericField, ChoiceChipRow;
 export '../widgets/quick_action.dart' show QuickAction;
+export '../widgets/capsule_action.dart' show CapsuleAction;
 export '../widgets/contact_actions.dart'
     show CallButton, ContactRow, ContactActions;
 

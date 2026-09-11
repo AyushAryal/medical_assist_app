@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_theme.dart' show kAppNavigationBarHeight;
+import '../theme/app_theme.dart'
+    show kPillNavBarHeight, pillNavBottomMargin;
 import '../theme/theme_scope.dart';
 
 /// How much horizontal room the window actually has.
@@ -76,7 +77,10 @@ extension BreakpointX on BuildContext {
   /// bottom bar, so content never sits underneath anything there.
   double get bottomBarClearance {
     if (!breakpoint.isCompact) return 0;
-    return kAppNavigationBarHeight + MediaQuery.paddingOf(this).bottom;
+    // The floating pill: its height, the margin it floats above the edge,
+    // and a breath of space so content never kisses the pill.
+    final inset = MediaQuery.paddingOf(this).bottom;
+    return kPillNavBarHeight + pillNavBottomMargin(inset) + 8;
   }
 }
 

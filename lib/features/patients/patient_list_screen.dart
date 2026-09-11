@@ -88,16 +88,20 @@ class _PatientListScreenState extends State<PatientListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(title: const Text('Patients')),
-      floatingActionButton: FloatingActionButton.extended(
-        // See clinic_list_screen.dart's heroTag comment.
-        heroTag: 'patientListFab',
-        onPressed: () async {
-          await context.push(Routes.patientNew);
-          if (mounted) _search(_query.text);
-        },
-        icon: const Icon(Icons.person_add_alt),
-        label: const Text('New patient'),
+      appBar: AppBar(
+        title: const Text('Patients'),
+        actions: <Widget>[
+          // Top-right, iOS-style: a FAB down there sat behind the floating
+          // pill bar.
+          IconButton(
+            tooltip: 'New patient',
+            icon: const Icon(Icons.person_add_alt),
+            onPressed: () async {
+              await context.push(Routes.patientNew);
+              if (mounted) _search(_query.text);
+            },
+          ),
+        ],
       ),
       body: TwoPane(
         masterFlex: 2,
@@ -233,9 +237,18 @@ class _PatientTile extends StatelessWidget {
                     tone: palette.critical,
                   )
                 : null,
+            // "Not seen yet", not a dash: a placeholder glyph in the
+            // last-seen slot reads as a rendering bug on a freshly
+            // registered patient.
             trailing: Text(
-              Fmt.relative(patient.lastSeenAt),
-              style: context.texts.labelSmall,
+              patient.lastSeenAt == null
+                  ? 'Not seen yet'
+                  : Fmt.relative(patient.lastSeenAt),
+              style: context.texts.labelSmall?.copyWith(
+                color: patient.lastSeenAt == null
+                    ? context.palette.onSurfaceMuted
+                    : null,
+              ),
             ),
           ),
         ),

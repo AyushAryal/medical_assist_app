@@ -248,7 +248,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   @override
   Widget build(BuildContext context) {
     final m = context.metrics;
-    final palette = context.palette;
     final wide = context.breakpoint.hasDetailPane;
 
     return Scaffold(
@@ -260,6 +259,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             tooltip: 'Jump to today',
             icon: const Icon(Icons.today_outlined),
             onPressed: _isToday ? null : () => _select(DateTime.now()),
+          ),
+          // Top-right, iOS-style: the FAB this replaces sat behind the
+          // floating pill bar.
+          IconButton(
+            tooltip: 'Find patient',
+            icon: const Icon(Icons.person_search),
+            onPressed: () => context.go(Routes.patients),
           ),
         ],
       ),
@@ -291,14 +297,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 Expanded(child: _dayPane(context, showDate: false)),
               ],
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        // See clinic_list_screen.dart's heroTag comment.
-        heroTag: 'scheduleFindPatientFab',
-        onPressed: () => context.go(Routes.patients),
-        icon: const Icon(Icons.person_search),
-        label: const Text('Find patient'),
-        backgroundColor: palette.primary,
-      ),
     );
   }
 

@@ -66,33 +66,35 @@ class RecordSummaryCard extends StatelessWidget {
               onReferral != null ||
               onExplain != null) ...<Widget>[
             SizedBox(height: m.spaceMd),
+            // Compact tinted capsules, the way iOS marks a row of secondary
+            // actions — four outlined slabs read as four competing forms.
             Wrap(
               spacing: m.spaceSm,
               runSpacing: m.spaceSm,
               children: <Widget>[
                 if (onBrief != null)
-                  OutlinedButton.icon(
-                    onPressed: onBrief,
-                    icon: const Icon(Icons.auto_awesome, size: 18),
-                    label: const Text('Brief me'),
+                  CapsuleAction(
+                    onTap: onBrief,
+                    icon: Icons.auto_awesome,
+                    label: 'Brief me',
                   ),
                 if (onExplain != null)
-                  OutlinedButton.icon(
-                    onPressed: onExplain,
-                    icon: const Icon(Icons.help_outline, size: 18),
-                    label: const Text('Explain'),
+                  CapsuleAction(
+                    onTap: onExplain,
+                    icon: Icons.help_outline,
+                    label: 'Explain',
                   ),
                 if (onHandoff != null)
-                  OutlinedButton.icon(
-                    onPressed: onHandoff,
-                    icon: const Icon(Icons.assignment_outlined, size: 18),
-                    label: const Text('Handoff'),
+                  CapsuleAction(
+                    onTap: onHandoff,
+                    icon: Icons.assignment_outlined,
+                    label: 'Handoff',
                   ),
                 if (onReferral != null)
-                  OutlinedButton.icon(
-                    onPressed: onReferral,
-                    icon: const Icon(Icons.outgoing_mail, size: 18),
-                    label: const Text('Referral'),
+                  CapsuleAction(
+                    onTap: onReferral,
+                    icon: Icons.outgoing_mail,
+                    label: 'Referral',
                   ),
               ],
             ),
