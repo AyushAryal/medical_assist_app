@@ -136,7 +136,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final controller = _controller;
     if (controller == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const LoadingState();
     }
 
     final session = context.watch<SessionController>();

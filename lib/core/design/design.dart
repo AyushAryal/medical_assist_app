@@ -72,6 +72,7 @@ export '../widgets/vital_value.dart' show VitalValue;
 export '../widgets/sparkline.dart' show Sparkline, MiniBarChart;
 export '../widgets/data_chart.dart' show DataChart;
 export '../widgets/empty_state.dart' show EmptyState;
+export '../widgets/loading_state.dart' show LoadingState;
 
 // Explaining derived values. Anything the app worked out for itself carries an
 // InfoDot; the rule is documented in `clinical/explanations.dart`.

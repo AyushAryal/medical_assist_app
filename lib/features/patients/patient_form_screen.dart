@@ -296,7 +296,7 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
     final age = PatientAge.fromDateOfBirth(_dateOfBirth);
 
     if (_loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const LoadingState();
     }
 
     return Scaffold(

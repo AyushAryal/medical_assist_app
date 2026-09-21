@@ -84,7 +84,7 @@ class _PatientChartScreenState extends State<PatientChartScreen> {
   Widget build(BuildContext context) {
     final controller = _controller;
     if (controller == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const LoadingState();
     }
 
     return ChangeNotifierProvider<PatientChartController>.value(
@@ -92,9 +92,7 @@ class _PatientChartScreenState extends State<PatientChartScreen> {
       child: Consumer<PatientChartController>(
         builder: (context, chart, _) {
           if (chart.isLoading) {
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            );
+            return const LoadingState();
           }
 
           final patient = chart.patient;
