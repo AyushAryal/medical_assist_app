@@ -57,6 +57,7 @@ abstract final class Routes {
   static const String dictation = '/settings/dictation';
   static const String voice = '/settings/voice';
   static const String ai = '/settings/ai';
+  static const String about = '/settings/about';
 
   static String chartFor(String patientId) => '/patients/$patientId';
   static String editFor(String patientId) => '/patients/$patientId/edit';
@@ -242,6 +243,12 @@ abstract final class AppRouter {
           path: Routes.ai,
           parentNavigatorKey: rootNavigatorKey,
           builder: (context, state) => const AiSettingsScreen(),
+        ),
+        GoRoute(
+          path: Routes.about,
+          parentNavigatorKey: rootNavigatorKey,
+          pageBuilder: (context, state) =>
+              _fadeThrough(state, const AboutScreen()),
         ),
       ],
       errorBuilder: (context, state) => Scaffold(

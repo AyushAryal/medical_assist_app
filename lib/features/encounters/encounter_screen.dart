@@ -70,11 +70,7 @@ class _EncounterScreenState extends State<EncounterScreen> {
     if (encounter == null) return;
 
     if (note == null || note.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Write the clinical note before signing.'),
-        ),
-      );
+      OptToast.error(context, 'Write the clinical note before signing.');
       return;
     }
 
@@ -99,9 +95,7 @@ class _EncounterScreenState extends State<EncounterScreen> {
     await _load();
 
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Encounter signed.')));
+    OptToast.success(context, 'Encounter signed.');
   }
 
   Future<void> _setDisposition(Disposition disposition) async {

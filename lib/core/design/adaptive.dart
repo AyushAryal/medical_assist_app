@@ -65,13 +65,15 @@ extension BreakpointX on BuildContext {
   /// does *not* auto-inset the body, and every scrollable behind the bar
   /// must reserve this space itself rather than relying on the framework.
   ///
-  /// The figure is the bar's themed content height ([kAppNavigationBarHeight])
-  /// plus the device's own bottom inset, because [NavigationBar] wraps
-  /// itself in a [SafeArea] and grows to clear the home indicator or gesture
-  /// bar on top of that configured height. That inset is 0 on some Android
-  /// devices, ~34 on an iPhone with a home indicator, and something else
-  /// again on a foldable or an iPad — hence reading it from [MediaQuery]
-  /// rather than hardcoding it.
+  /// The figure mirrors the pill bar's own geometry exactly: the pill's
+  /// height plus the margin it floats above the screen edge, derived from the
+  /// device's *raw* bottom inset ([MediaQuery.viewPaddingOf]) — the same
+  /// value the kit's `PillNavBar` uses to place itself. Not
+  /// [MediaQuery.paddingOf]: inside an `extendBody` [Scaffold] the framework
+  /// rewrites the body's `padding.bottom` to the bottom bar's full layout
+  /// height, so reading it here double-counted the pill and over-reserved by
+  /// ~50px. ([AppShell] restores the body's `viewPadding.bottom`, which the
+  /// same rewrite strips to 0 — see the note there.)
   ///
   /// Zero on medium/expanded breakpoints: those use a side rail instead of a
   /// bottom bar, so content never sits underneath anything there.
@@ -79,7 +81,7 @@ extension BreakpointX on BuildContext {
     if (!breakpoint.isCompact) return 0;
     // The floating pill: its height, the margin it floats above the edge,
     // and a breath of space so content never kisses the pill.
-    final inset = MediaQuery.paddingOf(this).bottom;
+    final inset = MediaQuery.viewPaddingOf(this).bottom;
     return kPillNavBarHeight + pillNavBottomMargin(inset) + 8;
   }
 }

@@ -104,18 +104,14 @@ class _AskScreenState extends State<AskScreen> {
   /// full page is where longer questions get asked. Same recorder, same
   /// on-device transcription as note dictation.
   Future<void> _startListening() async {
-    final messenger = ScaffoldMessenger.of(context);
     final started = await context.read<AppBootstrap>().dictation.start();
     if (!mounted) return;
     if (!started) {
       // Silence here would be indistinguishable from a broken button.
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text(
-            'The microphone is not available. Check that this app has '
-            'permission to use it.',
-          ),
-        ),
+      OptToast.error(
+        context,
+        'The microphone is not available. Check that this app has '
+        'permission to use it.',
       );
       return;
     }

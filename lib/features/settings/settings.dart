@@ -2,6 +2,7 @@
 /// model and dictation configuration, and module entitlements.
 library;
 
+export 'about_screen.dart' show AboutScreen;
 export 'ai_settings_screen.dart' show AiSettingsScreen;
 export 'audit_log_screen.dart' show AuditLogScreen;
 export 'dictation_settings_screen.dart' show DictationSettingsScreen;

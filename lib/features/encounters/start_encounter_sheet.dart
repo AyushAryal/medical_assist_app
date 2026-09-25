@@ -82,9 +82,7 @@ class _StartEncounterSheetState extends State<StartEncounterSheet> {
     final session = context.read<SessionController>();
     final clinic = session.activeClinic;
     if (clinic == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select a clinic first.')),
-      );
+      OptToast.error(context, 'Select a clinic first.');
       return;
     }
 
@@ -99,7 +97,10 @@ class _StartEncounterSheetState extends State<StartEncounterSheet> {
       providerName: session.signatureName,
     );
 
-    if (mounted) Navigator.of(context).pop(encounter);
+    if (mounted) {
+      OptToast.success(context, 'Visit started');
+      Navigator.of(context).pop(encounter);
+    }
   }
 
   @override

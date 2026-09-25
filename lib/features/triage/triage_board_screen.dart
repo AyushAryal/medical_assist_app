@@ -85,7 +85,11 @@ class _TriageBoardScreenState extends State<TriageBoardScreen> {
                                   .assistModelActive,
                             ),
                           if (c.needsObs.isNotEmpty) ...<Widget>[
-                            SizedBox(height: m.spaceLg),
+                            // Only a gap when there is a section above it —
+                            // otherwise the spacer renders as a void at the
+                            // top of the board.
+                            if (c.attention.isNotEmpty)
+                              SizedBox(height: m.spaceLg),
                             _Section(
                               title: 'Needs observations',
                               subtitle: 'Risk unknown until vitals are taken.',

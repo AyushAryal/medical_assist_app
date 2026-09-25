@@ -65,7 +65,7 @@ class Header extends StatelessWidget {
                       Icon(
                         Icons.location_on_outlined,
                         size: 16,
-                        color: palette.primary,
+                        color: palette.accent,
                       ),
                       SizedBox(width: m.spaceXs + 2),
                       ConstrainedBox(

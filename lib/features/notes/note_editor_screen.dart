@@ -451,7 +451,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// since, not just what is captured from now on.
   Future<void> _transcribeExisting(Attachment attachment, String section) async {
     final bootstrap = context.read<AppBootstrap>();
-    final messenger = ScaffoldMessenger.of(context);
     final path = _attachmentPaths[attachment.id];
     if (path == null) return;
 
@@ -459,9 +458,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     try {
       final availability = await bootstrap.transcription.availability();
       if (!availability.isReady) {
-        messenger.showSnackBar(
-          SnackBar(content: Text(availability.reason ?? 'Not available.')),
-        );
+        if (mounted) {
+          OptToast.error(context, availability.reason ?? 'Not available.');
+        }
         return;
       }
 
@@ -469,11 +468,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       if (!mounted) return;
 
       if (result.isEmpty) {
-        messenger.showSnackBar(
-          const SnackBar(
-            content: Text('Nothing recognisable in that recording.'),
-          ),
-        );
+        OptToast.info(context, 'Nothing recognisable in that recording.');
         return;
       }
 
@@ -503,19 +498,16 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       // Recordings made before the current pipeline are compressed AAC, and
       // there is no decoder available here. Saying which files can be
       // transcribed beats a generic failure the user cannot act on.
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text(
-            'This recording is in a compressed format that cannot be '
-            'transcribed on the device. Recordings made with the current '
-            'version can be.',
-          ),
-        ),
-      );
+      if (mounted) {
+        OptToast.error(
+          context,
+          'This recording is in a compressed format that cannot be '
+          'transcribed on the device. Recordings made with the current '
+          'version can be.',
+        );
+      }
     } on Object catch (error) {
-      messenger.showSnackBar(
-        SnackBar(content: Text('Could not transcribe: $error')),
-      );
+      if (mounted) OptToast.error(context, 'Could not transcribe: $error');
     } finally {
       if (mounted) setState(() => _transcribingId = null);
     }
@@ -567,13 +559,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         // nobody downstream ever feels safe deleting one. Severity and
         // reaction have to be asked, so this opens the full form instead.
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Add "${term.text}" from the chart, where severity and reaction '
-              'are recorded with it.',
-            ),
-          ),
+        OptToast.info(
+          context,
+          'Add "${term.text}" from the chart, where severity and reaction '
+          'are recorded with it.',
         );
         return;
       case ExtractedTermKind.followUp:
@@ -587,9 +576,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       _suggestions =
           _suggestions.where((t) => t != term).toList(growable: false);
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${term.kind.label} added: ${term.text}')),
-    );
+    OptToast.success(context, '${term.kind.label} added: ${term.text}');
   }
 
   void _dismissSuggestion(ExtractedTerm term) {
@@ -615,9 +602,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
     if (!mounted) return;
     if (previous == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No previous signed note to copy from.')),
-      );
+      OptToast.info(context, 'No previous signed note to copy from.');
       return;
     }
 
@@ -653,9 +638,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     if (note == null) return;
 
     if (note.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('An empty note cannot be signed.')),
-      );
+      OptToast.error(context, 'An empty note cannot be signed.');
       return;
     }
 
@@ -897,7 +880,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                         AmendmentList(amendments: _amendments),
                       if (!isLocked)
                         SaveStatus(dirty: _dirty, savedAt: _savedAt),
-                      SizedBox(height: m.space2xl),
+                      // No trailing spacer: SplitColumns interleaves its own
+                      // gap and the scroll padding clears the sign bar, so on
+                      // a locked note this rendered as a bare block of space
+                      // under the last section.
                     ],
                   ),
                 ),
@@ -988,7 +974,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     // No model is not a blocker: the app's own rules sort the common
     // wordings, and a model only reaches further.
     final engine = context.read<AppBootstrap>().assistEngine;
-    final messenger = ScaffoldMessenger.of(context);
     if (_drafting) return;
 
     final source = _working.text.trim();
@@ -1000,11 +985,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       if (!mounted) return;
 
       if (draft.isEmpty) {
-        messenger.showSnackBar(
-          const SnackBar(
-            content: Text('Nothing in there matched a section. Try full '
-                'sentences — "on examination…", "likely…", "review in a week".'),
-          ),
+        OptToast.info(
+          context,
+          'Nothing in there matched a section. Try full sentences — '
+          '"on examination…", "likely…", "review in a week".',
         );
         return;
       }
@@ -1051,7 +1035,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         'Generated text stays marked until you edit it.',
       );
     } on DraftRefused catch (refusal) {
-      messenger.showSnackBar(SnackBar(content: Text(refusal.reason)));
+      if (mounted) OptToast.error(context, refusal.reason);
     } finally {
       if (mounted) setState(() => _drafting = false);
     }
@@ -1083,7 +1067,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// Rewords the plan as instructions for the patient, via the model.
   Future<void> _explainForPatient() async {
     final engine = context.read<AppBootstrap>().assistEngine;
-    final messenger = ScaffoldMessenger.of(context);
     if (engine == null || _drafting) return;
 
     final plan = _plan.text.trim();
@@ -1120,17 +1103,16 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           _offerUndo('Instructions added under the plan. Read them as the '
               'patient will.');
         case InstructionsAction.copied:
-          messenger.showSnackBar(
-            const SnackBar(
-              content: Text('Copied. Generated text — check it against the '
-                  'plan before sharing.'),
-            ),
+          OptToast.info(
+            context,
+            'Copied. Generated text — check it against the plan before '
+            'sharing.',
           );
         case InstructionsAction.dismissed:
           break;
       }
     } on DraftRefused catch (refusal) {
-      messenger.showSnackBar(SnackBar(content: Text(refusal.reason)));
+      if (mounted) OptToast.error(context, refusal.reason);
     } finally {
       if (mounted) setState(() => _drafting = false);
     }

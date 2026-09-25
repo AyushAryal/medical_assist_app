@@ -143,12 +143,13 @@ class StatusBarScrim extends StatelessWidget {
   }
 }
 
-/// A faint two-hue wash painted behind the whole app.
+/// The OptERP family wash painted behind the whole app — a soft coral → violet
+/// → blue sweep so OptDAI reads as part of the suite rather than a flat violet
+/// app. Clinical content sits on opaque glass panels, so the wash colours the
+/// space *between* panels and behind chrome without tinting records themselves.
 ///
-/// Translucent panels need something to reveal. Without this the glass has
-/// nothing behind it and collapses into flat grey. Kept far below the
-/// threshold where it reads as a "gradient background" — it should be felt
-/// rather than seen, and it must never tint clinical content.
+/// Three brand blobs (warm top-left, violet mid, cool bottom-right) mirror the
+/// family gradient direction; kept translucent so it stays calm and legible.
 class AmbientBackground extends StatelessWidget {
   const AmbientBackground({super.key, required this.child});
 
@@ -157,24 +158,36 @@ class AmbientBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final strength = context.isDark ? 0.26 : 0.14;
+    final strength = context.isDark ? 0.34 : 0.22;
 
     return DecoratedBox(
       decoration: BoxDecoration(color: palette.surfaceMuted),
       child: Stack(
         children: <Widget>[
+          // Coral — warm anchor, top-left (gradient origin).
           Positioned(
-            top: -160,
-            left: -120,
-            child: _Blob(color: palette.ambientOne, alpha: strength, size: 520),
+            top: -170,
+            left: -130,
+            child: _Blob(color: palette.ambientOne, alpha: strength, size: 560),
           ),
+          // Violet — the brand core, drifting through the middle.
           Positioned(
-            top: 180,
+            top: 240,
+            left: -60,
+            child: _Blob(
+              color: palette.heroSurface,
+              alpha: strength * 0.7,
+              size: 520,
+            ),
+          ),
+          // Blue — cool end, bottom-right (gradient terminus).
+          Positioned(
+            bottom: -200,
             right: -160,
             child: _Blob(
               color: palette.ambientTwo,
-              alpha: strength * 0.8,
-              size: 460,
+              alpha: strength * 0.9,
+              size: 560,
             ),
           ),
           Positioned.fill(child: child),

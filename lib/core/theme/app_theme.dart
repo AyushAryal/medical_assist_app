@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:opt_kit/opt_kit.dart' show BrandTheme;
 
 import 'theme_config.dart';
 
@@ -82,6 +83,15 @@ abstract final class AppTheme {
       fontFamily: t.fontFamily,
       textTheme: text,
       splashFactory: InkSparkle.splashFactory,
+
+      // The family brand carried through ThemeData.extensions so shared kit
+      // widgets (the pill nav bar's selection blob, the About page's hero
+      // wash) pick up this app's gradient without importing its colour files.
+      // Built from the palette's own tokens — the approved `heroGradient`
+      // sweep (coral → violet → blue) — so it re-skins with the JSON theme.
+      extensions: <ThemeExtension<dynamic>>[
+        BrandTheme(gradient: p.heroGradient, accent: p.primary),
+      ],
       visualDensity: VisualDensity.standard,
       materialTapTargetSize: MaterialTapTargetSize.padded,
 

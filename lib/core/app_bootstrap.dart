@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:opt_kit/opt_kit.dart' show OptDrafts;
 
 import '../data/repositories/clinical_repository.dart';
 import '../ai/pipeline.dart';
@@ -23,6 +24,7 @@ import '../data/services/voice_note_service.dart';
 import 'audit/audit_service.dart';
 import 'db/app_database.dart';
 import 'db/app_meta_store.dart';
+import 'db/draft_store.dart';
 import 'modules/entitlements.dart';
 import 'modules/workflow_preferences.dart';
 import 'security/app_lock_service.dart';
@@ -362,6 +364,10 @@ class AppBootstrap extends ChangeNotifier {
       );
       final meta = AppMetaStore(database);
       _meta = meta;
+      // Interruption-safe form drafts (kit DraftGroup) persist inside the
+      // encrypted database, alongside every other operational setting. Set
+      // once per unlock; cleared again on lock with the rest of the handles.
+      OptDrafts.store = MetaDraftStore(meta);
       final session = SessionController(repository, meta);
       await session.load();
 
@@ -454,6 +460,9 @@ class AppBootstrap extends ChangeNotifier {
     _assistEngine = null;
     _activeAssistModel = null;
     await _voiceNotes?.dispose();
+    // Drafts live behind the same lock as the database: with the store gone,
+    // kit draft groups become silent no-ops rather than touching a closed db.
+    OptDrafts.store = null;
     await _database?.close();
     _database = null;
     _audit = null;

@@ -60,14 +60,33 @@ class _VitalsEntryScreenState extends State<VitalsEntryScreen> {
   bool _loading = true;
   bool _busy = false;
 
+  /// Interruption-safe entry: every typed value is snapshotted (debounced)
+  /// under one per-patient draft, so a phone call or an app kill mid-set
+  /// never means re-taking observations from memory.
+  late final DraftGroup _draft;
+  bool _draftRestored = false;
+
   @override
   void initState() {
     super.initState();
+    _draft = DraftGroup(draftKey: 'vitals:${widget.patientId}')
+      ..attach('respiratoryRate', _respiratoryRate)
+      ..attach('spo2', _spo2)
+      ..attach('oxygenFlow', _oxygenFlow)
+      ..attach('systolic', _systolic)
+      ..attach('diastolic', _diastolic)
+      ..attach('heartRate', _heartRate)
+      ..attach('temperature', _temperature)
+      ..attach('weight', _weight)
+      ..attach('height', _height)
+      ..attach('glucose', _glucose)
+      ..attach('notes', _notes);
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
   @override
   void dispose() {
+    _draft.dispose();
     for (final controller in <TextEditingController>[
       _respiratoryRate,
       _spo2,
@@ -90,12 +109,22 @@ class _VitalsEntryScreenState extends State<VitalsEntryScreen> {
     final repository = context.read<ClinicalRepository>();
     final patient = await repository.patients.byId(widget.patientId);
     final previous = await repository.vitals.latestForPatient(widget.patientId);
+    // Restore after load, in one setState: the restored values must arrive
+    // together with the patient, so the NEWS2 preview scores them on the
+    // same frame the form appears.
+    final restored = await _draft.restore();
     if (!mounted) return;
     setState(() {
       _patient = patient;
       _previous = previous;
+      _draftRestored = restored;
       _loading = false;
     });
+  }
+
+  Future<void> _discardDraft() async {
+    await _draft.discardRestored();
+    if (mounted) setState(() => _draftRestored = false);
   }
 
   /// Carries forward the values that genuinely do not change between visits.
@@ -114,11 +143,7 @@ class _VitalsEntryScreenState extends State<VitalsEntryScreen> {
         _weight.text = Fmt.number(previous.weightKg);
       }
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Copied height and weight. Measure the rest.'),
-      ),
-    );
+    OptToast.info(context, 'Copied height and weight. Measure the rest.');
   }
 
   int? _int(TextEditingController controller) =>
@@ -295,9 +320,7 @@ class _VitalsEntryScreenState extends State<VitalsEntryScreen> {
     );
 
     if (draft.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter at least one observation.')),
-      );
+      OptToast.error(context, 'Enter at least one observation.');
       return;
     }
 
@@ -307,8 +330,13 @@ class _VitalsEntryScreenState extends State<VitalsEntryScreen> {
       draft: draft,
       patientAgeYears: patient.age?.years,
     );
+    // The set is now record; the interruption draft must not resurrect it.
+    await _draft.clear();
 
     if (!mounted) return;
+    // Toast before the pop: the root messenger outlives this route, so the
+    // confirmation stays visible over the screen the clinician returns to.
+    OptToast.success(context, 'Vitals saved');
     Navigator.of(context).pop(true);
   }
 
@@ -607,6 +635,8 @@ class _VitalsEntryScreenState extends State<VitalsEntryScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: <Widget>[
+                          if (_draftRestored)
+                            DraftRestoredRow(onDiscard: _discardDraft),
                           // Two columns on a wide screen. Respiration and
                           // circulation stay together on the left because that
                           // is the order the observations are physically taken
@@ -620,7 +650,9 @@ class _VitalsEntryScreenState extends State<VitalsEntryScreen> {
                               _additional(),
                             ],
                           ),
-                          SizedBox(height: m.space2xl),
+                          // No trailing spacer: the scroll padding already
+                          // clears the save bar, and stacking both left a
+                          // void under the last card.
                         ],
                       ),
                     ),

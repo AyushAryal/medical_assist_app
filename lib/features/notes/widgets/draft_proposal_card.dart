@@ -80,7 +80,7 @@ class ProposalCard extends StatelessWidget {
           // accent and never a severity colour: red in this app means a patient
           // is unwell, and "a machine decided this" must not borrow that.
           AnimatedOpacity(
-            duration: const Duration(milliseconds: 180),
+            duration: OptMotion.micro,
             opacity: kept ? 1 : 0.45,
             child: Container(
               width: double.infinity,

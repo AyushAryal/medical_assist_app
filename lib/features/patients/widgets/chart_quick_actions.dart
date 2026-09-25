@@ -13,6 +13,28 @@ class ChartQuickActions extends StatelessWidget {
 
   final PatientChartController chart;
 
+  /// The chart's primary action: resume the open visit, or start a new one.
+  /// Shared by the wide button below and the compact echo in the patient
+  /// header, so the two entry points cannot drift apart.
+  static Future<void> openOrStartVisit(
+    BuildContext context,
+    PatientChartController chart,
+  ) async {
+    final open = chart.openEncounter;
+    if (open != null) {
+      await context.push(Routes.encounterFor(open.id));
+    } else {
+      final encounter = await StartEncounterSheet.show(
+        context,
+        patient: chart.patient!,
+      );
+      if (encounter != null && context.mounted) {
+        await context.push(Routes.encounterFor(encounter.id));
+      }
+    }
+    await chart.refresh();
+  }
+
   @override
   Widget build(BuildContext context) {
     final m = context.metrics;
@@ -23,20 +45,7 @@ class ChartQuickActions extends StatelessWidget {
       children: <Widget>[
         Expanded(
           child: FilledButton.icon(
-            onPressed: () async {
-              if (open != null) {
-                await context.push(Routes.encounterFor(open.id));
-              } else {
-                final encounter = await StartEncounterSheet.show(
-                  context,
-                  patient: patient,
-                );
-                if (encounter != null && context.mounted) {
-                  await context.push(Routes.encounterFor(encounter.id));
-                }
-              }
-              await chart.refresh();
-            },
+            onPressed: () => openOrStartVisit(context, chart),
             icon: Icon(open != null ? Icons.play_arrow : Icons.add),
             label: Text(open != null ? 'Resume visit' : 'Start visit'),
           ),

@@ -145,9 +145,7 @@ class _BookAppointmentSheetState extends State<BookAppointmentSheet> {
     final session = context.read<SessionController>();
     final clinic = session.activeClinic;
     if (clinic == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select a clinic first.')),
-      );
+      OptToast.error(context, 'Select a clinic first.');
       return;
     }
 
@@ -174,7 +172,13 @@ class _BookAppointmentSheetState extends State<BookAppointmentSheet> {
       );
     }
 
-    if (mounted) Navigator.of(context).pop(result);
+    if (mounted) {
+      OptToast.success(
+        context,
+        widget.existing != null ? 'Appointment rescheduled' : 'Appointment booked',
+      );
+      Navigator.of(context).pop(result);
+    }
   }
 
   @override

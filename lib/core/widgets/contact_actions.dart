@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:opt_kit/opt_kit.dart' show OptToast;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../theme/theme_scope.dart';
@@ -52,12 +53,9 @@ class CallButton extends StatelessWidget {
   bool get _hasNumber => (phone ?? '').trim().isNotEmpty;
 
   Future<void> _handle(BuildContext context) async {
-    final messenger = ScaffoldMessenger.of(context);
     final ok = await ContactActions.call(phone!);
-    if (!ok) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('No dialler available on this device.')),
-      );
+    if (!ok && context.mounted) {
+      OptToast.error(context, 'No dialler available on this device.');
     }
   }
 

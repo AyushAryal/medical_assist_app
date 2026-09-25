@@ -56,15 +56,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   static String _caseloadFigures(DashboardController d) => <String>[
-        'Patients waiting now: ${d.waitingCount}',
-        'Appointments remaining today: ${d.remainingToday}',
-        'Encounters today: ${d.todayEncounterCount}',
-        'Observation sets today: ${d.todayVitalsCount}',
-        'Unsigned notes: ${d.draftNoteCount}',
-        'Follow-ups due: ${d.followUpsDue.length}',
-        'Observations flagged today: ${d.flagged.length}',
-        'Registered patients: ${d.patientCount}',
-      ].join('\n');
+    'Patients waiting now: ${d.waitingCount}',
+    'Appointments remaining today: ${d.remainingToday}',
+    'Encounters today: ${d.todayEncounterCount}',
+    'Observation sets today: ${d.todayVitalsCount}',
+    'Unsigned notes: ${d.draftNoteCount}',
+    'Follow-ups due: ${d.followUpsDue.length}',
+    'Observations flagged today: ${d.flagged.length}',
+    'Registered patients: ${d.patientCount}',
+  ].join('\n');
 
   static String _greeting(DateTime now) {
     if (now.hour < 12) return 'Good morning';
@@ -173,9 +173,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             await ClinicPickerSheet.show(context);
                             if (context.mounted) await _reload();
                           },
-                          trailing: context
-                                  .watch<AppBootstrap>()
-                                  .assistModelActive
+                          trailing:
+                              context.watch<AppBootstrap>().assistModelActive
                               ? AiPillButton(
                                   label: 'Daily brief',
                                   onTap: () => AiDraftSheet.show(
@@ -184,13 +183,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     subtitle: session.activeClinic?.name,
                                     notice: 'Generated from today\'s figures.',
                                     sources: <AiSource>[
-                                      for (final line in
-                                          _caseloadFigures(dashboard)
-                                              .split('\n'))
+                                      for (final line in _caseloadFigures(
+                                        dashboard,
+                                      ).split('\n'))
                                         AiSource(label: line),
                                     ],
                                     generate: (engine) => engine.caseloadReport(
-                                        _caseloadFigures(dashboard)),
+                                      _caseloadFigures(dashboard),
+                                    ),
                                   ),
                                 )
                               : null,
@@ -226,9 +226,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         // screen runs them in two columns rather than a single
                         // strip between two empty margins.
                         SplitColumns(
+                          // Conditions hoisted here: SplitColumns interleaves
+                          // a gap before every listed child, so a panel that
+                          // collapses internally would still leave its spacer
+                          // behind as an unexplained block of empty space.
                           primary: <Widget>[
-                            TodaySchedule(dashboard: dashboard),
-                            OpenWork(dashboard: dashboard, onChanged: _reload),
+                            if (TodaySchedule.hasContent(dashboard))
+                              TodaySchedule(dashboard: dashboard),
+                            if (OpenWork.hasContent(dashboard))
+                              OpenWork(
+                                dashboard: dashboard,
+                                onChanged: _reload,
+                              ),
                           ],
                           secondary: <Widget>[
                             AtAGlance(dashboard: dashboard),

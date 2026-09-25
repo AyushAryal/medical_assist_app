@@ -82,7 +82,7 @@ class NextUpCard extends StatelessWidget {
     return Container(
       padding: EdgeInsets.all(m.spaceLg),
       decoration: BoxDecoration(
-        color: palette.heroSurface,
+        gradient: palette.heroGradient,
         borderRadius: BorderRadius.circular(m.radiusMd),
       ),
       child: Column(

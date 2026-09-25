@@ -76,7 +76,6 @@ class MonthGrid extends StatelessWidget {
     final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
     // DateTime.weekday is 1 = Monday, and the grid starts on Monday.
     final leadingBlanks = first.weekday - 1;
-    final busiest = days.values.fold<int>(0, (max, d) => d.total > max ? d.total : max);
 
     final cells = <Widget>[
       for (var i = 0; i < leadingBlanks; i++) const SizedBox.shrink(),
@@ -86,7 +85,6 @@ class MonthGrid extends StatelessWidget {
           day: days[DateTime(month.year, month.month, day)],
           isSelected: dayKey(selected) ==
               DateTime(month.year, month.month, day),
-          busiest: busiest,
           onTap: onSelect,
         ),
     ];
@@ -120,9 +118,8 @@ class MonthGrid extends StatelessWidget {
           crossAxisCount: 7,
           mainAxisSpacing: m.spaceXs,
           crossAxisSpacing: m.spaceXs,
-          // Slightly taller than square: the cell holds a date, a count and a
-          // density bar, and a square cell clips the bar on a small phone.
-          childAspectRatio: 0.82,
+          // Near-square: the cell holds a plain number circle and a dot strip.
+          childAspectRatio: 1.05,
           children: cells,
         ),
       ],
@@ -140,161 +137,130 @@ class _DayCell extends StatelessWidget {
     required this.date,
     required this.day,
     required this.isSelected,
-    required this.busiest,
     required this.onTap,
   });
 
   final DateTime date;
   final CalendarDay? day;
   final bool isSelected;
-  final int busiest;
   final ValueChanged<DateTime> onTap;
 
   @override
   Widget build(BuildContext context) {
-    final m = context.metrics;
-    final palette = context.palette;
     final now = DateTime.now();
     final isToday = date.year == now.year &&
         date.month == now.month &&
         date.day == now.day;
     final isPast = date.isBefore(DateTime(now.year, now.month, now.day));
-    final total = day?.total ?? 0;
-    final waiting = day?.waiting ?? 0;
 
-    return Material(
-      color: isSelected
-          ? palette.primaryContainer
-          : total > 0
-              ? palette.surfaceMuted
-              : Colors.transparent,
-      borderRadius: BorderRadius.circular(m.radiusSm),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => onTap(date),
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: m.spaceXs),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              Container(
-                width: 24,
-                height: 24,
-                alignment: Alignment.center,
-                decoration: isToday
-                    ? BoxDecoration(
-                        color: isSelected ? palette.primary : palette.accent,
-                        shape: BoxShape.circle,
-                      )
-                    : null,
-                child: Text(
-                  '${date.day}',
-                  style: context.texts.labelMedium?.copyWith(
-                    color: isToday
-                        ? palette.surface
-                        : isSelected
-                            ? palette.onPrimaryContainer
-                            : isPast
-                                ? palette.onSurfaceMuted
-                                : palette.onSurface,
-                    fontWeight:
-                        isSelected || isToday ? FontWeight.w700 : null,
-                    fontFeatures: const <FontFeature>[
-                      FontFeature.tabularFigures(),
-                    ],
-                  ),
-                ),
-              ),
-              SizedBox(height: m.spaceXs / 2),
-              if (total == 0)
-                // A dash, not an empty cell: it says "checked, nothing booked"
-                // rather than leaving the reader to wonder if it failed to load.
-                Text(
-                  '·',
-                  style: context.texts.labelSmall?.copyWith(
-                    color: palette.onSurfaceMuted,
-                  ),
-                )
-              else
-                Column(
-                  children: <Widget>[
-                    // A count pill, not a muted digit: how loaded a day is
-                    // must be readable at month-glance, per date.
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 5,
-                        vertical: 0.5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: (waiting > 0 ? palette.caution : palette.primary)
-                            .withValues(alpha: context.isDark ? 0.28 : 0.14),
-                        borderRadius: BorderRadius.circular(m.radiusSm),
-                      ),
-                      child: Text(
-                        '$total',
-                        style: context.texts.labelSmall?.copyWith(
-                          color: waiting > 0 ? palette.caution : palette.primary,
-                          fontWeight: FontWeight.w700,
-                          fontFeatures: const <FontFeature>[
-                            FontFeature.tabularFigures(),
-                          ],
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: m.spaceXs / 2),
-                    // Density bar. The track stays far lighter than any real
-                    // bar so an empty day can never read as a full one.
-                    _DensityBar(
-                      fraction: busiest == 0 ? 0 : total / busiest,
-                      tone: waiting > 0
-                          ? palette.caution
-                          : isPast
-                              ? palette.outline
-                              : palette.primary,
-                    ),
-                  ],
-                ),
-            ],
+    // The family day cell: a plain number, a filled circle when chosen, a
+    // soft circle on today, marker dots for load. No boxes, no dashes.
+    return InkWell(
+      onTap: () => onTap(date),
+      customBorder: const CircleBorder(),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: <Widget>[
+          _DayNumber(
+            date: date,
+            isSelected: isSelected,
+            isToday: isToday,
+            isPast: isPast,
           ),
+          SizedBox(height: context.metrics.spaceXs / 2),
+          _MarkerDots(day: day),
+        ],
+      ),
+    );
+  }
+}
+
+/// The day-of-month figure, drawn the family way: bare on the card surface,
+/// a filled primary circle when it is the selected day, a soft primary
+/// circle when it is today.
+class _DayNumber extends StatelessWidget {
+  const _DayNumber({
+    required this.date,
+    required this.isSelected,
+    required this.isToday,
+    required this.isPast,
+    this.diameter = 32,
+  });
+
+  final DateTime date;
+  final bool isSelected;
+  final bool isToday;
+  final bool isPast;
+  final double diameter;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+
+    return Container(
+      width: diameter,
+      height: diameter,
+      alignment: Alignment.center,
+      decoration: isSelected
+          ? BoxDecoration(color: palette.primary, shape: BoxShape.circle)
+          : isToday
+              ? BoxDecoration(
+                  color: palette.primary.withValues(alpha: 0.22),
+                  shape: BoxShape.circle,
+                )
+              : null,
+      child: Text(
+        '${date.day}',
+        style: context.texts.labelLarge?.copyWith(
+          color: isSelected
+              ? palette.onPrimary
+              : isToday
+                  ? palette.primary
+                  : isPast
+                      ? palette.onSurfaceMuted
+                      : palette.onSurface,
+          fontWeight: isSelected || isToday ? FontWeight.w700 : null,
+          fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
         ),
       ),
     );
   }
 }
 
-class _DensityBar extends StatelessWidget {
-  const _DensityBar({required this.fraction, required this.tone});
+/// The family's load marker: up to three small dots under the number — the
+/// language every OptERP calendar speaks. Caution-toned while anyone on that
+/// day is still waiting, accent otherwise. A fixed-height strip so rows with
+/// and without bookings keep the same rhythm.
+class _MarkerDots extends StatelessWidget {
+  const _MarkerDots({required this.day});
 
-  final double fraction;
-  final Color tone;
+  final CalendarDay? day;
 
   @override
   Widget build(BuildContext context) {
-    final m = context.metrics;
     final palette = context.palette;
+    final total = day?.total ?? 0;
+    final tone = (day?.waiting ?? 0) > 0 ? palette.caution : palette.accent;
+    final count = total.clamp(0, 3);
 
     return SizedBox(
-      width: 20,
-      height: 3,
-      child: Stack(
-        children: <Widget>[
-          Container(
-            decoration: BoxDecoration(
-              color: palette.outline.withValues(alpha: 0.35),
-              borderRadius: BorderRadius.circular(m.radiusXs / 2),
+      height: 5,
+      child: count == 0
+          ? null
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                for (var i = 0; i < count; i++)
+                  Container(
+                    width: 5,
+                    height: 5,
+                    margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                    decoration:
+                        BoxDecoration(color: tone, shape: BoxShape.circle),
+                  ),
+              ],
             ),
-          ),
-          FractionallySizedBox(
-            widthFactor: fraction.clamp(0.12, 1.0),
-            child: Container(
-              decoration: BoxDecoration(
-                color: tone,
-                borderRadius: BorderRadius.circular(m.radiusXs / 2),
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -323,8 +289,6 @@ class WeekStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final m = context.metrics;
-    final busiest =
-        days.values.fold<int>(0, (max, d) => d.total > max ? d.total : max);
 
     return Row(
       children: <Widget>[
@@ -337,7 +301,6 @@ class WeekStrip extends StatelessWidget {
                 day: days[MonthGrid.dayKey(weekStart.add(Duration(days: i)))],
                 isSelected: MonthGrid.dayKey(selected) ==
                     MonthGrid.dayKey(weekStart.add(Duration(days: i))),
-                busiest: busiest,
                 onTap: onSelect,
               ),
             ),
@@ -352,14 +315,12 @@ class _WeekDayCell extends StatelessWidget {
     required this.date,
     required this.day,
     required this.isSelected,
-    required this.busiest,
     required this.onTap,
   });
 
   final DateTime date;
   final CalendarDay? day;
   final bool isSelected;
-  final int busiest;
   final ValueChanged<DateTime> onTap;
 
   @override
@@ -370,58 +331,35 @@ class _WeekDayCell extends StatelessWidget {
     final isToday = date.year == now.year &&
         date.month == now.month &&
         date.day == now.day;
-    final total = day?.total ?? 0;
+    final isPast = date.isBefore(DateTime(now.year, now.month, now.day));
 
-    return Material(
-      color: isSelected ? palette.primaryContainer : palette.surfaceMuted,
-      borderRadius: BorderRadius.circular(m.radiusSm),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => onTap(date),
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: m.spaceSm),
-          child: Column(
-            children: <Widget>[
-              Text(
-                MonthGrid._weekdayInitials[date.weekday - 1],
-                style: context.texts.labelSmall,
+    // Same family cell as the month grid, with the weekday initial above it —
+    // a muted letter and a plain number, not a boxed tile.
+    return InkWell(
+      onTap: () => onTap(date),
+      customBorder: const StadiumBorder(),
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: m.spaceXs),
+        child: Column(
+          children: <Widget>[
+            Text(
+              MonthGrid._weekdayInitials[date.weekday - 1],
+              style: context.texts.labelSmall?.copyWith(
+                color: palette.onSurfaceMuted,
+                letterSpacing: 0.6,
               ),
-              SizedBox(height: m.spaceXs / 2),
-              Text(
-                '${date.day}',
-                style: context.texts.titleSmall?.copyWith(
-                  color: isSelected
-                      ? palette.onPrimaryContainer
-                      : isToday
-                          ? palette.accent
-                          : palette.onSurface,
-                  fontWeight: isSelected || isToday ? FontWeight.w700 : null,
-                  fontFeatures: const <FontFeature>[
-                    FontFeature.tabularFigures(),
-                  ],
-                ),
-              ),
-              SizedBox(height: m.spaceXs),
-              Text(
-                total == 0 ? '—' : '$total',
-                style: context.texts.labelSmall?.copyWith(
-                  color: (day?.waiting ?? 0) > 0
-                      ? palette.caution
-                      : palette.onSurfaceMuted,
-                  fontWeight: total == 0 ? null : FontWeight.w700,
-                ),
-              ),
-              if (total > 0) ...<Widget>[
-                SizedBox(height: m.spaceXs / 2),
-                _DensityBar(
-                  fraction: busiest == 0 ? 0 : total / busiest,
-                  tone: (day?.waiting ?? 0) > 0
-                      ? palette.caution
-                      : palette.primary,
-                ),
-              ],
-            ],
-          ),
+            ),
+            SizedBox(height: m.spaceXs),
+            _DayNumber(
+              date: date,
+              isSelected: isSelected,
+              isToday: isToday,
+              isPast: isPast,
+              diameter: 34,
+            ),
+            SizedBox(height: m.spaceXs / 2),
+            _MarkerDots(day: day),
+          ],
         ),
       ),
     );

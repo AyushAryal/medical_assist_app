@@ -315,7 +315,7 @@ class AssistantPanelState extends State<AssistantPanel> {
       if (!_scroll.hasClients) return;
       _scroll.animateTo(
         _scroll.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 220),
+        duration: OptMotion.small,
         curve: Curves.easeOut,
       );
     });

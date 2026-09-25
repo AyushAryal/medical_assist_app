@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/design/design.dart';
-import 'pill_nav_bar.dart';
 
 /// Top-level navigation frame.
 ///
@@ -122,29 +121,48 @@ class AppShell extends StatelessWidget {
       );
     }
 
+    // The device's true bottom inset, captured ABOVE the Scaffold. Scaffold
+    // strips the body's MediaQuery when a bottomNavigationBar is present
+    // (removePadding(removeBottom) zeroes both padding.bottom and
+    // viewPadding.bottom, then extendBody restores only padding.bottom as the
+    // bar's layout height) — so inside the tabs, viewPadding.bottom read 0.
+    // The kit's `bottomNavClearance` (LargeTitleScaffold/OptSettingsScaffold
+    // spacers) and this app's `bottomBarClearance` both derive the pill's
+    // occupied height from that inset, so with 0 they under-reserved and tab
+    // content sat under the pill. Restoring the raw inset for the body keeps
+    // every clearance computed from the same figure the pill itself uses.
+    final viewPadding = MediaQuery.viewPaddingOf(context);
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       // Content runs under the bar so the blur has something to sample —
       // the bar reads as a material rather than an opaque strip.
       extendBody: true,
-      body: navigationShell,
+      body: Builder(
+        builder: (body) => MediaQuery(
+          data: MediaQuery.of(body).copyWith(
+            viewPadding: MediaQuery.of(
+              body,
+            ).viewPadding.copyWith(bottom: viewPadding.bottom),
+          ),
+          child: navigationShell,
+        ),
+      ),
       bottomNavigationBar: _bottomBar(context),
     );
   }
 
   /// The floating pill bar, on both platforms — the pill is the design, not
-  /// a themed platform strip.
+  /// a themed platform strip. The rendering is the kit's family-standard
+  /// [PillNavBar] (frosted capsule, BrandTheme-gradient selection blob),
+  /// re-exported through the design barrel; this app keeps its own tab set.
   Widget _bottomBar(BuildContext context) {
     return PillNavBar(
       currentIndex: navigationShell.currentIndex,
       onTap: _onSelect,
-      destinations: <PillNavDestination>[
+      items: <PillNavItem>[
         for (final d in _destinations)
-          PillNavDestination(
-            label: d.label,
-            icon: d.icon,
-            selectedIcon: d.selectedIcon,
-          ),
+          PillNavItem(label: d.label, icon: d.icon, activeIcon: d.selectedIcon),
       ],
     );
   }

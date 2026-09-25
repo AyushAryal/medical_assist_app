@@ -306,40 +306,51 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final m = context.metrics;
     final wide = context.breakpoint.hasDetailPane;
 
+    // The family calendar card: month title flanked by chevrons with the
+    // scale chip beside it, weekday initials, plain day numbers — the same
+    // shape OptHealth and OptIVF draw, in this app's own tokens.
     final calendar = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        _ScaleSwitcher(
-          scale: _scale,
-          onChanged: (scale) {
-            setState(() => _scale = scale);
-            _load();
-          },
-        ),
-        SizedBox(height: m.spaceMd),
-        _PeriodHeader(
-          title: _periodTitle,
-          subtitle: _periodSubtitle,
-          onPrevious: () => _shift(-1),
-          onNext: () => _shift(1),
-        ),
-        SizedBox(height: m.spaceMd),
-        if (_scale == CalendarScale.month)
-          MonthGrid(
-            month: _day,
-            days: _calendar,
-            selected: _day,
-            onSelect: _select,
-          )
-        else if (_scale == CalendarScale.week)
-          WeekStrip(
-            weekStart: WeekStrip.startOfWeek(_day),
-            days: _calendar,
-            selected: _day,
-            onSelect: _select,
+        GlassPanel(
+          padding: EdgeInsets.fromLTRB(m.spaceSm, m.spaceSm, m.spaceSm, m.spaceMd),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              _PeriodHeader(
+                title: _periodTitle,
+                scale: _scale,
+                onScale: (scale) {
+                  setState(() => _scale = scale);
+                  _load();
+                },
+                onPrevious: () => _shift(-1),
+                onNext: () => _shift(1),
+              ),
+              SizedBox(height: m.spaceSm),
+              if (_scale == CalendarScale.month)
+                MonthGrid(
+                  month: _day,
+                  days: _calendar,
+                  selected: _day,
+                  onSelect: _select,
+                )
+              else if (_scale == CalendarScale.week)
+                WeekStrip(
+                  weekStart: WeekStrip.startOfWeek(_day),
+                  days: _calendar,
+                  selected: _day,
+                  onSelect: _select,
+                ),
+            ],
           ),
-        SizedBox(height: m.spaceMd),
-        _DayCounts(rows: _rows),
+        ),
+        // The counts collapse to nothing on an empty day; the spacer must go
+        // with them or it stands as a bare gap under the calendar.
+        if (_rows.isNotEmpty) ...<Widget>[
+          SizedBox(height: m.spaceMd),
+          _DayCounts(rows: _rows),
+        ],
       ],
     );
 
@@ -405,92 +416,114 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     );
   }
 
+  // The subtitle the old header carried ("Showing today") is gone with the
+  // family restyle, so the day title carries the date itself.
   String get _periodTitle => switch (_scale) {
-    CalendarScale.day => _isToday ? 'Today' : Fmt.weekday(_day),
+    CalendarScale.day => _isToday ? 'Today · ${Fmt.dateShort(_day)}' : Fmt.date(_day),
     CalendarScale.week =>
       'Week of ${Fmt.dateShort(WeekStrip.startOfWeek(_day))}',
     CalendarScale.month => Fmt.monthAndYear(_day),
-  };
-
-  String get _periodSubtitle => switch (_scale) {
-    CalendarScale.day => Fmt.date(_day),
-    CalendarScale.week || CalendarScale.month =>
-      _isToday ? 'Showing today' : 'Showing ${Fmt.dateShort(_day)}',
   };
 
   static bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
 }
 
-/// On a phone the calendar and the day list share one scroll view, so the day
-/// list is always reachable without a mode switch.
-class _ScaleSwitcher extends StatelessWidget {
-  const _ScaleSwitcher({required this.scale, required this.onChanged});
+/// The family calendar header: ‹ Month Year › with the scale chip beside the
+/// title. Plain muted chevrons, not boxed tonal buttons — the card is the
+/// chrome, the controls stay quiet inside it.
+class _PeriodHeader extends StatelessWidget {
+  const _PeriodHeader({
+    required this.title,
+    required this.scale,
+    required this.onScale,
+    required this.onPrevious,
+    required this.onNext,
+  });
+
+  final String title;
+  final CalendarScale scale;
+  final ValueChanged<CalendarScale> onScale;
+  final VoidCallback onPrevious;
+  final VoidCallback onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    final m = context.metrics;
+    final palette = context.palette;
+
+    return Row(
+      children: <Widget>[
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          icon: Icon(Icons.chevron_left, color: palette.onSurfaceMuted),
+          tooltip: 'Previous',
+          onPressed: onPrevious,
+        ),
+        Expanded(
+          child: Text(
+            title,
+            style: context.texts.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        _ScaleChip(scale: scale, onChanged: onScale),
+        SizedBox(width: m.spaceXs),
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          icon: Icon(Icons.chevron_right, color: palette.onSurfaceMuted),
+          tooltip: 'Next',
+          onPressed: onNext,
+        ),
+      ],
+    );
+  }
+}
+
+/// The family's format chip — the small tinted pill OptHealth/OptIVF show in
+/// the calendar header. It names the current scale and a tap cycles
+/// Day → Week → Month, which keeps all three views behind one quiet control
+/// instead of a three-segment bar above the card.
+class _ScaleChip extends StatelessWidget {
+  const _ScaleChip({required this.scale, required this.onChanged});
 
   final CalendarScale scale;
   final ValueChanged<CalendarScale> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return SegmentedButton<CalendarScale>(
-      showSelectedIcon: false,
-      style: const ButtonStyle(visualDensity: VisualDensity.compact),
-      segments: <ButtonSegment<CalendarScale>>[
-        for (final value in CalendarScale.values)
-          ButtonSegment<CalendarScale>(
-            value: value,
-            label: Text(value.label),
-            icon: Icon(value.icon, size: 16),
-          ),
-      ],
-      selected: <CalendarScale>{scale},
-      onSelectionChanged: (selection) => onChanged(selection.first),
-    );
-  }
-}
+    final m = context.metrics;
+    final palette = context.palette;
+    final next = CalendarScale
+        .values[(scale.index + 1) % CalendarScale.values.length];
 
-class _PeriodHeader extends StatelessWidget {
-  const _PeriodHeader({
-    required this.title,
-    required this.subtitle,
-    required this.onPrevious,
-    required this.onNext,
-  });
-
-  final String title;
-  final String subtitle;
-  final VoidCallback onPrevious;
-  final VoidCallback onNext;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: <Widget>[
-        IconButton.filledTonal(
-          icon: const Icon(Icons.chevron_left),
-          onPressed: onPrevious,
-        ),
-        Expanded(
-          child: Column(
-            children: <Widget>[
-              Text(
-                title,
-                style: context.texts.titleMedium,
-                textAlign: TextAlign.center,
+    return Material(
+      color: palette.primary.withValues(alpha: context.isDark ? 0.24 : 0.12),
+      shape: const StadiumBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => onChanged(next),
+        child: Tooltip(
+          message: 'Switch to ${next.label.toLowerCase()} view',
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: m.spaceMd,
+              vertical: m.spaceXs,
+            ),
+            child: Text(
+              scale.label,
+              style: context.texts.labelMedium?.copyWith(
+                color: palette.primary,
+                fontWeight: FontWeight.w600,
               ),
-              Text(
-                subtitle,
-                style: context.texts.bodySmall,
-                textAlign: TextAlign.center,
-              ),
-            ],
+            ),
           ),
         ),
-        IconButton.filledTonal(
-          icon: const Icon(Icons.chevron_right),
-          onPressed: onNext,
-        ),
-      ],
+      ),
     );
   }
 }

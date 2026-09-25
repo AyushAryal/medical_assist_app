@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:opt_kit/opt_kit.dart' show OptDetailRow;
 
+import '../theme/theme_config.dart' show ClinicalPaletteX;
 import '../theme/theme_scope.dart';
 import '../widgets/patient_avatar.dart';
 import '../widgets/status_pill.dart';
@@ -69,6 +71,14 @@ class PersonRow extends StatelessWidget {
 }
 
 /// Label/value line used inside detail panels.
+///
+/// A thin wrapper over the kit's family-canonical [OptDetailRow] — one shared
+/// implementation of the label/value row across the OptERP suite. The local
+/// name and constructor are kept so call sites don't churn. The kit row reads
+/// `Theme.of(context).colorScheme`, which this app populates from its JSON
+/// tokens, so colours stay tokenized. Note it carries the family's own edge
+/// padding (16 horizontal / 12 vertical), so detail panels adopt the family
+/// rhythm rather than this app's former tighter one.
 class DetailRow extends StatelessWidget {
   const DetailRow({
     super.key,
@@ -83,21 +93,7 @@ class DetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final m = context.metrics;
-
-    return Padding(
-      padding: EdgeInsets.only(bottom: m.spaceSm),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          SizedBox(
-            width: labelWidth,
-            child: Text(label, style: context.texts.labelMedium),
-          ),
-          Expanded(child: Text(value, style: context.texts.bodyMedium)),
-        ],
-      ),
-    );
+    return OptDetailRow(label: label, value: value, labelWidth: labelWidth);
   }
 }
 
@@ -233,7 +229,10 @@ class HeroPanel extends StatelessWidget {
       width: double.infinity,
       padding: EdgeInsets.all(m.spaceLg),
       decoration: BoxDecoration(
-        color: tone ?? palette.heroSurface,
+        // A brand/hero surface carries the family warm→cool sweep. An explicit
+        // [tone] override (a caller wanting a flat fill) still wins.
+        color: tone,
+        gradient: tone == null ? palette.heroGradient : null,
         borderRadius: BorderRadius.circular(m.radiusMd),
       ),
       child: DefaultTextStyle.merge(

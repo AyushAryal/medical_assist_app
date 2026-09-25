@@ -39,7 +39,6 @@ class FieldAttachBar extends StatelessWidget {
   }) onCaptured;
 
   Future<void> _pickImage(BuildContext context, ImageSource source) async {
-    final messenger = ScaffoldMessenger.of(context);
     try {
       final picker = ImagePicker();
       final shot = await picker.pickImage(
@@ -56,14 +55,11 @@ class FieldAttachBar extends StatelessWidget {
         mimeType: shot.mimeType ?? 'image/jpeg',
       );
     } on Object catch (error) {
-      messenger.showSnackBar(
-        SnackBar(content: Text('Could not add image: $error')),
-      );
+      if (context.mounted) OptToast.error(context, 'Could not add image: $error');
     }
   }
 
   Future<void> _pickFile(BuildContext context) async {
-    final messenger = ScaffoldMessenger.of(context);
     try {
       final picked = await FilePicker.pickFile(
         type: FileType.custom,
@@ -81,9 +77,7 @@ class FieldAttachBar extends StatelessWidget {
             : 'image/jpeg',
       );
     } on Object catch (error) {
-      messenger.showSnackBar(
-        SnackBar(content: Text('Could not add file: $error')),
-      );
+      if (context.mounted) OptToast.error(context, 'Could not add file: $error');
     }
   }
 

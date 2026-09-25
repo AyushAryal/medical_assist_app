@@ -92,6 +92,19 @@ class AppLockService extends ChangeNotifier {
     return true;
   }
 
+  /// Removes the PIN entirely, turning app lock off. Biometric unlock is
+  /// cleared with it, because biometrics exist only as a shortcut on top of the
+  /// mandatory PIN fallback — leaving it enabled with no PIN would be a lock
+  /// with no way in. Only callable while unlocked (you reach it from Settings),
+  /// so no current-PIN check is needed.
+  Future<void> clearPin() async {
+    await _store.delete(_pinKey);
+    await _store.write(_biometricEnabledKey, 'false');
+    await _resetFailures();
+    _state = AppLockState.uninitialised;
+    notifyListeners();
+  }
+
   Future<UnlockFailure?> unlockWithPin(String pin) async {
     if (isThrottled) return UnlockFailure.throttled;
 

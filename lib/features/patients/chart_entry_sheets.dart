@@ -14,6 +14,11 @@ import 'patient_chart_controller.dart';
 /// Sheets rather than full screens on purpose: adding a problem happens *while*
 /// reading the chart, and pushing a route loses the reading position the
 /// clinician was in.
+///
+/// Each sheet binds its text fields to a kit [DraftGroup] keyed to the
+/// patient, so a half-typed entry survives the sheet being dismissed, the app
+/// being backgrounded, or the phone ringing — reopening the sheet restores it
+/// with a "Draft restored · Discard" row, and a successful save clears it.
 
 class AllergySheet extends StatefulWidget {
   const AllergySheet({super.key});
@@ -43,11 +48,32 @@ class _AllergySheetState extends State<AllergySheet> {
   AllergySeverity _severity = AllergySeverity.unknown;
   bool _busy = false;
 
+  late final DraftGroup _draft;
+  bool _draftRestored = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final patientId = context.read<PatientChartController>().patientId;
+    _draft = DraftGroup(draftKey: 'allergy:$patientId')
+      ..attach('substance', _substance)
+      ..attach('reaction', _reaction);
+    _draft.restore().then((restored) {
+      if (restored && mounted) setState(() => _draftRestored = true);
+    });
+  }
+
   @override
   void dispose() {
+    _draft.dispose();
     _substance.dispose();
     _reaction.dispose();
     super.dispose();
+  }
+
+  Future<void> _discardDraft() async {
+    await _draft.discardRestored();
+    if (mounted) setState(() => _draftRestored = false);
   }
 
   Future<void> _save() async {
@@ -68,7 +94,11 @@ class _AllergySheetState extends State<AllergySheet> {
         updatedAt: now,
       ),
     );
-    if (mounted) Navigator.of(context).pop();
+    await _draft.clear();
+    if (mounted) {
+      OptToast.success(context, 'Allergy saved');
+      Navigator.of(context).pop();
+    }
   }
 
   @override
@@ -79,6 +109,7 @@ class _AllergySheetState extends State<AllergySheet> {
       title: 'Add allergy',
       onSave: _busy ? null : _save,
       children: <Widget>[
+        if (_draftRestored) DraftRestoredRow(onDiscard: _discardDraft),
         LabeledField(
           label: 'Substance',
           controller: _substance,
@@ -145,11 +176,32 @@ class _ProblemSheetState extends State<ProblemSheet> {
   bool _isChronic = false;
   bool _busy = false;
 
+  late final DraftGroup _draft;
+  bool _draftRestored = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final patientId = context.read<PatientChartController>().patientId;
+    _draft = DraftGroup(draftKey: 'problem:$patientId')
+      ..attach('display', _display)
+      ..attach('code', _code);
+    _draft.restore().then((restored) {
+      if (restored && mounted) setState(() => _draftRestored = true);
+    });
+  }
+
   @override
   void dispose() {
+    _draft.dispose();
     _display.dispose();
     _code.dispose();
     super.dispose();
+  }
+
+  Future<void> _discardDraft() async {
+    await _draft.discardRestored();
+    if (mounted) setState(() => _draftRestored = false);
   }
 
   Future<void> _save() async {
@@ -171,7 +223,11 @@ class _ProblemSheetState extends State<ProblemSheet> {
         updatedAt: now,
       ),
     );
-    if (mounted) Navigator.of(context).pop();
+    await _draft.clear();
+    if (mounted) {
+      OptToast.success(context, 'Problem saved');
+      Navigator.of(context).pop();
+    }
   }
 
   @override
@@ -182,6 +238,7 @@ class _ProblemSheetState extends State<ProblemSheet> {
       title: 'Add problem',
       onSave: _busy ? null : _save,
       children: <Widget>[
+        if (_draftRestored) DraftRestoredRow(onDiscard: _discardDraft),
         LabeledField(
           label: 'Diagnosis',
           controller: _display,
@@ -237,12 +294,34 @@ class _MedicationSheetState extends State<MedicationSheet> {
   String? _frequency = 'OD';
   bool _busy = false;
 
+  late final DraftGroup _draft;
+  bool _draftRestored = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final patientId = context.read<PatientChartController>().patientId;
+    _draft = DraftGroup(draftKey: 'medication:$patientId')
+      ..attach('name', _name)
+      ..attach('dose', _dose)
+      ..attach('indication', _indication);
+    _draft.restore().then((restored) {
+      if (restored && mounted) setState(() => _draftRestored = true);
+    });
+  }
+
   @override
   void dispose() {
+    _draft.dispose();
     _name.dispose();
     _dose.dispose();
     _indication.dispose();
     super.dispose();
+  }
+
+  Future<void> _discardDraft() async {
+    await _draft.discardRestored();
+    if (mounted) setState(() => _draftRestored = false);
   }
 
   Future<void> _save() async {
@@ -266,7 +345,11 @@ class _MedicationSheetState extends State<MedicationSheet> {
         updatedAt: now,
       ),
     );
-    if (mounted) Navigator.of(context).pop();
+    await _draft.clear();
+    if (mounted) {
+      OptToast.success(context, 'Medication saved');
+      Navigator.of(context).pop();
+    }
   }
 
   @override
@@ -277,6 +360,7 @@ class _MedicationSheetState extends State<MedicationSheet> {
       title: 'Add medication',
       onSave: _busy ? null : _save,
       children: <Widget>[
+        if (_draftRestored) DraftRestoredRow(onDiscard: _discardDraft),
         LabeledField(
           label: 'Medication',
           controller: _name,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:opt_kit/opt_kit.dart' show OptUnfocus;
 import 'package:provider/provider.dart';
 
 import 'features/assist/assist.dart';
@@ -7,6 +8,7 @@ import 'features/assist/assist.dart';
 import 'core/agentic/agent_host.dart';
 import 'core/agentic/agent_scope.dart';
 import 'core/app_bootstrap.dart';
+import 'core/branding/splash_gate.dart';
 import 'core/routing/app_router.dart';
 import 'core/security/app_lock_service.dart';
 import 'core/modules/workflow_preferences.dart';
@@ -82,12 +84,22 @@ class _MedicalAppState extends State<MedicalApp> with WidgetsBindingObserver {
         // The ambient wash sits at the very root so every route — shell tabs
         // and full-screen charts alike — has the same ground beneath it.
         // Without it the translucent panels would have nothing to sample.
-        builder: (context, child) => AmbientBackground(
-          child: LockGate(
-            child: _DataScope(
-              child: AgentScope(
-                host: widget.agentHost,
-                child: child ?? const SizedBox.shrink(),
+        // The branded launch splash sits at the very top on cold start: it
+        // paints over the ambient wash + lock gate for a minimum beat (so the
+        // "an OptERP product" credit is seen) while unlock and the database
+        // open proceed underneath, then fades out to reveal the lock gate.
+        // OptUnfocus: tapping anywhere non-interactive dismisses the keyboard
+        // so form footers are never stranded behind the IME.
+        builder: (context, child) => OptUnfocus(
+          child: SplashGate(
+            child: AmbientBackground(
+              child: LockGate(
+                child: _DataScope(
+                  child: AgentScope(
+                    host: widget.agentHost,
+                    child: child ?? const SizedBox.shrink(),
+                  ),
+                ),
               ),
             ),
           ),

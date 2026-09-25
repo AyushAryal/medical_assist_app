@@ -8,6 +8,7 @@ import 'db_types.dart';
 abstract interface class MetaKeyValue {
   Future<String?> read(String key);
   Future<void> write(String key, String? value);
+  Future<void> delete(String key);
 }
 
 /// Key/value preferences that live *inside* the encrypted database rather than
@@ -53,6 +54,14 @@ class AppMetaStore implements MetaKeyValue {
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+  }
+
+  /// Removes the row entirely — unlike `write(key, null)`, which leaves a
+  /// tombstone. Drafts come and go constantly, so they get a real delete.
+  @override
+  Future<void> delete(String key) async {
+    if (!_database.isOpen) return;
+    await _database.db.delete(table, where: 'key = ?', whereArgs: [key]);
   }
 
   Future<Map<String, String?>> readAll(List<String> keys) async {

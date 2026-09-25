@@ -47,7 +47,9 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
       backgroundColor: Colors.transparent,
       appBar: AppBar(title: const Text('Access log')),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? ContentWidth(
+              child: SkeletonList(padding: EdgeInsets.all(m.spaceLg)),
+            )
           : _events.isEmpty
               ? const EmptyState(
                   icon: Icons.receipt_long_outlined,

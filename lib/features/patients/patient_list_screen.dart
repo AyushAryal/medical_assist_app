@@ -162,7 +162,14 @@ class _PatientListScreenState extends State<PatientListScreen> {
           ),
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? SkeletonList(
+                    padding: EdgeInsets.fromLTRB(
+                      m.spaceLg,
+                      0,
+                      m.spaceLg,
+                      m.spaceLg + context.bottomBarClearance,
+                    ),
+                  )
                 : _results.isEmpty
                 ? EmptyState(
                     icon: Icons.person_search_outlined,

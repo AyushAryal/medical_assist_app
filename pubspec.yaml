@@ -1,7 +1,7 @@
 name: medical_app
 description: "Opt Doctor Assistance Intelligence — offline-first clinical records with an on-device assistant."
 publish_to: 'none'
-version: 1.0.0+4
+version: 1.0.0+15
 
 environment:
   sdk: ^3.12.2
@@ -31,6 +31,11 @@ dependencies:
   intl: ^0.20.3
   just_audio: ^0.10.6
   local_auth: ^3.0.2
+  # The shared OptERP family kit: the co-brand credit, canonical detail/stat
+  # primitives and the research-backed trend charts. Path dependency, no
+  # override — the kit's file_picker constraint now spans 8.x–12.x.
+  opt_kit:
+    path: ../opt_kit
   path: ^1.9.1
   path_provider: ^2.1.6
   pdf: ^3.13.0
@@ -69,6 +74,11 @@ flutter:
   # a single file.
   assets:
     - assets/theme/
+    # Brand marks shown on the Dart launch splash (see core/branding) — the
+    # white glyph (icon_foreground) is the splash mark; icon.png is the full
+    # gradient icon used in-app (e.g. about/settings).
+    - assets/branding/icon.png
+    - assets/branding/icon_foreground.png
 
 # ---------------------------------------------------------------------------
 # App icon. Regenerate after changing assets/branding/icon*.png:
@@ -79,7 +89,7 @@ flutter_launcher_icons:
   android: "launcher_icon"
   # Adaptive icon: the OS masks the foreground to a circle/squircle, so the
   # mark is scaled into the inner safe zone rather than filling the canvas.
-  adaptive_icon_background: "#0F6473"
+  adaptive_icon_background: "#6C4FD8"
   adaptive_icon_foreground: "assets/branding/icon_foreground.png"
   adaptive_icon_monochrome: "assets/branding/icon_foreground.png"
   min_sdk_android: 24
@@ -89,18 +99,31 @@ flutter_launcher_icons:
 # ---------------------------------------------------------------------------
 # Splash screen. Regenerate after changing the logo:
 #   dart run flutter_native_splash:create
-# The colour matches the theme's primary so the handoff from splash to the
-# lock screen has no flash of a different background.
+# The colour matches the theme's primary (family violet) so the handoff from
+# the instant native splash to the Dart family splash has no colour flash.
 # ---------------------------------------------------------------------------
 flutter_native_splash:
-  color: "#0F6473"
-  image: "assets/branding/splash_logo.png"
-  color_dark: "#16292E"
-  image_dark: "assets/branding/splash_logo_dark.png"
+  # Full-screen family gradient so the pre-Flutter launch matches the Dart
+  # splash exactly (same coral->violet->blue backdrop + white glyph) — no
+  # background or logo jump between the two stages. The family splash is the
+  # BRIGHT gradient in BOTH modes (OptHealth/OptIVF splashes don't dim in dark
+  # mode — it's a brand moment), so light and dark use the same image. The
+  # solid colour is only the fallback (mid-gradient violet) where an image
+  # can't be painted (the Android 12+ behind-icon area, below).
+  #
+  # NOTE: do NOT add top-level `color`/`color_dark` here — flutter_native_splash
+  # treats colour and background_image as mutually exclusive and silently lets
+  # the colour WIN (it writes a 1x1 solid pixel as LaunchBackground and ignores
+  # the image; see ios.dart _createBackground `if (color) … else if (image)`).
+  # That was the "solid dark violet native splash" bug.
+  background_image: "assets/branding/splash_bg.png"
+  image: "assets/branding/icon_foreground.png"
+  background_image_dark: "assets/branding/splash_bg.png"
+  image_dark: "assets/branding/icon_foreground.png"
   android_12:
-    color: "#0F6473"
+    color: "#7B5FD6"
     image: "assets/branding/icon_foreground.png"
-    color_dark: "#16292E"
-    image_dark: "assets/branding/splash_logo_dark.png"
+    color_dark: "#7B5FD6"
+    image_dark: "assets/branding/icon_foreground.png"
   android: true
   ios: true

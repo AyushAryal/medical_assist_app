@@ -217,11 +217,6 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
       revision: _existing?.revision ?? 1,
     );
 
-    // Captured before the pop: after this route is gone its own context can no
-    // longer resolve a ScaffoldMessenger, and the confirmation would be
-    // silently dropped.
-    final messenger = ScaffoldMessenger.of(context);
-
     try {
       if (_existing == null) {
         // Duplicate check happens here, between building the record and
@@ -249,20 +244,20 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
           );
         }
         if (!mounted) return;
-        Navigator.of(context).pop(created.id);
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              'Registered ${created.displayName} — MRN ${created.mrn}',
-            ),
-          ),
+        // Toast before the pop: it lands on the root messenger, which
+        // outlives this route, so the confirmation is not silently dropped.
+        OptToast.success(
+          context,
+          'Registered ${created.displayName} — MRN ${created.mrn}',
         );
+        Navigator.of(context).pop(created.id);
       } else {
         await repository.updatePatient(
           draft,
           changedFields: 'demographics',
         );
         if (!mounted) return;
+        OptToast.success(context, 'Patient saved');
         Navigator.of(context).pop(draft.id);
       }
     } on Object catch (error) {
@@ -282,10 +277,9 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
     });
   }
 
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
-  }
+  // Both callers report a problem (missing DOB, failed save), so this is
+  // always the error voice.
+  void _showMessage(String message) => OptToast.error(context, message);
 
   static String? _nullIfBlank(String value) =>
       value.trim().isEmpty ? null : value.trim();

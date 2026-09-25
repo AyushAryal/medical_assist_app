@@ -35,9 +35,9 @@ class _LockGateState extends State<LockGate> {
     // Everything is painted on the shared ambient background, so the fade
     // blends surfaces rather than flashing them.
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 320),
-      switchInCurve: Curves.easeOutCubic,
-      switchOutCurve: Curves.easeInCubic,
+      duration: OptMotion.large,
+      switchInCurve: OptMotion.standard,
+      switchOutCurve: OptMotion.exit,
       transitionBuilder: (child, animation) => FadeTransition(
         opacity: animation,
         child: ScaleTransition(

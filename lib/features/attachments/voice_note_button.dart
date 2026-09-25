@@ -45,11 +45,7 @@ class _VoiceNoteButtonState extends State<VoiceNoteButton> {
       if (!mounted) return;
       if (!started) {
         setState(() => _busy = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Microphone permission is needed to dictate.'),
-          ),
-        );
+        OptToast.error(context, 'Microphone permission is needed to dictate.');
         return;
       }
       _ticker = Timer.periodic(const Duration(seconds: 1), (_) {

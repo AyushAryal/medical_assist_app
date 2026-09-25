@@ -227,15 +227,16 @@ class _FloatingAssistantState extends State<FloatingAssistant> {
           // Ride above the keyboard. A panel anchored to a fixed offset is
           // simply invisible the moment its own text field is focused, which
           // is the one moment it is certainly being used.
-          // Down to a hair above the pill bar (3px gap), no further — and no
-          // higher floor than that.
+          // Otherwise the floor is the standard nav clearance + 12: the same
+          // figure every tab list reserves above the pill, so the bubble
+          // always floats clear of the bar AND of the last list row — the
+          // one height on every tab, never on the pill. (This widget mounts
+          // above the router, outside the shell's Scaffold, so viewPadding
+          // here is the raw device inset and bottomBarClearance is exact.)
           bottom: keyboard > 0
               ? keyboard + m.spaceMd
               : (context.breakpoint.isCompact
-                  ? pillNavBottomMargin(
-                          MediaQuery.viewPaddingOf(context).bottom) +
-                      kPillNavBarHeight +
-                      3
+                  ? context.bottomBarClearance + 12
                   : m.space2xl + MediaQuery.viewPaddingOf(context).bottom),
           top: m.space2xl * 2,
           left: m.spaceLg,

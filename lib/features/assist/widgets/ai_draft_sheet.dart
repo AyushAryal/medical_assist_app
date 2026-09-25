@@ -560,9 +560,7 @@ class _AiDraftSheetState extends State<AiDraftSheet> {
                   onPressed: () async {
                     await Clipboard.setData(ClipboardData(text: _text));
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Copied')),
-                      );
+                      OptToast.success(context, 'Copied');
                       Navigator.of(context).pop();
                     }
                   },

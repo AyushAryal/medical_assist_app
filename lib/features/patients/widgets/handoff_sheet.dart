@@ -3,31 +3,132 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../clinical/flags/clinical_flag.dart';
+import '../../../clinical/news2.dart';
 import '../../../clinical/summary/handoff.dart';
 import '../../../core/app_bootstrap.dart';
 import '../../../core/design/design.dart';
+import '../../../core/utils/formatters.dart';
+import '../../../data/models/encounter.dart';
 import '../../../data/services/assist/language_model.dart';
 import '../../../data/services/speech_out.dart';
 import '../../assist/assist.dart';
+import '../patient_chart_controller.dart';
 
 /// Shows a deterministic SBAR handoff, ready to read aloud or copy.
 ///
-/// The structured SBAR is the source of truth — no editing, so what is copied
-/// is exactly what the record says. When an on-device model is available, it
-/// can additionally *reword* that same handoff into a natural paragraph for
-/// reading aloud; that version is marked as generated and never replaces the
-/// structured one. If no model is present, the feature simply is not offered —
-/// the handoff works without it.
+/// Two layers on purpose. At the top, the kit's [OptSituationCard] — the
+/// 30-second cross-cover glance, with the NEWS2 chip structurally impossible
+/// to omit. Below it, the structured SBAR text remains the source of truth —
+/// no editing, so what is copied is exactly what the record says. When an
+/// on-device model is available, it can additionally *reword* that same
+/// handoff into a natural paragraph for reading aloud; that version is marked
+/// as generated and never replaces the structured one. If no model is
+/// present, the feature simply is not offered — the handoff works without it.
 class HandoffSheet extends StatefulWidget {
-  const HandoffSheet({super.key, required this.handoff});
+  const HandoffSheet({
+    super.key,
+    required this.handoff,
+    this.news2,
+    this.situation,
+    this.background = const <String>[],
+    this.recentEvents = const <(String, String)>[],
+    this.recommendation,
+  });
 
   final Handoff handoff;
+
+  /// The latest scored NEWS2, for the situation card's risk chip.
+  final News2Result? news2;
+
+  /// One line: why this patient is being handed over (current complaint).
+  final String? situation;
+
+  /// Active problems, capped at 4 by the card itself.
+  final List<String> background;
+
+  /// (time, event) pairs — last visit, latest observations.
+  final List<(String, String)> recentEvents;
+
+  /// The contingency line — mirrors the SBAR Recommendation section.
+  final String? recommendation;
 
   static Future<void> show(BuildContext context, Handoff handoff) {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       builder: (_) => HandoffSheet(handoff: handoff),
+    );
+  }
+
+  /// Opens the handoff for a loaded chart, deriving the situation-card
+  /// glance from data the controller already holds — the same latest-scored
+  /// NEWS2 the header chip shows, the open visit's complaint, the active
+  /// problem list, and the most recent visit and observation times. One
+  /// helper so the header action and the summary-card button cannot drift.
+  static Future<void> showForChart(
+    BuildContext context,
+    PatientChartController chart,
+  ) {
+    final handoff = chart.handoff;
+    if (handoff == null) return Future<void>.value();
+
+    // Rebuild the result from the stored score: the total and band are what
+    // the chip renders, and the stored pair is the scored record — recomputing
+    // here could disagree with what was written at the time.
+    final vitals = chart.latestVitals;
+    final risk = vitals == null
+        ? null
+        : News2Risk.values.where((r) => r.name == vitals.news2Risk).firstOrNull;
+    final news2 = (vitals != null && vitals.news2Score != null && risk != null)
+        ? News2Result(
+            total: vitals.news2Score!,
+            risk: risk,
+            parameterScores: const <String, int>{},
+            hasSingleParameterThree: false,
+            algorithmVersion:
+                vitals.news2Algorithm ?? News2Calculator.algorithmVersion,
+          )
+        : null;
+
+    final open = chart.openEncounter;
+    final lastVisit = chart.encounters.firstOrNull;
+    final situation = open?.chiefComplaint ?? lastVisit?.chiefComplaint;
+
+    final recentEvents = <(String, String)>[
+      if (lastVisit != null)
+        (
+          Fmt.dateShort(lastVisit.startedAt),
+          'Visit: ${lastVisit.chiefComplaint ?? lastVisit.type.label}',
+        ),
+      if (vitals != null)
+        (
+          Fmt.dateShort(vitals.recordedAt),
+          'Obs at ${Fmt.time(vitals.recordedAt)}'
+              '${vitals.news2Score != null ? ' · NEWS2 ${vitals.news2Score}' : ''}',
+        ),
+    ];
+
+    // The card's R mirrors the sheet's own Recommendation section — the
+    // deterministic contingency text, never a second opinion.
+    final recommendation = handoff.sections
+        .where((s) => s.part == SbarPart.recommendation)
+        .expand((s) => s.lines)
+        .map((l) => l.text)
+        .join(' · ');
+
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => HandoffSheet(
+        handoff: handoff,
+        news2: news2,
+        situation: situation,
+        background: <String>[
+          for (final problem in chart.activeProblems.take(4)) problem.display,
+        ],
+        recentEvents: recentEvents,
+        recommendation: recommendation.isEmpty ? null : recommendation,
+      ),
     );
   }
 
@@ -79,9 +180,7 @@ class _HandoffSheetState extends State<HandoffSheet> {
         onPressed: () async {
           await Clipboard.setData(ClipboardData(text: handoff.plainText));
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Handoff copied')),
-            );
+            OptToast.success(context, 'Handoff copied');
             Navigator.of(context).pop();
           }
         },
@@ -89,6 +188,17 @@ class _HandoffSheetState extends State<HandoffSheet> {
         label: const Text('Copy handoff'),
       ),
       children: <Widget>[
+        // The 30-second glance. The card collapses to nothing when every slot
+        // is empty, so a sparse record costs no dead space; the deterministic
+        // SBAR text below stays the read-aloud, copyable artifact.
+        OptSituationCard(
+          news2: widget.news2,
+          situation: widget.situation,
+          background: widget.background,
+          recentEvents: widget.recentEvents,
+          recommendation: widget.recommendation,
+          margin: EdgeInsets.only(bottom: m.spaceLg),
+        ),
         for (final section in handoff.sections) ...<Widget>[
           _PartHeader(part: section.part),
           for (final line in section.lines) _LineRow(line: line),
@@ -150,9 +260,7 @@ class _SpokenSection extends StatelessWidget {
               onPressed: () async {
                 await Clipboard.setData(ClipboardData(text: d.text));
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Spoken version copied')),
-                  );
+                  OptToast.success(context, 'Spoken version copied');
                 }
               },
               icon: const Icon(Icons.copy_outlined, size: 18),

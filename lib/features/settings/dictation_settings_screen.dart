@@ -183,7 +183,6 @@ class _DictationSettingsScreenState extends State<DictationSettingsScreen> {
   /// time means three trips through the system document picker to accomplish
   /// one task.
   Future<void> _sideLoad() async {
-    final messenger = ScaffoldMessenger.of(context);
     final bootstrap = context.read<AppBootstrap>();
 
     final picked = await FilePicker.pickFiles(
@@ -224,17 +223,16 @@ class _DictationSettingsScreenState extends State<DictationSettingsScreen> {
         target != null && await bootstrap.speechModels.installed(target) != null;
     if (!mounted) return;
 
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          complete
-              ? '${target.name} is now complete and ready to use.'
-              : 'Added $accepted file${accepted == 1 ? '' : 's'}. '
-                  '${target == null ? 'More' : '${target.name} needs more'} '
-                  'files before it can run.',
-        ),
-      ),
-    );
+    if (complete) {
+      OptToast.success(context, '${target.name} is now complete and ready to use.');
+    } else {
+      OptToast.info(
+        context,
+        'Added $accepted file${accepted == 1 ? '' : 's'}. '
+        '${target == null ? 'More' : '${target.name} needs more'} '
+        'files before it can run.',
+      );
+    }
   }
 
   /// Switches which installed model transcribes.
@@ -244,14 +242,11 @@ class _DictationSettingsScreenState extends State<DictationSettingsScreen> {
   /// exactly the wrong behaviour for a clinic that installed the multilingual
   /// model on purpose.
   Future<void> _use(SpeechModel model) async {
-    final messenger = ScaffoldMessenger.of(context);
     await context.read<AppBootstrap>().setSpeechModel(model);
     if (!mounted) return;
     await _refresh();
     if (!mounted) return;
-    messenger.showSnackBar(
-      SnackBar(content: Text('Now transcribing with ${model.name}.')),
-    );
+    OptToast.success(context, 'Now transcribing with ${model.name}.');
   }
 
   Future<void> _remove(SpeechModel model) async {

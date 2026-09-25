@@ -113,6 +113,13 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
           });
           return;
         }
+        // Saved silently before: the screen just popped back to Settings with
+        // nothing to say the new PIN took. The toast lands on the root
+        // messenger, so it stays visible over the screen underneath.
+        OptToast.success(
+          context,
+          widget.isFirstRun ? 'PIN set' : 'PIN updated',
+        );
         if (!widget.isFirstRun && Navigator.of(context).canPop()) {
           Navigator.of(context).pop(true);
         }

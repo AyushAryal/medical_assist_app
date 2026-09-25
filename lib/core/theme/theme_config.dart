@@ -387,6 +387,22 @@ class ClinicalPalette {
 }
 
 extension ClinicalPaletteX on ClinicalPalette {
+  /// The family warm→cool sweep for brand / hero surfaces: coral → violet →
+  /// blue, top-left to bottom-right. Derived from the palette's own tokens —
+  /// [ambientOne] (coral), [heroSurface] (violet) and [ambientTwo] (blue) — so
+  /// it re-skins with the theme file rather than being a literal, and so a
+  /// feature can consume it as an approved token instead of writing a raw
+  /// gradient (which the design guardrails forbid).
+  ///
+  /// Reserved for brand moments — the "next up" hero, the splash. Clinical
+  /// content surfaces stay flat and calm.
+  LinearGradient get heroGradient => LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: <Color>[ambientOne, heroSurface, ambientTwo],
+        stops: const <double>[0.0, 0.55, 1.0],
+      );
+
   /// Stable per-identifier avatar colour. Hashing the id rather than the name
   /// keeps the colour fixed when a patient is renamed.
   Color avatarToneFor(String seed) {
